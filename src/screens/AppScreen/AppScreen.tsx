@@ -48,9 +48,6 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         originWhitelist={['*']}
         onNavigationStateChange={handleOnNavigationStateChange}
       />
-      {isOnNotificationPage && !hasNotiPermission && (
-        <NotiPermissionRequestButton />
-      )}
     </SafeAreaView>
   );
 };
