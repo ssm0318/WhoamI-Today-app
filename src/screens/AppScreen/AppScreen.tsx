@@ -6,7 +6,6 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenRouteParamList } from '@screens';
 import { useAppStateActiveEffect, useWebView } from '@hooks';
 import notifee, { AuthorizationStatus } from '@notifee/react-native';
-import NotiPermissionRequestButton from './components/NotiPermissionRequestButton/NotiPermissionRequestButton';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/home' } = route.params;
