@@ -1,36 +1,20 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { SafeAreaView, StatusBar } from 'react-native';
-import { WebView, WebViewNavigation } from 'react-native-webview';
+import { WebView } from 'react-native-webview';
 import { WEBVIEW_CONSTS } from '@constants';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenRouteParamList } from '@screens';
-import { useAppStateActiveEffect, useWebView } from '@hooks';
-import notifee, { AuthorizationStatus } from '@notifee/react-native';
+import { useWebView } from '@hooks';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/home' } = route.params;
 
   const { ref, onMessage, postMessage } = useWebView();
-  const [hasNotiPermission, setHasNotiPermission] = useState(false);
-  const [isOnNotificationPage, setIsOnNotificationpage] = useState(false);
-
-  const handleOnNavigationStateChange = (event: WebViewNavigation) => {
-    return setIsOnNotificationpage(event.url.includes('/notifications'));
-  };
 
   useEffect(() => {
     if (!url) return;
     postMessage('REDIRECT', url);
   }, [postMessage, url]);
-
-  useAppStateActiveEffect(
-    useCallback(async () => {
-      const settings = await notifee.requestPermission();
-      setHasNotiPermission(
-        settings.authorizationStatus === AuthorizationStatus.AUTHORIZED,
-      );
-    }, []),
-  );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
@@ -45,7 +29,6 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         javaScriptEnabled
         injectedJavaScript={WEBVIEW_CONSTS.WEB_VIEW_DEBUGGING_SCRIPT}
         originWhitelist={['*']}
-        onNavigationStateChange={handleOnNavigationStateChange}
       />
     </SafeAreaView>
   );
