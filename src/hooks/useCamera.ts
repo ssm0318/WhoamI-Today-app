@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, CameraPosition } from 'react-native-vision-camera';
 import { Platform } from 'react-native';
+import { APP_CONSTS } from '@constants';
 
 export type CameraImage = { uri: string };
 
@@ -21,7 +22,7 @@ const useCamera = () => {
 
     let path: null | string = null;
 
-    if (Platform.OS === 'ios') {
+    if (APP_CONSTS.IS_IOS) {
       path = (
         await cameraRef.current.takePhoto({
           qualityPrioritization: 'quality',

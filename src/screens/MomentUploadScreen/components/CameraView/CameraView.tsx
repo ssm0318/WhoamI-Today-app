@@ -1,6 +1,8 @@
 import React, { useCallback, useState } from 'react';
 import {
+  Alert,
   Image,
+  Linking,
   StyleSheet,
   TouchableWithoutFeedback,
   useWindowDimensions,
@@ -12,8 +14,9 @@ import {
   useCameraDevices,
 } from 'react-native-vision-camera';
 import * as S from './CameraView.styles';
-import { useCamera } from '@hooks';
+import { useAsyncEffect, useCamera } from '@hooks';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { APP_CONSTS } from '@constants';
 
 const CameraView: React.FC<CameraViewProps> = (props) => {
   const { onPreviewReady } = props;
@@ -25,12 +28,10 @@ const CameraView: React.FC<CameraViewProps> = (props) => {
   const isFocused = useIsFocused();
   const { width } = useWindowDimensions();
 
-  const { cameraRef, position, togglePosition, takePhoto } = useCamera();
+  const { cameraRef, togglePosition, takePhoto } = useCamera();
 
   const handlePressCameraButton = useCallback(async () => {
     try {
-      // LoadingIndicator.show();
-
       const { uri } = await takePhoto();
 
       if (!uri) throw new Error('[CommonCameraView] no uri found');
@@ -38,34 +39,33 @@ const CameraView: React.FC<CameraViewProps> = (props) => {
       setCameraPreviewUrl(uri);
     } catch (error) {
       console.log(error);
-      // LoadingIndicator.hide();
     }
   }, []);
 
-  //   const onLoadPreview = useCallback(async () => {
-  //     if (!onPreviewReady) {
-  //       return console.warn('[CameraView] onPreviewReady is not a function');
-  //     }
-  //     try {
-  //       onPreviewReady(await captureViewRef());
-  //     } catch {
-  //       LoadingIndicator.hide();
-  //     }
-  //   }, [onPreviewReady]);
+  useAsyncEffect(async () => {
+    const permission = await Camera.requestCameraPermission();
 
-  //   useAsyncEffect(async () => {
-  //     const permission = await Camera.requestCameraPermission();
-
-  //     if (permission === 'denied') {
-  //       return ConfirmationPopUp.show({
-  //         title: '카메라와 사진첩 권한이 없습니다.',
-  //         body: '휴대폰 설정에서 사진첩과 카메라 접근 권한을 허용해주세요.',
-  //         yesText: '설정으로 가기',
-  //         closeOnOutsidePress: true,
-  //         onPressYes: () => Linking.openSettings(),
-  //       });
-  //     }
-  //   });
+    if (permission === 'denied') {
+      Alert.alert(
+        '카메라와 사진첩 권한이 없습니다.',
+        '휴대폰 설정에서 사진첩과 카메라 접근 권한을 허용해주세요.',
+        [
+          {
+            text: '닫기',
+            style: 'cancel',
+          },
+          {
+            text: '설정으로 이동',
+            onPress: () => {
+              if (APP_CONSTS.IS_ANDROID) Linking.openURL('App-Prefs:root');
+              else Linking.openURL('app-settings:');
+            },
+            style: 'default',
+          },
+        ],
+      );
+    }
+  }, []);
 
   if (!device || !isFocused) return <></>;
   return (
