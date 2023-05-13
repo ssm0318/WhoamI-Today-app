@@ -76,7 +76,7 @@ export default (() => {
     }
 
     return LocalNotification.immediate({
-      title: 'Diivers',
+      title: 'WhoAmI Today',
       body: body || '',
       data,
     });

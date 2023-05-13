@@ -13,8 +13,8 @@ import WebView from 'react-native-webview';
 export default (() => {
   const androidChannelId = Platform.select({
     android: notifee.createChannel({
-      id: 'Diivers',
-      name: 'Diivers',
+      id: 'WhoAmI Today',
+      name: 'WhoAmI Today',
       vibration: true,
       visibility: AndroidVisibility.PUBLIC,
       importance: AndroidImportance.HIGH,
