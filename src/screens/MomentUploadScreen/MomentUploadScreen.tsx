@@ -82,7 +82,7 @@ const MomentUploadScreen: React.FC<MomentUploadScreenProps> = ({ route }) => {
         {renderComponent()}
       </S.ComponentContainer>
       {/* 컴포넌트 하단 (send, 카메라 버튼) */}
-      {currentStep !== 'photo' && !cameraPreviewUrl ? (
+      {currentStep === 'photo' && !cameraPreviewUrl ? (
         <CameraButtons />
       ) : (
         <S.FooterContainer bottom={bottom}>

@@ -1,50 +1,22 @@
-import React, { useCallback, useState } from 'react';
-import {
-  Alert,
-  Image,
-  Linking,
-  StyleSheet,
-  TouchableWithoutFeedback,
-  useWindowDimensions,
-} from 'react-native';
+import React from 'react';
+import { Alert, Linking, StyleSheet, useWindowDimensions } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
-import {
-  Camera,
-  CameraPosition,
-  useCameraDevices,
-} from 'react-native-vision-camera';
+import { Camera, useCameraDevices } from 'react-native-vision-camera';
 import * as S from './CameraView.styles';
 import { useAsyncEffect, useCamera } from '@hooks';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { APP_CONSTS } from '@constants';
 
-const CameraView: React.FC<CameraViewProps> = (props) => {
-  const { onPreviewReady } = props;
-  const [cameraPreviewUrl, setCameraPreviewUrl] = useState<null | string>(null);
+const CameraView: React.FC = () => {
   const devices = useCameraDevices();
   const device = devices.back;
-  const { bottom } = useSafeAreaInsets();
 
   const isFocused = useIsFocused();
   const { width } = useWindowDimensions();
 
-  const { cameraRef, togglePosition, takePhoto } = useCamera();
-
-  const handlePressCameraButton = useCallback(async () => {
-    try {
-      const { uri } = await takePhoto();
-
-      if (!uri) throw new Error('[CommonCameraView] no uri found');
-
-      setCameraPreviewUrl(uri);
-    } catch (error) {
-      console.log(error);
-    }
-  }, []);
+  const { cameraRef } = useCamera();
 
   useAsyncEffect(async () => {
     const permission = await Camera.requestCameraPermission();
-
     if (permission === 'denied') {
       Alert.alert(
         '카메라와 사진첩 권한이 없습니다.',
@@ -70,16 +42,19 @@ const CameraView: React.FC<CameraViewProps> = (props) => {
   if (!device || !isFocused) return <></>;
   return (
     <S.CameraWrapper width={width}>
-      <Camera
-        ref={cameraRef}
-        device={device}
-        style={StyleSheet.absoluteFill}
-        photo
-        isActive={isFocused}
-        enableZoomGesture={false}
-        preset="high"
-        orientation="portrait"
-      />
+      {device && (
+        <Camera
+          ref={cameraRef}
+          device={device}
+          style={StyleSheet.absoluteFill}
+          photo
+          isActive={isFocused}
+          enableZoomGesture={false}
+          preset="high"
+          orientation="portrait"
+        />
+      )}
+
       {/* {!!cameraPreviewUrl && (
           <Image
             source={{ uri: cameraPreviewUrl }}
@@ -88,51 +63,8 @@ const CameraView: React.FC<CameraViewProps> = (props) => {
             fadeDuration={0}
           />
         )} */}
-      {/* {children} */}
-      {/* 버튼 컨테이너 */}
-      <S.ButtonContainer bottomInset={bottom}>
-        {/* 플래시 */}
-        <TouchableWithoutFeedback onPress={togglePosition}>
-          <S.SubButton>
-            <Image
-              source={{
-                uri: '/icons/camera_flash_off.svg',
-              }}
-              style={{
-                width: '100%',
-                height: '100%',
-              }}
-            />
-          </S.SubButton>
-        </TouchableWithoutFeedback>
-
-        {/* 사진 촬영 */}
-        <TouchableWithoutFeedback onPress={handlePressCameraButton}>
-          <S.CameraButton />
-        </TouchableWithoutFeedback>
-
-        {/* 모드 전환 */}
-        <TouchableWithoutFeedback onPress={togglePosition}>
-          <S.SubButton>
-            <Image
-              source={{
-                uri: '/icons/camera_switch.svg',
-              }}
-              style={{
-                width: '100%',
-                height: '100%',
-              }}
-            />
-          </S.SubButton>
-        </TouchableWithoutFeedback>
-      </S.ButtonContainer>
     </S.CameraWrapper>
   );
 };
 
-type CameraViewProps = {
-  children?: React.ReactNode;
-  onPreviewReady?: (imageUrl: string) => void | Promise<void>;
-};
-
-export default React.memo(CameraView);
+export default CameraView;

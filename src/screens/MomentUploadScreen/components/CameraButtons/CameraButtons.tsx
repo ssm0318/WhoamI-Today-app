@@ -6,28 +6,18 @@ import { useCamera } from '@hooks';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const CameraButtons = () => {
-  const {
-    cameraRef,
-    position,
-    togglePosition,
-    takePhoto,
-    setCameraPreviewUrl,
-  } = useCamera();
+  const { togglePosition, takePhoto, setCameraPreviewUrl } = useCamera();
 
-  const { bottom, top } = useSafeAreaInsets();
+  const { bottom } = useSafeAreaInsets();
 
   const handlePressCameraButton = useCallback(async () => {
+    console.log('take photo');
     try {
-      // LoadingIndicator.show();
-
       const { uri } = await takePhoto();
-
-      if (!uri) throw new Error('[CommonCameraView] no uri found');
-
+      if (!uri) throw new Error('[Error] no uri found');
       setCameraPreviewUrl(uri);
     } catch (error) {
       console.log(error);
-      // LoadingIndicator.hide();
     }
   }, []);
 

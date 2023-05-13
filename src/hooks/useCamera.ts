@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Camera, CameraPosition } from 'react-native-vision-camera';
-import { Platform } from 'react-native';
 import { APP_CONSTS } from '@constants';
 
 export type CameraImage = { uri: string };
@@ -16,6 +15,7 @@ const useCamera = () => {
   );
 
   const takePhoto = useCallback(async (): Promise<CameraImage> => {
+    console.log('takePhoto', cameraRef.current);
     if (!cameraRef.current) {
       throw new Error('[useCamera] cameraRef not found');
     }
@@ -44,7 +44,7 @@ const useCamera = () => {
     }
 
     return { uri: `file://${path}` };
-  }, []);
+  }, [cameraRef]);
 
   return {
     cameraRef,
