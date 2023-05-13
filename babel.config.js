@@ -1,6 +1,12 @@
 module.exports = {
   presets: ['module:metro-react-native-babel-preset'],
   plugins: [
+    [
+      'babel-plugin-inline-import',
+      {
+        extensions: ['.svg'],
+      },
+    ],
     ['babel-plugin-styled-components'],
     ['@babel/plugin-proposal-export-namespace-from'],
     [
@@ -36,7 +42,6 @@ module.exports = {
           '@recoil': './src/recoil',
           '@storage': './src/storage',
           '@react-query': './src/react-query',
-          '@assets': './src/assets',
           '@tools': './src/tools',
         },
       },
