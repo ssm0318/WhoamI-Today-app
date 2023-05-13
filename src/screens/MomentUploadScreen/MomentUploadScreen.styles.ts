@@ -24,7 +24,6 @@ export const ScreenTitle = styled(Text)`
 export const ComponentContainer = styled.View<{ size: number }>`
   width: ${({ size }) => size}px;
   height: ${({ size }) => size}px;
-  border: 1px solid white;
   border-radius: 14px;
 `;
 

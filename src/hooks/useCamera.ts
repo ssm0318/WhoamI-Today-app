@@ -6,7 +6,7 @@ export type CameraImage = { uri: string };
 
 const useCamera = () => {
   const cameraRef = useRef<Camera | null>(null);
-
+  const [cameraPreviewUrl, setCameraPreviewUrl] = useState<null | string>(null);
   const [position, setPosition] = useState<CameraPosition>('back');
 
   const togglePosition = useCallback(
@@ -49,6 +49,8 @@ const useCamera = () => {
     cameraRef,
     position,
     togglePosition,
+    cameraPreviewUrl,
+    setCameraPreviewUrl,
     takePhoto,
   };
 };

@@ -2,13 +2,12 @@ import React, { useCallback, useState } from 'react';
 import {
   StatusBar,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   useWindowDimensions,
   Image,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenRouteParamList } from '@screens';
-import { useWebView } from '@hooks';
+import { useCamera, useWebView } from '@hooks';
 import { MomentType } from '@types';
 import Mood from './components/Mood/Mood';
 import Description from './components/Description/Description';
@@ -16,22 +15,23 @@ import Photo from './components/Photo/Photo';
 import * as S from './MomentUploadScreen.styles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgIcon } from '@components';
+import CameraButtons from './components/CameraButtons/CameraButtons';
 
-const TITLE_LABEL: Record<keyof MomentType.MomentData, string> = {
+const TITLE_LABEL: Record<keyof MomentType.MomentData, string | null> = {
   mood: 'Mood',
   photo: 'Photo',
-  description: '',
+  description: null,
 };
 
 const MomentUploadScreen: React.FC<MomentUploadScreenProps> = ({ route }) => {
-  const { step = 'description', state } = route.params;
+  const { step = 'photo', state } = route.params;
   const { bottom, top } = useSafeAreaInsets();
-
   const [currentStep, setCurrentStep] =
     useState<keyof MomentType.MomentData>(step);
   const { width } = useWindowDimensions();
 
   const { ref, onMessage, postMessage } = useWebView();
+  const { cameraPreviewUrl } = useCamera();
 
   const renderComponent = useCallback(() => {
     switch (step) {
@@ -46,9 +46,13 @@ const MomentUploadScreen: React.FC<MomentUploadScreenProps> = ({ route }) => {
     }
   }, [step]);
 
-  const handleSkip = useCallback(() => {}, []);
+  const handleSkip = useCallback(() => {
+    //TODO(handleSkip)
+  }, []);
 
-  const handleSend = useCallback(() => {}, []);
+  const handleSend = useCallback(() => {
+    //TODO(handleSend)
+  }, []);
 
   return (
     <S.ScreenContainer>
@@ -78,13 +82,17 @@ const MomentUploadScreen: React.FC<MomentUploadScreenProps> = ({ route }) => {
         {renderComponent()}
       </S.ComponentContainer>
       {/* 컴포넌트 하단 (send, 카메라 버튼) */}
-      <S.FooterContainer bottom={bottom}>
-        <TouchableOpacity onPress={handleSend}>
-          <S.SendButton>
-            <S.SendText>Send</S.SendText>
-          </S.SendButton>
-        </TouchableOpacity>
-      </S.FooterContainer>
+      {currentStep !== 'photo' && !cameraPreviewUrl ? (
+        <CameraButtons />
+      ) : (
+        <S.FooterContainer bottom={bottom}>
+          <TouchableOpacity onPress={handleSend}>
+            <S.SendButton>
+              <S.SendText>Send</S.SendText>
+            </S.SendButton>
+          </TouchableOpacity>
+        </S.FooterContainer>
+      )}
     </S.ScreenContainer>
   );
 };
