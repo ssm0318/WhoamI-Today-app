@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { SafeAreaView, StatusBar } from 'react-native';
+import { SafeAreaView, StatusBar, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { WEBVIEW_CONSTS } from '@constants';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -12,12 +12,14 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { ref, onMessage, postMessage } = useWebView();
 
   useEffect(() => {
-    if (!url) return;
+    if (!url) {
+      return;
+    }
     postMessage('REDIRECT', url);
   }, [postMessage, url]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
       <WebView
         ref={ref}
@@ -33,6 +35,13 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+});
 
 type AppScreenProps = NativeStackScreenProps<ScreenRouteParamList, 'AppScreen'>;
 
