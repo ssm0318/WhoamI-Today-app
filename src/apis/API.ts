@@ -1,8 +1,8 @@
 import { TokenStorage } from '@tools';
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 
-export const API_BASE_URL = 'https://diivers.world/api/';
-// export const API_BASE_URL = 'http://localhost:3000/api/';
+// export const API_BASE_URL = 'https://diivers.world/api/';
+export const API_BASE_URL = 'http://localhost:3000/api/';
 
 interface APIInstance extends AxiosInstance {
   getUri(config?: AxiosRequestConfig): string;
