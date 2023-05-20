@@ -6,7 +6,8 @@ import { useCamera } from '@hooks';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const CameraButtons = () => {
-  const { togglePosition, takePhoto, setCameraPreviewUrl } = useCamera();
+  const { togglePosition, takePhoto, setCameraPreviewUrl, toggleFlash, flash } =
+    useCamera();
 
   const { bottom } = useSafeAreaInsets();
 
@@ -24,9 +25,9 @@ const CameraButtons = () => {
   return (
     <S.ButtonContainer bottom={bottom}>
       {/* 플래시 */}
-      <TouchableWithoutFeedback onPress={togglePosition}>
+      <TouchableWithoutFeedback onPress={toggleFlash}>
         <S.SubButton>
-          <SvgIcon name={'camera_flash_off'} size={36} />
+          <SvgIcon name={`camera_flash_${flash}`} size={36} />
         </S.SubButton>
       </TouchableWithoutFeedback>
 

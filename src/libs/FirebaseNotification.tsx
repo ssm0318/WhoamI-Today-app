@@ -4,6 +4,7 @@ import messaging, {
 } from '@react-native-firebase/messaging';
 import LocalNotification from './LocalNotification';
 import { Alert, Linking } from 'react-native';
+import { redirectSetting } from '@tools';
 
 export default (() => {
   let isInitialized = false;
@@ -107,10 +108,7 @@ export default (() => {
           },
           {
             text: '설정으로 이동',
-            onPress: () => {
-              if (APP_CONSTS.IS_ANDROID) Linking.openURL('App-Prefs:root');
-              else Linking.openURL('app-settings:');
-            },
+            onPress: redirectSetting,
             style: 'default',
           },
         ],

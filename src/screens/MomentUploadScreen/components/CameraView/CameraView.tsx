@@ -13,30 +13,10 @@ const CameraView: React.FC = () => {
   const isFocused = useIsFocused();
   const { width } = useWindowDimensions();
 
-  const { cameraRef } = useCamera();
+  const { cameraRef, flash, requestPermission } = useCamera();
 
   useAsyncEffect(async () => {
-    const permission = await Camera.requestCameraPermission();
-    if (permission === 'denied') {
-      Alert.alert(
-        '카메라와 사진첩 권한이 없습니다.',
-        '휴대폰 설정에서 사진첩과 카메라 접근 권한을 허용해주세요.',
-        [
-          {
-            text: '닫기',
-            style: 'cancel',
-          },
-          {
-            text: '설정으로 이동',
-            onPress: () => {
-              if (APP_CONSTS.IS_ANDROID) Linking.openURL('App-Prefs:root');
-              else Linking.openURL('app-settings:');
-            },
-            style: 'default',
-          },
-        ],
-      );
-    }
+    await requestPermission();
   }, []);
 
   if (!device || !isFocused) return <></>;
@@ -52,6 +32,7 @@ const CameraView: React.FC = () => {
           enableZoomGesture={false}
           preset="high"
           orientation="portrait"
+          torch={flash}
         />
       )}
 
