@@ -6,12 +6,12 @@ import MomentUploadScreen, {
 
 export const allRoutes: RouteType.RouteObject<ScreenRouteParamList> = {
   // first screen would be initial landing screen
-  MomentUploadScreen: {
-    Component: MomentUploadScreen,
-    type: 'CARD',
-  },
   AppScreen: {
     Component: AppScreen,
+    type: 'CARD',
+  },
+  MomentUploadScreen: {
+    Component: MomentUploadScreen,
     type: 'CARD',
   },
 };
