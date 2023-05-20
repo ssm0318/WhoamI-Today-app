@@ -1,10 +1,9 @@
 import React from 'react';
-import { Alert, Linking, StyleSheet, useWindowDimensions } from 'react-native';
+import { Image, StyleSheet, useWindowDimensions } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { Camera, useCameraDevices } from 'react-native-vision-camera';
 import * as S from './CameraView.styles';
 import { useAsyncEffect, useCamera } from '@hooks';
-import { APP_CONSTS } from '@constants';
 
 const CameraView: React.FC = () => {
   const devices = useCameraDevices();
@@ -13,8 +12,9 @@ const CameraView: React.FC = () => {
   const isFocused = useIsFocused();
   const { width } = useWindowDimensions();
 
-  const { cameraRef, flash, requestPermission } = useCamera();
+  const { cameraRef, flash, requestPermission, cameraPreviewUrl } = useCamera();
 
+  // 최초에 한번만 카메라 권한 요청
   useAsyncEffect(async () => {
     await requestPermission();
   }, []);
@@ -22,28 +22,24 @@ const CameraView: React.FC = () => {
   if (!device || !isFocused) return <></>;
   return (
     <S.CameraWrapper width={width}>
-      {device && (
-        <Camera
-          ref={cameraRef}
-          device={device}
+      <Camera
+        ref={cameraRef}
+        device={device}
+        style={StyleSheet.absoluteFill}
+        photo
+        isActive={isFocused}
+        enableZoomGesture={false}
+        preset="high"
+        orientation="portrait"
+        torch={flash}
+      />
+      {!!cameraPreviewUrl && (
+        <Image
+          source={{ uri: cameraPreviewUrl }}
           style={StyleSheet.absoluteFill}
-          photo
-          isActive={isFocused}
-          enableZoomGesture={false}
-          preset="high"
-          orientation="portrait"
-          torch={flash}
+          fadeDuration={0}
         />
       )}
-
-      {/* {!!cameraPreviewUrl && (
-          <Image
-            source={{ uri: cameraPreviewUrl }}
-            style={StyleSheet.absoluteFill}
-            onLoad={onLoadPreview}
-            fadeDuration={0}
-          />
-        )} */}
     </S.CameraWrapper>
   );
 };

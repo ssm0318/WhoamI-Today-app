@@ -12,7 +12,6 @@ const CameraButtons = () => {
   const { bottom } = useSafeAreaInsets();
 
   const handlePressCameraButton = useCallback(async () => {
-    console.log('take photo');
     try {
       const { uri } = await takePhoto();
       if (!uri) throw new Error('[Error] no uri found');

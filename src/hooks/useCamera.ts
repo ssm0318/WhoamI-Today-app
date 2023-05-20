@@ -23,7 +23,6 @@ const useCamera = () => {
   );
 
   const takePhoto = useCallback(async (): Promise<CameraImage> => {
-    console.log('takePhoto', cameraRef.current);
     if (!cameraRef.current) {
       throw new Error('[useCamera] cameraRef not found');
     }
