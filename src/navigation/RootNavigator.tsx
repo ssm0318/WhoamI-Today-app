@@ -2,12 +2,20 @@ import React, { useCallback, useLayoutEffect, useMemo } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { getRoutes } from './routes';
 import { useAppStateEffect, useAsyncEffect, useWebView } from '@hooks';
-import { FcmTokenStorage, registerFCMToken, TokenStorage } from '@tools';
+import {
+  FcmTokenStorage,
+  registerFCMToken,
+  TokenStorage,
+  getDeviceLanguage,
+} from '@tools';
 import { FirebaseNotification, LocalNotification } from '@libs';
 import BootSplash from 'react-native-bootsplash';
+import { useTranslation } from 'react-i18next';
 
 const RootNavigator = () => {
   const { ref, postMessage } = useWebView();
+
+  const { i18n } = useTranslation();
 
   const { routes } = useMemo(() => getRoutes(), []);
 
@@ -15,6 +23,11 @@ const RootNavigator = () => {
     FirebaseNotification.initialize();
     FirebaseNotification.requestUserPermission();
     LocalNotification.initialize(ref);
+
+    // 언어 감지 후 언어 셋팅
+    // TODO 추후에는 언어 설정에서 직접 설정할 수 있도록
+    const language = getDeviceLanguage();
+    i18n.changeLanguage(language);
   }, [ref]);
 
   useAppStateEffect(
