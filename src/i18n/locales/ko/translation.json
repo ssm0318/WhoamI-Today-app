@@ -1,5 +1,9 @@
 {
   "moment": {
-    "todays_moments": "오늘의 순간"
+    "todays_moments": "오늘의 순간",
+    "20_characters": "당신의 오늘을\n20자로 표현해본다면?",
+    "skip": "건너뛰기",
+    "mood": "감정",
+    "photo": "사진"
   }
 }

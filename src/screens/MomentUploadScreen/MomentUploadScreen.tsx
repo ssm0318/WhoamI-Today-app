@@ -16,19 +16,22 @@ import * as S from './MomentUploadScreen.styles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgIcon } from '@components';
 import CameraButtons from './components/CameraButtons/CameraButtons';
-
-const TITLE_LABEL: Record<keyof MomentType.MomentData, string | null> = {
-  mood: 'Mood',
-  photo: 'Photo',
-  description: null,
-};
+import { useTranslation } from 'react-i18next';
 
 const MomentUploadScreen: React.FC<MomentUploadScreenProps> = ({ route }) => {
+  //TODO 나중에 photo가 아닌 실제 시작 step을 받도록 'mood'로 기본값 변경 (현재는 테스트용)
   const { step = 'photo', state } = route.params;
   const { bottom, top } = useSafeAreaInsets();
   const [currentStep, setCurrentStep] =
     useState<keyof MomentType.MomentData>(step);
   const { width } = useWindowDimensions();
+  const [t] = useTranslation('translation', { keyPrefix: 'moment' });
+
+  const TITLE_LABEL: Record<keyof MomentType.MomentData, string | null> = {
+    mood: t('mood'),
+    photo: t('photo'),
+    description: null,
+  };
 
   const { ref, onMessage, postMessage } = useWebView();
   const { cameraPreviewUrl } = useCamera();
@@ -60,9 +63,7 @@ const MomentUploadScreen: React.FC<MomentUploadScreenProps> = ({ route }) => {
       {/* 스크린 타이틀 */}
       <S.TopContainer top={top}>
         <S.ScreenTitle>
-          {step === 'description'
-            ? 'How would you describe\nyour day in 20 characters?'
-            : `Today's Moment`}
+          {step === 'description' ? t('20_characters') : t('todays_moments')}
         </S.ScreenTitle>
       </S.TopContainer>
       {/* 컴포넌트 */}
@@ -73,7 +74,7 @@ const MomentUploadScreen: React.FC<MomentUploadScreenProps> = ({ route }) => {
           <S.HeaderRight>
             <TouchableOpacity onPress={handleSkip}>
               <S.SkipButton>
-                <S.SkipText>Skip</S.SkipText>
+                <S.SkipText>{t('skip')}</S.SkipText>
                 <SvgIcon name={'moment_skip'} size={16} />
               </S.SkipButton>
             </TouchableOpacity>
