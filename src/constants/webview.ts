@@ -1,4 +1,8 @@
 export const WEB_VIEW_DEBUGGING_SCRIPT = `
+const meta = document.createElement('meta');
+meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0');
+meta.setAttribute('name', 'viewport');
+document.head.appendChild(meta);
 const consoleLog = (type, log) => window.ReactNativeWebView.postMessage(JSON.stringify({'actionType': 'CONSOLE', 'data': log}));
 console = {
   log: (log) => consoleLog('log', log),
@@ -10,6 +14,6 @@ console = {
 `;
 
 export const WEB_VIEW_URL = {
-  DEV: 'http://172.30.1.15:3000/home',
+  DEV: 'http://localhost:3000/',
   PROD: 'https://diivers.world',
 };

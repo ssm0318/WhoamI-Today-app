@@ -4,6 +4,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { Camera, useCameraDevices } from 'react-native-vision-camera';
 import * as S from './CameraView.styles';
 import { useAsyncEffect, useCamera } from '@hooks';
+import { useTranslation } from 'react-i18next';
 
 const CameraView: React.FC = () => {
   const devices = useCameraDevices();
@@ -11,12 +12,15 @@ const CameraView: React.FC = () => {
 
   const isFocused = useIsFocused();
   const { width } = useWindowDimensions();
+  const [cameraTranslation] = useTranslation('translation', {
+    keyPrefix: 'camera_permission',
+  });
 
   const { cameraRef, flash, requestPermission, cameraPreviewUrl } = useCamera();
 
   // 최초에 한번만 카메라 권한 요청
   useAsyncEffect(async () => {
-    await requestPermission();
+    await requestPermission(cameraTranslation);
   }, []);
 
   if (!device || !isFocused) return <></>;

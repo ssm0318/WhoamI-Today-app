@@ -16,9 +16,13 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     postMessage('REDIRECT', url);
   }, [postMessage, url]);
 
+  useEffect(() => {
+    StatusBar.setBarStyle('dark-content', true);
+  }, []);
+
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar />
       <WebView
         ref={ref}
         onMessage={onMessage}
@@ -29,6 +33,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         javaScriptEnabled
         injectedJavaScript={WEBVIEW_CONSTS.WEB_VIEW_DEBUGGING_SCRIPT}
         originWhitelist={['*']}
+        scalesPageToFit={false}
       />
     </SafeAreaView>
   );
