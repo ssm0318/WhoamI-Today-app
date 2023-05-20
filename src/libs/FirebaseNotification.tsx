@@ -5,6 +5,7 @@ import messaging, {
 import LocalNotification from './LocalNotification';
 import { Alert, Linking } from 'react-native';
 import { redirectSetting } from '@tools';
+import { TFunction } from 'i18next';
 
 export default (() => {
   let isInitialized = false;
@@ -91,28 +92,24 @@ export default (() => {
   /**
    * requestUserPermission
    */
-  const requestUserPermission = async () => {
+  const requestUserPermission = async (t: TFunction) => {
     const authStatus = await messaging().requestPermission();
     const enabled =
       authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
       authStatus === messaging.AuthorizationStatus.PROVISIONAL;
 
     if (!enabled) {
-      Alert.alert(
-        '알림 설정',
-        '알림 권한 설정은 휴대폰 설정에서 변경 가능합니다.',
-        [
-          {
-            text: '닫기',
-            style: 'cancel',
-          },
-          {
-            text: '설정으로 이동',
-            onPress: redirectSetting,
-            style: 'default',
-          },
-        ],
-      );
+      Alert.alert(String(t('title')), String(t('description')), [
+        {
+          text: String(t('cancel')),
+          style: 'cancel',
+        },
+        {
+          text: String(t('redirect_setting')),
+          onPress: redirectSetting,
+          style: 'default',
+        },
+      ]);
     }
 
     console.log(

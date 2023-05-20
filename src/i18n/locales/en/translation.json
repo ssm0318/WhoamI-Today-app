@@ -5,5 +5,17 @@
     "skip": "Skip",
     "mood": "Mood",
     "photo": "Photo"
+  },
+  "noti_permission": {
+    "title": "Notification Settings",
+    "description": "Notification permissions can be changed in your phone settings.",
+    "redirect_setting": "Go to Settings",
+    "close": "Close"
+  },
+  "camera_permission": {
+    "title": "Camera Permission",
+    "description": "Please allow camera access permission in your phone settings.",
+    "redirect_setting": "Go to Settings",
+    "close": "Close"
   }
 }

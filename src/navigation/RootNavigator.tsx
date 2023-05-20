@@ -16,12 +16,15 @@ const RootNavigator = () => {
   const { ref, postMessage } = useWebView();
 
   const { i18n } = useTranslation();
+  const [notiTranslation] = useTranslation('translation', {
+    keyPrefix: 'noti_permission',
+  });
 
   const { routes } = useMemo(() => getRoutes(), []);
 
   useLayoutEffect(() => {
     FirebaseNotification.initialize();
-    FirebaseNotification.requestUserPermission();
+    FirebaseNotification.requestUserPermission(notiTranslation);
     LocalNotification.initialize(ref);
 
     // 언어 감지 후 언어 셋팅

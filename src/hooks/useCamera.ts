@@ -3,6 +3,7 @@ import { Camera, CameraPosition } from 'react-native-vision-camera';
 import { APP_CONSTS } from '@constants';
 import { Alert, Linking } from 'react-native';
 import { redirectSetting } from '@tools';
+import { TFunction } from 'i18next';
 
 export type CameraImage = { uri: string };
 
@@ -53,24 +54,20 @@ const useCamera = () => {
     return { uri: `file://${path}` };
   }, [cameraRef]);
 
-  const requestPermission = async () => {
+  const requestPermission = async (t: TFunction) => {
     const permission = await Camera.requestCameraPermission();
     if (permission === 'denied') {
-      Alert.alert(
-        '카메라 권한이 없습니다.',
-        '휴대폰 설정에서 카메라 접근 권한을 허용해주세요.',
-        [
-          {
-            text: '닫기',
-            style: 'cancel',
-          },
-          {
-            text: '설정으로 이동',
-            onPress: redirectSetting,
-            style: 'default',
-          },
-        ],
-      );
+      Alert.alert(String(t('title')), String(t('description')), [
+        {
+          text: String(t('cancel')),
+          style: 'cancel',
+        },
+        {
+          text: String(t('redirect_setting')),
+          onPress: redirectSetting,
+          style: 'default',
+        },
+      ]);
     }
   };
 
