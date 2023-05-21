@@ -2,7 +2,8 @@
   "moment": {
     "todays_moments": "오늘의 순간",
     "skip": "건너뛰기",
-    "photo": "사진"
+    "photo": "사진",
+    "send": "보내기"
   },
   "noti_permission": {
     "title": "알림 설정",

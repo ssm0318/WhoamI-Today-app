@@ -2,7 +2,8 @@
   "moment": {
     "todays_moments": "Today's Moment",
     "skip": "Skip",
-    "photo": "Photo"
+    "photo": "Photo",
+    "send": "Send"
   },
   "noti_permission": {
     "title": "Notification Settings",

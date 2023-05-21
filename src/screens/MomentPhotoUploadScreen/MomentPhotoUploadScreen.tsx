@@ -1,10 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import {
-  StatusBar,
-  TouchableOpacity,
-  useWindowDimensions,
-  Image,
-} from 'react-native';
+import React, { useCallback } from 'react';
+import { StatusBar, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenRouteParamList } from '@screens';
 import { useCamera, useWebView } from '@hooks';
@@ -15,29 +10,44 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgIcon } from '@components';
 import CameraButtons from './components/CameraButtons/CameraButtons';
 import { useTranslation } from 'react-i18next';
+import { momentApis } from '@apis';
+import { tsUtils } from '@utils';
 
+//TODO PHOTO가 첫 단계라고 가정한 뒤 수정했고, 기획 확정 후 수정이 필요할 수도!
 const MomentPhotoUploadScreen: React.FC<MomentPhotoUploadScreenProps> = ({
   route,
 }) => {
-  // state가 나중에는 사라질 수도 있음 (Photo 업로드 단계가 1단계면 필요없음)
   const { state } = route.params;
   const { bottom, top } = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [t] = useTranslation('translation', { keyPrefix: 'moment' });
 
-  const { ref, onMessage, postMessage } = useWebView();
+  const { postMessage } = useWebView();
   const { cameraPreviewUrl } = useCamera();
 
-  const handleSkip = useCallback(() => {
-    //TODO(handleSkip)
-    // 아무것도 전달하지 않고 바로 web에 메시지
-  }, []);
+  const goToNextStep = useCallback(() => {
+    // photo -> mood -> description
+    if (!!state.mood) return postMessage('REDIRECT', 'moment/mood');
+    if (!!state.description)
+      return postMessage('REDIRECT', 'moment/description');
+    // 앞으로 업로드 할 것이 없으면 home으로 이동
+    return postMessage('REDIRECT', '/home');
+  }, [state]);
 
-  const handleSend = useCallback(() => {
-    //TODO(handleSend)
-    console.log(cameraPreviewUrl);
-    // 아무것도 전달하지 않고 바로 web에 메시지
-  }, [cameraPreviewUrl]);
+  const handleSend = useCallback(async () => {
+    goToNextStep();
+    // 처음 업로드 하는거면 POST
+    if (tsUtils.isObjectValueNull(state)) {
+      return await momentApis.uploadMoment({
+        ...state,
+        photo: cameraPreviewUrl,
+      });
+    }
+    // 아니면 update
+    return await momentApis.updateMoment({
+      photo: cameraPreviewUrl,
+    });
+  }, [cameraPreviewUrl, state]);
 
   return (
     <S.ScreenContainer>
@@ -52,7 +62,7 @@ const MomentPhotoUploadScreen: React.FC<MomentPhotoUploadScreenProps> = ({
         <S.HeaderContainer>
           <S.Step>{t('photo')}</S.Step>
           <S.HeaderRight>
-            <TouchableOpacity onPress={handleSkip}>
+            <TouchableOpacity onPress={goToNextStep}>
               <S.SkipButton>
                 <S.SkipText>{t('skip')}</S.SkipText>
                 <SvgIcon name={'moment_skip'} size={16} />
@@ -63,7 +73,17 @@ const MomentPhotoUploadScreen: React.FC<MomentPhotoUploadScreenProps> = ({
         <Photo />
       </S.ComponentContainer>
       {/* 컴포넌트 하단 (send, 카메라 버튼) */}
-      {!cameraPreviewUrl && <CameraButtons />}
+      {!cameraPreviewUrl ? (
+        <CameraButtons />
+      ) : (
+        <S.FooterContainer bottom={bottom}>
+          <TouchableOpacity onPress={handleSend}>
+            <S.SendButton>
+              <S.SendText>{t('send')}</S.SendText>
+            </S.SendButton>
+          </TouchableOpacity>
+        </S.FooterContainer>
+      )}
     </S.ScreenContainer>
   );
 };

@@ -5,7 +5,7 @@ import { SvgIcon } from '@components';
 import { useCamera } from '@hooks';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const CameraButtons = () => {
+const CameraButtons: React.FC = () => {
   const { togglePosition, takePhoto, setCameraPreviewUrl, toggleFlash, flash } =
     useCamera();
 
