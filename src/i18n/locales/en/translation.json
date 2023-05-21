@@ -1,9 +1,7 @@
 {
   "moment": {
     "todays_moments": "Today's Moment",
-    "20_characters": "How would you describe\nyour day in 20 characters?",
     "skip": "Skip",
-    "mood": "Mood",
     "photo": "Photo"
   },
   "noti_permission": {
