@@ -10,7 +10,7 @@
     "strictNullChecks": true,
     "skipLibCheck": true,
     "baseUrl": "./",
-    "lib": ["ES2017"],
+    "lib": ["es2019"],
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "paths": {

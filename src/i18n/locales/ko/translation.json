@@ -1,5 +1,20 @@
 {
   "moment": {
-    "todays_moments": "오늘의 순간"
+    "todays_moments": "오늘의 순간",
+    "skip": "건너뛰기",
+    "photo": "사진",
+    "send": "보내기"
+  },
+  "noti_permission": {
+    "title": "알림 설정",
+    "description": "알림 권한 설정은 휴대폰 설정에서 변경 가능합니다.",
+    "redirect_setting": "설정으로 이동",
+    "close": "닫기"
+  },
+  "camera_permission": {
+    "title": "카메라 설정",
+    "description": "휴대폰 설정에서 카메라 접근 권한을 허용해주세요.",
+    "redirect_setting": "설정으로 이동",
+    "close": "닫기"
   }
 }
