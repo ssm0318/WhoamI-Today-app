@@ -1,12 +1,15 @@
+import { useNavigation } from '@hooks';
 import { TokenStorage } from '@tools';
 import { useCallback, useRef, useState } from 'react';
 import { Linking } from 'react-native';
 import { WebViewMessageEvent, WebView } from 'react-native-webview';
 import { WebViewProgressEvent } from 'react-native-webview/lib/WebViewTypes';
+import { ScreenRouteParamList } from '@screens';
 
 const useWebView = () => {
   const [loadProgress, setLoadProgress] = useState(0);
   const ref = useRef<WebView>(null);
+  const navigation = useNavigation(); // useNavigation 훅을 사용하여 navigation 객체를 가져옴
 
   const postMessage = useCallback((key: string, data: any) => {
     ref.current?.postMessage(JSON.stringify({ key, data }));
@@ -17,6 +20,7 @@ const useWebView = () => {
    */
   const onMessage = useCallback(async (event: WebViewMessageEvent) => {
     const data = JSON.parse(event.nativeEvent.data);
+    console.log(data);
     if (!('actionType' in data)) return;
 
     switch (data.actionType) {
@@ -37,6 +41,13 @@ const useWebView = () => {
       case 'REMOVE_TOKEN': {
         await TokenStorage.removeToken();
         return;
+      }
+      case 'NAVIGATE': {
+        if (!data.screenName) return;
+        return navigation.navigate(
+          data.screenName as keyof ScreenRouteParamList,
+          { ...data.params },
+        );
       }
       default:
         return;

@@ -1,11 +1,12 @@
 import { fcmApis } from '@apis';
+import { APP_CONSTS } from '@constants';
 import { FcmTokenStorage } from '@tools';
 import { Platform } from 'react-native';
 
 // 유저의 FCM 토큰 저장 (api 호출)
 export const registerFCMToken = async (fcmToken: string, isActive: boolean) => {
   await fcmApis.registerFCMToken({
-    type: Platform.OS === 'android' ? 'android' : 'ios',
+    type: APP_CONSTS.IS_ANDROID ? 'android' : 'ios',
     registration_id: fcmToken,
     active: isActive,
   });
