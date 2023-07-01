@@ -9,12 +9,7 @@ import { useWebView } from '@hooks';
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/home' } = route.params;
 
-  const { ref, onMessage, postMessage } = useWebView();
-
-  useEffect(() => {
-    if (!url) return;
-    postMessage('REDIRECT', url);
-  }, [postMessage, url]);
+  const { ref, onMessage } = useWebView();
 
   useEffect(() => {
     StatusBar.setBarStyle('dark-content', true);
@@ -27,7 +22,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         ref={ref}
         onMessage={onMessage}
         source={{
-          uri: WEBVIEW_CONSTS.WEB_VIEW_URL.DEV,
+          uri: WEBVIEW_CONSTS.WEB_VIEW_URL.DEV + url,
         }}
         decelerationRate="normal"
         javaScriptEnabled

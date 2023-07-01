@@ -11,3 +11,13 @@ export const isObjectValueNull = <T>(obj: T): boolean => {
   }
   return true;
 };
+
+// object를 FormData 형태로 변환하는 serializer
+export const objectFormDataSerializer = (object: Record<string, any>) => {
+  const formData = new FormData();
+  Object.keys(object).forEach((key) => {
+    const value = object[key];
+    formData.append(key, value || '');
+  });
+  return formData;
+};
