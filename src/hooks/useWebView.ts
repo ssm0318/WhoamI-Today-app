@@ -1,5 +1,5 @@
 import { useNavigation } from '@hooks';
-import { TokenStorage } from '@tools';
+import { TokenStorage, redirectSetting } from '@tools';
 import { useCallback, useRef, useState } from 'react';
 import { Linking } from 'react-native';
 import { WebViewMessageEvent, WebView } from 'react-native-webview';
@@ -49,6 +49,8 @@ const useWebView = () => {
           { ...data.params },
         );
       }
+      case 'OPEN_SETTING':
+        return redirectSetting();
       default:
         return;
     }
