@@ -1,8 +1,11 @@
+import { WEBVIEW_CONSTS } from '@constants';
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import i18n from 'i18next';
 
-// export const API_BASE_URL = 'https://diivers.world/api/';
-export const API_BASE_URL = 'http://192.168.35.89:8000/api/';
+export const API_BASE_URL = {
+  DEV: `http://${WEBVIEW_CONSTS.WEB_VIEW_DEV_HOSTNAME}:8000/api/`,
+  PROD: 'https://diivers.world/api/',
+};
 
 interface APIInstance extends AxiosInstance {
   getUri(config?: AxiosRequestConfig): string;
@@ -17,7 +20,7 @@ interface APIInstance extends AxiosInstance {
 }
 
 const JSON_DEFAULT_OPTIONS: AxiosRequestConfig = {
-  baseURL: API_BASE_URL,
+  baseURL: API_BASE_URL.DEV,
   withCredentials: true,
   xsrfHeaderName: 'X-CSRFTOKEN',
   xsrfCookieName: 'csrftoken',

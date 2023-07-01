@@ -13,7 +13,10 @@ console = {
 };
 `;
 
+// dev 환경에서 설정하는 hostname
+export const WEB_VIEW_DEV_HOSTNAME = '192.168.35.89';
+
 export const WEB_VIEW_URL = {
-  DEV: 'http://192.168.35.89:3000',
+  DEV: `http://${WEB_VIEW_DEV_HOSTNAME}:3000`,
   PROD: 'https://diivers.world',
 };
