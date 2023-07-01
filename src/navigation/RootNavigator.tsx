@@ -24,7 +24,13 @@ const RootNavigator = () => {
 
   useLayoutEffect(() => {
     FirebaseNotification.initialize();
-    FirebaseNotification.requestPermission(notiTranslation);
+    FirebaseNotification.getPermissionEnabled().then((enabled) => {
+      postMessage('SET_NOTI_PERMISSION', enabled);
+      if (!enabled) {
+        FirebaseNotification.requestPermission(notiTranslation);
+      }
+    });
+
     LocalNotification.initialize(ref);
 
     // 언어 감지 후 언어 셋팅

@@ -93,34 +93,31 @@ export default (() => {
   const getInitialNotification = () => messaging().getInitialNotification();
 
   /**
+   * getPermissionEnabled
+   */
+  const getPermissionEnabled = async () => {
+    const permission = await messaging().requestPermission();
+    const enabled =
+      permission === messaging.AuthorizationStatus.AUTHORIZED ||
+      permission === messaging.AuthorizationStatus.PROVISIONAL;
+    return enabled;
+  };
+
+  /**
    * requestPermission
    */
   const requestPermission = async (t: TFunction) => {
-    const authStatus = await messaging().requestPermission();
-    const enabled =
-      authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-      authStatus === messaging.AuthorizationStatus.PROVISIONAL;
-
-    if (!enabled) {
-      Alert.alert(String(t('title')), String(t('description')), [
-        {
-          text: String(t('close')),
-          style: 'cancel',
-        },
-        {
-          text: String(t('redirect_setting')),
-          onPress: redirectSetting,
-          style: 'default',
-        },
-      ]);
-    }
-
-    console.log(
-      '[FirebaseNotification] requestPermission authStatus is ',
-      authStatus,
-    );
-
-    return { enabled };
+    Alert.alert(String(t('title')), String(t('description')), [
+      {
+        text: String(t('close')),
+        style: 'cancel',
+      },
+      {
+        text: String(t('redirect_setting')),
+        onPress: redirectSetting,
+        style: 'default',
+      },
+    ]);
   };
 
   return {
@@ -129,5 +126,6 @@ export default (() => {
     checkToken,
     getInitialNotification,
     requestPermission,
+    getPermissionEnabled,
   };
 })();
