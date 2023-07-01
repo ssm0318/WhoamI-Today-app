@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { Camera, CameraPosition } from 'react-native-vision-camera';
 import { APP_CONSTS } from '@constants';
-import { Alert, Linking } from 'react-native';
+import { Alert } from 'react-native';
 import { redirectSetting } from '@tools';
 import { TFunction } from 'i18next';
 
@@ -13,10 +13,9 @@ const useCamera = () => {
   const [position, setPosition] = useState<CameraPosition>('back');
   const [flash, setFlash] = useState<'on' | 'off'>('off');
 
-  const togglePosition = useCallback(
-    () => setPosition((prev) => (prev === 'front' ? 'back' : 'front')),
-    [],
-  );
+  const togglePosition = useCallback(() => {
+    setPosition((prev) => (prev === 'front' ? 'back' : 'front'));
+  }, []);
 
   const toggleFlash = useCallback(
     () => setFlash((prev) => (prev === 'on' ? 'off' : 'on')),
