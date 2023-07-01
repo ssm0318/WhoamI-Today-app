@@ -93,9 +93,9 @@ export default (() => {
   const getInitialNotification = () => messaging().getInitialNotification();
 
   /**
-   * requestUserPermission
+   * requestPermission
    */
-  const requestUserPermission = async (t: TFunction) => {
+  const requestPermission = async (t: TFunction) => {
     const authStatus = await messaging().requestPermission();
     const enabled =
       authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
@@ -104,7 +104,7 @@ export default (() => {
     if (!enabled) {
       Alert.alert(String(t('title')), String(t('description')), [
         {
-          text: String(t('cancel')),
+          text: String(t('close')),
           style: 'cancel',
         },
         {
@@ -128,6 +128,6 @@ export default (() => {
     getToken,
     checkToken,
     getInitialNotification,
-    requestUserPermission,
+    requestPermission,
   };
 })();
