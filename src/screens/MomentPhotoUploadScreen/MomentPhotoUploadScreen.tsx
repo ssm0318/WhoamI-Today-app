@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenRouteParamList } from '@screens';
-import { useAsyncEffect, useCamera, useNavigation, useWebView } from '@hooks';
+import { useAsyncEffect, useCamera, useNavigation } from '@hooks';
 import { MomentType } from '@types';
 import * as S from './MomentPhotoUploadScreen.styled';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
