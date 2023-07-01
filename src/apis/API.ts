@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import i18n from 'i18next';
 
 // export const API_BASE_URL = 'https://diivers.world/api/';
-export const API_BASE_URL = 'http://localhost:8000/api/';
+export const API_BASE_URL = 'http://192.168.35.89:8000/api/';
 
 interface APIInstance extends AxiosInstance {
   getUri(config?: AxiosRequestConfig): string;
@@ -29,6 +29,27 @@ const JSON_DEFAULT_OPTIONS: AxiosRequestConfig = {
 
 const API = (() => {
   const apiInstance: APIInstance = axios.create(JSON_DEFAULT_OPTIONS);
+
+  apiInstance.interceptors.request.use(
+    async (config: any) => {
+      return config;
+    },
+    (err) => {
+      console.log('[API request error]', err);
+      return Promise.reject(err);
+    },
+  );
+
+  apiInstance.interceptors.response.use(
+    (config) => {
+      return config;
+    },
+    (err) => {
+      console.log('[API response error]', err);
+      return Promise.reject(err);
+    },
+  );
+
   return apiInstance;
 })();
 
