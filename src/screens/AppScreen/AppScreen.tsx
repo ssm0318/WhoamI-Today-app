@@ -29,6 +29,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         injectedJavaScript={WEBVIEW_CONSTS.WEB_VIEW_DEBUGGING_SCRIPT}
         originWhitelist={['*']}
         scalesPageToFit={false}
+        thirdPartyCookiesEnabled={true}
       />
     </SafeAreaView>
   );
