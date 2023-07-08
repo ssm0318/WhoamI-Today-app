@@ -22,14 +22,13 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         ref={ref}
         onMessage={onMessage}
         source={{
-          uri: WEBVIEW_CONSTS.WEB_VIEW_URL.DEV + url,
+          uri: WEBVIEW_CONSTS.WEB_VIEW_URL.DEV,
         }}
         decelerationRate="normal"
         javaScriptEnabled
         injectedJavaScript={WEBVIEW_CONSTS.WEB_VIEW_DEBUGGING_SCRIPT}
         originWhitelist={['*']}
         scalesPageToFit={false}
-        thirdPartyCookiesEnabled={true}
       />
     </SafeAreaView>
   );
