@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useLayoutEffect } from 'react';
 import { SafeAreaView, StatusBar, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { WEBVIEW_CONSTS } from '@constants';
@@ -11,7 +11,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
 
   const { ref, onMessage } = useWebView();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     StatusBar.setBarStyle('dark-content', true);
   }, []);
 
@@ -22,13 +22,15 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         ref={ref}
         onMessage={onMessage}
         source={{
-          uri: WEBVIEW_CONSTS.WEB_VIEW_URL.DEV,
+          uri: WEBVIEW_CONSTS.WEB_VIEW_URL.DEV + url,
         }}
         decelerationRate="normal"
         javaScriptEnabled
         injectedJavaScript={WEBVIEW_CONSTS.WEB_VIEW_DEBUGGING_SCRIPT}
         originWhitelist={['*']}
         scalesPageToFit={false}
+        sharedCookiesEnabled
+        thirdPartyCookiesEnabled
       />
     </SafeAreaView>
   );
@@ -49,4 +51,4 @@ export type AppScreenRoute = {
   };
 };
 
-export default AppScreen;
+export default React.memo(AppScreen);
