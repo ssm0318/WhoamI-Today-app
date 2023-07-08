@@ -40,19 +40,44 @@ export default (() => {
       messaging().registerDeviceForRemoteMessages();
     }
 
-    messaging().onMessage(handleOnMessage);
-    messaging().setBackgroundMessageHandler(handleOnMessage);
+    messaging().onMessage(handleOnForegroundMessage);
+    messaging().setBackgroundMessageHandler(handleOnBackgroundMessage);
   };
 
   /**
-   * IOS: 푸시를 누른 시점에 발생하는 이벤트라 바로 네비게이팅
-   * Android: 푸시가 발생한 시점에 발생하는 이벤트 & 실제 푸시는 보이지 않기 때문에 로컬 노티로 복사하여 보여줌.
-   * 이후 로컬 노티를 누르면 네비게이팅
+   * handleOnForegroundMessage
+   * IOS:
+   * ANDROID: foreground인 경우에는 local noti를 복사해서 보여줘야 함
    */
-  const handleOnMessage = async (
+  const handleOnForegroundMessage = async (
     event: FirebaseMessagingTypes.RemoteMessage,
   ) => {
-    console.log('[FirebaseNotification] handle on message', event);
+    console.log('[FirebaseNotification] handle on foreground message', event);
+
+    const { notification, data } = event;
+
+    const granted = await LocalNotification.getIsNotificationGranted();
+    if (!granted) return;
+
+    if (!notification) return;
+    const { body, title } = notification;
+
+    return LocalNotification.immediate({
+      title: title || '',
+      body: body || '',
+      data,
+    });
+  };
+
+  /**
+   * handleOnBackgroundMessage
+   * IOS:
+   * ANDROID: background인 경우에는 local noti를 복사할 필요 없음
+   */
+  const handleOnBackgroundMessage = async (
+    event: FirebaseMessagingTypes.RemoteMessage,
+  ) => {
+    console.log('[FirebaseNotification] handle on background message', event);
 
     const { data } = event;
 
@@ -60,28 +85,6 @@ export default (() => {
     if (!granted) return;
 
     if (!data) return;
-    const { body, type, tag } = data;
-
-    const displayedNotificationList =
-      await LocalNotification.getDisplayedNotifications();
-
-    if (type === 'cancel') {
-      const target = displayedNotificationList.find(
-        (dn) => dn.notification.data?.tag === tag,
-      );
-      // 현재 읽지 않은 노티 중에 같은 tag가 존재한다면
-      if (target && target.id) {
-        LocalNotification.cancelDisplayedNotification(target.id);
-      }
-      // 존재하지 않는다면 아무 처리 안함
-      return;
-    }
-
-    return LocalNotification.immediate({
-      title: 'WhoAmI Today',
-      body: body || '',
-      data,
-    });
   };
 
   /**
