@@ -2,12 +2,7 @@ import React, { useCallback, useLayoutEffect, useMemo } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { getRoutes } from './routes';
 import { useAppStateEffect, useAsyncEffect, useWebView } from '@hooks';
-import {
-  FcmTokenStorage,
-  registerFCMToken,
-  TokenStorage,
-  getDeviceLanguage,
-} from '@tools';
+import { FcmTokenStorage, registerFCMToken, getDeviceLanguage } from '@tools';
 import { FirebaseNotification, LocalNotification } from '@libs';
 import BootSplash from 'react-native-bootsplash';
 import { useTranslation } from 'react-i18next';
@@ -27,7 +22,6 @@ const RootNavigator = () => {
     FirebaseNotification.checkToken();
 
     FirebaseNotification.getPermissionEnabled().then((enabled) => {
-      postMessage('SET_NOTI_PERMISSION', enabled);
       if (!enabled) {
         FirebaseNotification.requestPermission(notiTranslation);
       }
@@ -45,13 +39,9 @@ const RootNavigator = () => {
     useCallback(
       async (state) => {
         if (state === 'active' || state === 'unknown') {
-          // 로컬 스토리지에서 token 확인 후 postMessage
-          const token = await TokenStorage.getToken();
-          postMessage('SET_TOKEN', token);
-
           // 로컬 스토리지에서 FCM token 확인 후 있으면 서버에 등록
           const { fcmToken } = await FcmTokenStorage.getToken();
-          if (!fcmToken || !token.access || !token.refresh) return;
+          if (!fcmToken) return;
           await registerFCMToken(fcmToken, true);
         }
       },

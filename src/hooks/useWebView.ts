@@ -1,5 +1,5 @@
 import { useNavigation } from '@hooks';
-import { TokenStorage, redirectSetting } from '@tools';
+import { redirectSetting } from '@tools';
 import { useCallback, useRef, useState } from 'react';
 import { Linking } from 'react-native';
 import { WebViewMessageEvent, WebView } from 'react-native-webview';
@@ -30,17 +30,6 @@ const useWebView = () => {
         //TODO(Gina): 나중에 가능하다면 openBrowserAsync 사용해보기
         await Linking.openURL(data.url);
         return;
-      case 'SET_TOKEN':
-        const { refresh = '', access = '' } = data.token;
-        await TokenStorage.setToken({
-          refresh,
-          access,
-        });
-        return;
-      case 'REMOVE_TOKEN': {
-        await TokenStorage.removeToken();
-        return;
-      }
       case 'NAVIGATE': {
         if (!data.screenName) return;
         return navigation.navigate(
