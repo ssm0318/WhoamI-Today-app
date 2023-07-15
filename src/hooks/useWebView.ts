@@ -20,7 +20,6 @@ const useWebView = () => {
    */
   const onMessage = useCallback(async (event: WebViewMessageEvent) => {
     const data = JSON.parse(event.nativeEvent.data);
-    console.log(data);
     if (!('actionType' in data)) return;
 
     switch (data.actionType) {
