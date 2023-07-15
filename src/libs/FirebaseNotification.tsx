@@ -46,7 +46,7 @@ export default (() => {
 
   /**
    * handleOnForegroundMessage
-   * IOS: TBU
+   * IOS: foreground인 경우에는 local noti를 복사해서 보여줘야 함
    * ANDROID: foreground인 경우에는 local noti를 복사해서 보여줘야 함
    */
   const handleOnForegroundMessage = async (
@@ -71,7 +71,7 @@ export default (() => {
 
   /**
    * handleOnBackgroundMessage
-   * IOS: TBU
+   * IOS: background인 경우에는 local noti를 복사할 필요 없음
    * ANDROID: background인 경우에는 local noti를 복사할 필요 없음
    */
   const handleOnBackgroundMessage = async (

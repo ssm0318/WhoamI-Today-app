@@ -24,6 +24,8 @@ const RootNavigator = () => {
 
   useLayoutEffect(() => {
     FirebaseNotification.initialize();
+    FirebaseNotification.checkToken();
+
     FirebaseNotification.getPermissionEnabled().then((enabled) => {
       postMessage('SET_NOTI_PERMISSION', enabled);
       if (!enabled) {
