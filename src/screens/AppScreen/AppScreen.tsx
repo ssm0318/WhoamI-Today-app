@@ -1,19 +1,34 @@
-import React, { useLayoutEffect } from 'react';
+import React, { useCallback, useLayoutEffect } from 'react';
 import { SafeAreaView, StatusBar, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { WEBVIEW_CONSTS } from '@constants';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenRouteParamList } from '@screens';
-import { useWebView } from '@hooks';
+import { useAppStateEffect, useWebView } from '@hooks';
+import { FirebaseNotification } from '@libs';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/home' } = route.params;
 
-  const { ref, onMessage } = useWebView();
+  const { ref, onMessage, postMessage } = useWebView();
 
   useLayoutEffect(() => {
     StatusBar.setBarStyle('dark-content', true);
   }, []);
+
+  useAppStateEffect(
+    useCallback(
+      async (state) => {
+        if (state === 'active' || state === 'unknown') {
+          FirebaseNotification.getPermissionEnabled().then((enabled) => {
+            postMessage('SET_NOTI_PERMISSION', { value: enabled });
+          });
+        }
+      },
+      [postMessage],
+    ),
+    [],
+  );
 
   return (
     <SafeAreaView style={styles.container}>
