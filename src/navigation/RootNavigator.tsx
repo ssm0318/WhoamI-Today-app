@@ -1,65 +1,34 @@
-import React, { useCallback, useLayoutEffect, useMemo } from 'react';
+import React, { useLayoutEffect, useMemo } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { getRoutes } from './routes';
-import { useAppStateEffect, useAsyncEffect, useWebView } from '@hooks';
-import {
-  FcmTokenStorage,
-  registerFCMToken,
-  TokenStorage,
-  getDeviceLanguage,
-} from '@tools';
-import { FirebaseNotification, LocalNotification } from '@libs';
+import { useAsyncEffect, usePushNotification } from '@hooks';
+import { getDeviceLanguage } from '@tools';
+import { FirebaseNotification } from '@libs';
 import BootSplash from 'react-native-bootsplash';
 import { useTranslation } from 'react-i18next';
 
 const RootNavigator = () => {
-  const { ref, postMessage } = useWebView();
-
   const { i18n } = useTranslation();
-  const [notiTranslation] = useTranslation('translation', {
-    keyPrefix: 'noti_permission',
-  });
+
+  const { initializeFcm } = usePushNotification();
 
   const { routes } = useMemo(() => getRoutes(), []);
 
   useLayoutEffect(() => {
-    FirebaseNotification.initialize();
-    FirebaseNotification.requestUserPermission(notiTranslation);
-    LocalNotification.initialize(ref);
+    // initialize FirebaseNotification
+    initializeFcm();
 
-    // 언어 감지 후 언어 셋팅
+    // initialize language
     // TODO 추후에는 언어 설정에서 직접 설정할 수 있도록
     const language = getDeviceLanguage();
     i18n.changeLanguage(language);
-  }, [ref]);
+  }, []);
 
-  useAppStateEffect(
-    useCallback(
-      async (state) => {
-        if (state === 'active' || state === 'unknown') {
-          // 로컬 스토리지에서 token 확인 후 postMessage
-          const token = await TokenStorage.getToken();
-          postMessage('SET_TOKEN', token);
-
-          // 로컬 스토리지에서 FCM token 확인 후 있으면 서버에 등록
-          const { fcmToken } = await FcmTokenStorage.getToken();
-          if (!fcmToken || !token.access || !token.refresh) return;
-          await registerFCMToken(fcmToken, true);
-        }
-      },
-      [postMessage],
-    ),
-    [],
-  );
-
+  // initialize with async handlers
   useAsyncEffect(async () => {
     try {
-      // 맨 처음에 FCM 토큰 무조건 로컬 스토리지에 저장 후 서버에 전송
-      const fcmToken = await FirebaseNotification.getToken();
-      await FcmTokenStorage.setToken({
-        fcmToken,
-      });
-      await registerFCMToken(fcmToken, true);
+      // 비동기 동작 필요한 것들은 Bootsplash 상태인 동안 처리
+      // ex. async storage, ...
     } catch (error) {
       console.log(error);
     } finally {

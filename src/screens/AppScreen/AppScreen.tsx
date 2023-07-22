@@ -1,19 +1,37 @@
-import React, { useLayoutEffect } from 'react';
+import React, { useCallback, useLayoutEffect } from 'react';
 import { SafeAreaView, StatusBar, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { WEBVIEW_CONSTS } from '@constants';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenRouteParamList } from '@screens';
-import { useWebView } from '@hooks';
+import { useAppStateEffect, usePushNotification, useWebView } from '@hooks';
+import { FirebaseNotification, LocalNotification } from '@libs';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/home' } = route.params;
 
-  const { ref, onMessage } = useWebView();
+  const { ref, onMessage, postMessage } = useWebView();
+  const { updateFcmToken } = usePushNotification();
 
   useLayoutEffect(() => {
     StatusBar.setBarStyle('dark-content', true);
+
+    // initialize LocalNotification
+    LocalNotification.initialize(ref);
   }, []);
+
+  // 푸시 권한 허용 변경 후 다시 앱으로 돌아왔을 때
+  useAppStateEffect(
+    useCallback(async (state) => {
+      if (state === 'active' || state === 'unknown') {
+        FirebaseNotification.getPermissionEnabled().then((enabled) => {
+          postMessage('SET_NOTI_PERMISSION', { value: enabled });
+          updateFcmToken(enabled);
+        });
+      }
+    }, []),
+    [],
+  );
 
   return (
     <SafeAreaView style={styles.container}>
