@@ -46,7 +46,7 @@ export default (() => {
 
   /**
    * handleOnForegroundMessage
-   * IOS: TBU
+   * IOS: foreground인 경우에는 local noti를 복사해서 보여줘야 함
    * ANDROID: foreground인 경우에는 local noti를 복사해서 보여줘야 함
    */
   const handleOnForegroundMessage = async (
@@ -71,7 +71,7 @@ export default (() => {
 
   /**
    * handleOnBackgroundMessage
-   * IOS: TBU
+   * IOS: background인 경우에는 local noti를 복사할 필요 없음
    * ANDROID: background인 경우에는 local noti를 복사할 필요 없음
    */
   const handleOnBackgroundMessage = async (
@@ -93,34 +93,31 @@ export default (() => {
   const getInitialNotification = () => messaging().getInitialNotification();
 
   /**
-   * requestUserPermission
+   * getPermissionEnabled
    */
-  const requestUserPermission = async (t: TFunction) => {
-    const authStatus = await messaging().requestPermission();
+  const getPermissionEnabled = async () => {
+    const permission = await messaging().requestPermission();
     const enabled =
-      authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-      authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+      permission === messaging.AuthorizationStatus.AUTHORIZED ||
+      permission === messaging.AuthorizationStatus.PROVISIONAL;
+    return enabled;
+  };
 
-    if (!enabled) {
-      Alert.alert(String(t('title')), String(t('description')), [
-        {
-          text: String(t('cancel')),
-          style: 'cancel',
-        },
-        {
-          text: String(t('redirect_setting')),
-          onPress: redirectSetting,
-          style: 'default',
-        },
-      ]);
-    }
-
-    console.log(
-      '[FirebaseNotification] requestPermission authStatus is ',
-      authStatus,
-    );
-
-    return { enabled };
+  /**
+   * requestPermission
+   */
+  const requestPermission = async (t: TFunction) => {
+    Alert.alert(String(t('title')), String(t('description')), [
+      {
+        text: String(t('close')),
+        style: 'cancel',
+      },
+      {
+        text: String(t('redirect_setting')),
+        onPress: redirectSetting,
+        style: 'default',
+      },
+    ]);
   };
 
   return {
@@ -128,6 +125,7 @@ export default (() => {
     getToken,
     checkToken,
     getInitialNotification,
-    requestUserPermission,
+    requestPermission,
+    getPermissionEnabled,
   };
 })();

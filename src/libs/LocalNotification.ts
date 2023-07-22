@@ -133,7 +133,9 @@ export default (() => {
    * navigate
    */
   const navigate = (webViewRef: React.RefObject<WebView>, url: string) => {
-    webViewRef.current?.postMessage(JSON.stringify({ key: 'REDIRECT', url }));
+    webViewRef.current?.postMessage(
+      JSON.stringify({ key: 'REDIRECT', data: { url } }),
+    );
   };
 
   const initialize = (webViewRef: React.RefObject<WebView>) => {
