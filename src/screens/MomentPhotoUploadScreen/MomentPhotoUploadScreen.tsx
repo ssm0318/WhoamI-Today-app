@@ -50,23 +50,23 @@ const MomentPhotoUploadScreen: React.FC<MomentPhotoUploadScreenProps> = ({
     navigation.goBack();
   }, []);
 
+  const handleResetPreview = useCallback(() => {
+    setCameraPreviewUrl('');
+  }, []);
+
   const handleConfirm = useCallback(async () => {
-    // 처음 업로드 하는거면 POST, 아니면 PUT
     try {
-      if (tsUtils.isObjectValueNull(state)) {
-        await momentApis.postTodayMoment({
-          ...state,
-          photo: cameraPreviewUrl,
-        });
-      } else {
-        await momentApis.updateTodayMoment({
-          photo: cameraPreviewUrl,
-        });
-      }
-      navigation.navigate('AppScreen', { url: '/home' });
+      await momentApis.updateTodayMoment({
+        photo: cameraPreviewUrl,
+      });
     } catch (err) {
       console.error(err);
-      navigation.navigate('AppScreen', { url: '/home' });
+      navigation.navigate('AppScreen', {
+        url: '/moment-upload',
+        // params: {
+        //   previewUrl: cameraPreviewUrl,
+        // },
+      });
     }
   }, [cameraPreviewUrl, state]);
 
@@ -105,7 +105,7 @@ const MomentPhotoUploadScreen: React.FC<MomentPhotoUploadScreenProps> = ({
         {cameraPreviewUrl ? (
           <>
             <S.ResetContainer>
-              <TouchableOpacity onPress={handleConfirm}>
+              <TouchableOpacity onPress={handleResetPreview}>
                 <SvgIcon name={'close_white'} size={26} />
               </TouchableOpacity>
             </S.ResetContainer>
