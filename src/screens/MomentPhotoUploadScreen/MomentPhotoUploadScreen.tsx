@@ -56,16 +56,15 @@ const MomentPhotoUploadScreen: React.FC<MomentPhotoUploadScreenProps> = ({
 
   const handleConfirm = useCallback(async () => {
     try {
+      // 사진 업로드
       await momentApis.updateTodayMoment({
         photo: cameraPreviewUrl,
       });
     } catch (err) {
       console.error(err);
+    } finally {
       navigation.navigate('AppScreen', {
         url: '/moment-upload',
-        // params: {
-        //   previewUrl: cameraPreviewUrl,
-        // },
       });
     }
   }, [cameraPreviewUrl, state]);
