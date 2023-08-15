@@ -15,14 +15,13 @@ import { SvgIcon } from '@components';
 import CameraButtons from './components/CameraButtons/CameraButtons';
 import { useTranslation } from 'react-i18next';
 import { momentApis } from '@apis';
-import { tsUtils } from '@utils';
 import { useIsFocused } from '@react-navigation/native';
 import { Camera, useCameraDevices } from 'react-native-vision-camera';
 
 const MomentPhotoUploadScreen: React.FC<MomentPhotoUploadScreenProps> = ({
   route,
 }) => {
-  const { state } = route.params;
+  const { todayMoment, draft } = route.params;
   const { width } = useWindowDimensions();
   const [t] = useTranslation('translation', { keyPrefix: 'moment' });
   const navigation = useNavigation();
@@ -54,20 +53,14 @@ const MomentPhotoUploadScreen: React.FC<MomentPhotoUploadScreenProps> = ({
     setCameraPreviewUrl('');
   }, []);
 
-  const handleConfirm = useCallback(async () => {
-    try {
-      // 사진 업로드
-      await momentApis.updateTodayMoment({
-        photo: cameraPreviewUrl,
-      });
-    } catch (err) {
-      console.error(err);
-    } finally {
-      navigation.navigate('AppScreen', {
-        url: '/moment-upload',
-      });
-    }
-  }, [cameraPreviewUrl, state]);
+  const handleConfirm = async () => {
+    if (!cameraPreviewUrl) return;
+    navigation.navigate('MomentPreviewScreen', {
+      todayMoment,
+      draft,
+      photoPreviewUrl: cameraPreviewUrl,
+    });
+  };
 
   // 최초에 한번만 카메라 권한 요청
   useAsyncEffect(async () => {
@@ -165,7 +158,8 @@ type MomentPhotoUploadScreenProps = NativeStackScreenProps<
 
 export type MomentPhotoUploadScreenRoute = {
   MomentPhotoUploadScreen: {
-    state: MomentType.TodayMoment;
+    todayMoment: MomentType.TodayMoment;
+    draft: MomentType.TodayMoment;
   };
 };
 

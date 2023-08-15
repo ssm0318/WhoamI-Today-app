@@ -1,7 +1,11 @@
 {
   "moment": {
     "todays_moments_photo": "Today's Moment Photo",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "todays_moment": "Today's Moment",
+    "post": "Post",
+    "mood_placeholder": "Express your mood with emojis",
+    "description_placeholder": "Describe your day with words"
   },
   "noti_permission": {
     "title": "Notification Settings",
