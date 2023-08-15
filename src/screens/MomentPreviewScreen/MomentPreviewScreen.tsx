@@ -1,7 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
   Alert,
-  GestureResponderEvent,
   Image,
   SafeAreaView,
   StyleSheet,
