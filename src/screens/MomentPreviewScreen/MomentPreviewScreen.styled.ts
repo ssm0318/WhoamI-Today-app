@@ -75,7 +75,6 @@ export const MoodInputWrapper = styled.View`
   border-radius: 14px;
   display: flex;
   flex-direction: row;
-  border: 1px solid blue;
   align-items: center;
 `;
 
@@ -84,7 +83,6 @@ export const MoodInput = styled.TextInput`
   margin-left: 16px;
   display: flex;
   flex: 1;
-  border: 1px solid blue;
 `;
 
 export const PhotoWrapper = styled.View`
@@ -101,7 +99,6 @@ export const DescriptionInputWrapper = styled.View`
   border-radius: 14px;
   display: flex;
   flex-direction: row;
-  border: 1px solid red;
   align-items: flex-start;
 `;
 
@@ -110,5 +107,4 @@ export const DescriptionInput = styled.TextInput`
   margin-left: 16px;
   display: flex;
   flex: 1;
-  border: 1px solid red;
 `;
