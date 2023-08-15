@@ -80,9 +80,14 @@ export const MoodInputWrapper = styled.View`
 
 export const MoodInput = styled.TextInput`
   font-size: 18px;
-  margin-left: 16px;
+  margin: 0px 16px;
   display: flex;
   flex: 1;
+`;
+
+export const EmojiDeleteIcon = styled.TouchableOpacity`
+  position: absolute;
+  right: 12px;
 `;
 
 export const PhotoWrapper = styled.View`

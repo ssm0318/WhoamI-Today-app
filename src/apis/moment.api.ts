@@ -1,6 +1,6 @@
 import { MomentType } from '@types';
 import API from './API';
-import { tsUtils } from '@utils';
+import { momentFormDataSerializer, tsUtils } from '@utils';
 
 // GET today's moment
 export const getTodayMoment = async () => {
@@ -16,7 +16,7 @@ export const postTodayMoment = async (
   moment: Partial<MomentType.TodayMoment>,
 ) => {
   const { year, month, day } = getMomentRequestParams(new Date());
-  const momentFormData = tsUtils.objectFormDataSerializer(moment);
+  const momentFormData = momentFormDataSerializer(moment);
   const res = await API.post<MomentType.TodayMoment>(
     `/moment/daily/${year}/${month}/${day}/`,
     momentFormData,
@@ -32,10 +32,9 @@ export const updateTodayMoment = async (
   moment: Partial<MomentType.TodayMoment>,
 ) => {
   const { year, month, day } = getMomentRequestParams(new Date());
-  const momentFormData = tsUtils.objectFormDataSerializer(moment);
   const res = await API.put<MomentType.TodayMoment>(
     `/moment/daily/${year}/${month}/${day}/`,
-    momentFormData,
+    moment,
     {
       headers: { 'Content-Type': 'multipart/form-data' },
     },

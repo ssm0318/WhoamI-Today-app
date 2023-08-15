@@ -8,6 +8,7 @@ import close_white from './close_white.svg';
 import navigation_close_black from './navigation_close_black.svg';
 import moment_mood from './moment_mood.svg';
 import moment_description from './moment_description.svg';
+import delete_button from './delete_button.svg';
 
 export {
   camera_flash_off,
@@ -20,4 +21,5 @@ export {
   navigation_close_black,
   moment_mood,
   moment_description,
+  delete_button,
 };

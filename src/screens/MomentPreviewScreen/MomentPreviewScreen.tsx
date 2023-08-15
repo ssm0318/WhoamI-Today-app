@@ -1,49 +1,78 @@
-import React, { useCallback, useLayoutEffect } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
+  Alert,
+  GestureResponderEvent,
   Image,
   SafeAreaView,
-  StatusBar,
   StyleSheet,
+  TouchableWithoutFeedback,
   useWindowDimensions,
 } from 'react-native';
-import { WebView } from 'react-native-webview';
-import { APP_CONSTS, WEBVIEW_CONSTS } from '@constants';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenRouteParamList } from '@screens';
-import {
-  useAppStateEffect,
-  useNavigation,
-  usePushNotification,
-  useWebView,
-} from '@hooks';
-import { FirebaseNotification, LocalNotification } from '@libs';
+import { useNavigation } from '@hooks';
 import { MomentType } from '@types';
 import { momentApis } from '@apis';
 import * as S from './MomentPreviewScreen.styled';
 import { SvgIcon } from '@components';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import EmojiSelector from 'react-native-emoji-selector';
 
 const MomentPreviewScreen: React.FC<MomentPreviewScreenProps> = ({ route }) => {
-  const { todayMoment, draft, photoPreviewUrl } = route.params;
+  const { todayMoment, draft: initialDraft, photoPreviewUrl } = route.params;
   const navigation = useNavigation();
   const [t] = useTranslation('translation', { keyPrefix: 'moment' });
   const { width } = useWindowDimensions();
-
+  const [isEmojiSelectorVisible, setIsEmojiSelectorVisible] = useState(false);
   const DEFAULT_MARGIN = 25;
   const PHOTO_SIZE = width - 2 * DEFAULT_MARGIN;
+  const [draft, setDraft] = useState<MomentType.TodayMoment>(initialDraft);
+
+  const isMoodInputEditable = !todayMoment.mood;
+  const isDescriptionInputEditalbe = !todayMoment.description;
+
+  const handleSelectedEmoji = (emoji: string) => {
+    setDraft({
+      ...draft,
+      mood: (draft.mood || '') + emoji,
+    });
+  };
+
+  const handleDeleteEmoji = () => {
+    const updatedEmoji = (draft.mood || '').slice(0, -1);
+    setDraft({
+      ...draft,
+      mood: updatedEmoji,
+    });
+  };
+
+  const handleChangeDescription = (text: string) => {
+    setDraft({
+      ...draft,
+      description: text,
+    });
+  };
 
   const handlePostMoment = useCallback(async () => {
+    const updatedData: MomentType.TodayMoment = draft;
+    Object.keys(todayMoment).forEach((key) => {
+      if (todayMoment[key as keyof MomentType.TodayMoment] !== null) {
+        delete updatedData[key as keyof MomentType.TodayMoment];
+      }
+    });
+
     try {
-      // 사진 업로드
-      await momentApis.updateTodayMoment({
-        photo: photoPreviewUrl,
-      });
+      // 모먼트 업로드
+      await momentApis.updateTodayMoment(updatedData);
+      //
+      Alert.alert('모먼트 업로드 성공');
     } catch (err) {
       console.error(err);
+      Alert.alert('에러 발생');
     } finally {
       navigation.navigate('AppScreen', {
-        url: '/moment-upload',
+        url: '/home',
       });
     }
   }, [photoPreviewUrl]);
@@ -55,7 +84,10 @@ const MomentPreviewScreen: React.FC<MomentPreviewScreenProps> = ({ route }) => {
     });
   };
 
-  const isPostable = true;
+  const toggleEmojiSelector = () => {
+    if (!isMoodInputEditable) return;
+    setIsEmojiSelectorVisible((prev) => !prev);
+  };
 
   return (
     <SafeAreaView
@@ -68,6 +100,9 @@ const MomentPreviewScreen: React.FC<MomentPreviewScreenProps> = ({ route }) => {
         style={{
           flex: 1,
         }}
+        contentContainerStyle={{
+          flex: 1,
+        }}
       >
         <S.ScreenContainer>
           <S.TopContainer>
@@ -76,26 +111,28 @@ const MomentPreviewScreen: React.FC<MomentPreviewScreenProps> = ({ route }) => {
             </S.CloseButton>
             <S.ScreenTitle>{t('todays_moment')}</S.ScreenTitle>
             {/* Post 버튼 */}
-            <S.PostButton
-              onPress={handlePostMoment}
-              bgColor={isPostable ? '#303030' : '#D9D9D9'}
-            >
-              <S.PostText textColor={isPostable ? '#FFFFFF' : '#A0A0A0'}>
-                {t('post')}
-              </S.PostText>
+            <S.PostButton onPress={handlePostMoment} bgColor={'#303030'}>
+              <S.PostText textColor={'#FFFFFF'}>{t('post')}</S.PostText>
             </S.PostButton>
           </S.TopContainer>
           <S.ContentWrapper>
             {/* mood */}
-            {/* react native emoji 적용 필요 */}
-            <S.MoodInputWrapper>
-              <SvgIcon name={'moment_mood'} size={20} />
-              <S.MoodInput
-                multiline
-                placeholder={t('mood_placeholder') || ''}
-              />
-            </S.MoodInputWrapper>
-
+            <TouchableWithoutFeedback onPress={toggleEmojiSelector}>
+              <S.MoodInputWrapper>
+                <SvgIcon name={'moment_mood'} size={20} />
+                <S.MoodInput
+                  multiline
+                  value={draft.mood || ''}
+                  placeholder={t('mood_placeholder') || ''}
+                  editable={false}
+                />
+                {draft.mood && (
+                  <S.EmojiDeleteIcon onPress={handleDeleteEmoji}>
+                    <SvgIcon name={'delete_button'} size={20} />
+                  </S.EmojiDeleteIcon>
+                )}
+              </S.MoodInputWrapper>
+            </TouchableWithoutFeedback>
             {/* photo */}
             <S.PhotoWrapper>
               <Image
@@ -113,12 +150,22 @@ const MomentPreviewScreen: React.FC<MomentPreviewScreenProps> = ({ route }) => {
               <SvgIcon name={'moment_description'} size={20} />
               <S.DescriptionInput
                 placeholder={t('description_placeholder') || ''}
+                value={draft.description || ''}
                 multiline
+                editable={isDescriptionInputEditalbe}
+                onChangeText={handleChangeDescription}
               />
             </S.DescriptionInputWrapper>
           </S.ContentWrapper>
         </S.ScreenContainer>
       </KeyboardAwareScrollView>
+      {isEmojiSelectorVisible && (
+        <EmojiSelector
+          onEmojiSelected={handleSelectedEmoji}
+          showSearchBar={false}
+          columns={8}
+        />
+      )}
     </SafeAreaView>
   );
 };
