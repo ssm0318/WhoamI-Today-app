@@ -1,4 +1,5 @@
 import { WEBVIEW_CONSTS } from '@constants';
+import { CookieStorage } from '@tools';
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import i18n from 'i18next';
 
@@ -31,10 +32,15 @@ const JSON_DEFAULT_OPTIONS: AxiosRequestConfig = {
 };
 
 const API = (() => {
+  const { getCookie } = CookieStorage;
   const apiInstance: APIInstance = axios.create(JSON_DEFAULT_OPTIONS);
 
   apiInstance.interceptors.request.use(
     async (config: any) => {
+      const { accessToken, cookie } = await getCookie();
+      config.headers.Authorization = `Bearer ${accessToken}`;
+      config.headers.Cookie = `csrftoken=${cookie}`;
+      config.headers['X-Csrftoken'] = cookie;
       return config;
     },
     (err) => {
