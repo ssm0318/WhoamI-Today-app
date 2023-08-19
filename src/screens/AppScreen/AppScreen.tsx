@@ -41,7 +41,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         ref={ref}
         onMessage={onMessage}
         source={{
-          uri: WEBVIEW_CONSTS.WEB_VIEW_URL.DEV + url,
+          uri: WEBVIEW_CONSTS.WEB_VIEW_URL.PROD + url,
         }}
         allowsBackForwardNavigationGestures
         decelerationRate="normal"
