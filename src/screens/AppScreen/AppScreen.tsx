@@ -6,6 +6,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenRouteParamList } from '@screens';
 import { useAppStateEffect, usePushNotification, useWebView } from '@hooks';
 import { FirebaseNotification, LocalNotification } from '@libs';
+import { checkCookie } from '@tools';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/home' } = route.params;
@@ -40,7 +41,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         ref={ref}
         onMessage={onMessage}
         source={{
-          uri: WEBVIEW_CONSTS.WEB_VIEW_URL.PROD + url,
+          uri: WEBVIEW_CONSTS.WEB_VIEW_URL.DEV + url,
         }}
         allowsBackForwardNavigationGestures
         decelerationRate="normal"
@@ -50,6 +51,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         scalesPageToFit={false}
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
+        onNavigationStateChange={checkCookie}
       />
     </SafeAreaView>
   );
