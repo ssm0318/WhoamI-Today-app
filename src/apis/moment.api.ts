@@ -32,9 +32,10 @@ export const updateTodayMoment = async (
   moment: Partial<MomentType.TodayMoment>,
 ) => {
   const { year, month, day } = getMomentRequestParams(new Date());
+  const momentFormData = momentFormDataSerializer(moment);
   const res = await API.put<MomentType.TodayMoment>(
     `/moment/daily/${year}/${month}/${day}/`,
-    moment,
+    momentFormData,
     {
       headers: { 'Content-Type': 'multipart/form-data' },
     },

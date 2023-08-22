@@ -17,6 +17,7 @@ import { SvgIcon } from '@components';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import EmojiSelector from 'react-native-emoji-selector';
+import RNFS from 'react-native-fs';
 
 const MomentPreviewScreen: React.FC<MomentPreviewScreenProps> = ({ route }) => {
   const { todayMoment, draft: initialDraft, photoPreviewUrl } = route.params;
@@ -54,7 +55,13 @@ const MomentPreviewScreen: React.FC<MomentPreviewScreenProps> = ({ route }) => {
   };
 
   const handlePostMoment = useCallback(async () => {
-    const updatedData: MomentType.TodayMoment = draft;
+    const base64 = await RNFS.readFile(photoPreviewUrl, 'base64');
+
+    const updatedData: MomentType.TodayMoment = {
+      ...draft,
+      photo: photoPreviewUrl,
+    };
+    // 이미 todayMoment에 존재하는 데이터는 key 값을 삭제 후 업로드
     Object.keys(todayMoment).forEach((key) => {
       if (todayMoment[key as keyof MomentType.TodayMoment] !== null) {
         delete updatedData[key as keyof MomentType.TodayMoment];
@@ -63,8 +70,13 @@ const MomentPreviewScreen: React.FC<MomentPreviewScreenProps> = ({ route }) => {
 
     try {
       // 모먼트 업로드
-      await momentApis.updateTodayMoment(updatedData);
-      //
+      if (!updatedData.mood && !updatedData.description) {
+        await momentApis.postTodayMoment(updatedData);
+      } else {
+        await momentApis.updateTodayMoment(updatedData);
+      }
+
+      // TODO 모달 디자인 픽스 후 적용 필요
       Alert.alert('모먼트 업로드 성공');
     } catch (err) {
       console.error(err);

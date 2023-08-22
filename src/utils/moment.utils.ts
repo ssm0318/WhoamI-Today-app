@@ -1,4 +1,7 @@
 import { MomentType } from '@types';
+import { Platform } from 'react-native';
+import RNFS from 'react-native-fs';
+import RNFetchBlob from 'rn-fetch-blob';
 
 export const getMomentPhotoFileName = (date: Date) => {
   const year = date.getFullYear();
@@ -11,16 +14,23 @@ export const momentFormDataSerializer = (
   moment: Partial<MomentType.TodayMoment>,
 ) => {
   const formData = new FormData();
-  Object.keys(moment).forEach((key) => {
+  console.log(14, moment);
+  Object.keys(moment).forEach(async (key) => {
     const _key = key as keyof MomentType.TodayMoment;
     const value = moment[_key];
     if (_key === 'photo') {
+      if (!value) return;
+      const fileName = getMomentPhotoFileName(new Date());
+
       formData.append('photo', {
-        fileName: getMomentPhotoFileName(new Date()),
-        type: 'image/jpeg',
-        uri: value,
+        uri: Platform.OS === 'android' ? value : value.replace('file://', ''),
+        type: 'multipart/form-data',
+        name: fileName,
       });
-    } else formData.append(key, value || '');
+    } else {
+      if (!!value) formData.append(key, value || '');
+    }
   });
+  console.log(26, formData);
   return formData;
 };

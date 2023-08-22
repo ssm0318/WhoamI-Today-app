@@ -21,7 +21,7 @@ interface APIInstance extends AxiosInstance {
 }
 
 const JSON_DEFAULT_OPTIONS: AxiosRequestConfig = {
-  baseURL: API_BASE_URL.DEV,
+  baseURL: API_BASE_URL.PROD,
   withCredentials: true,
   xsrfHeaderName: 'X-CSRFTOKEN',
   xsrfCookieName: 'csrftoken',
