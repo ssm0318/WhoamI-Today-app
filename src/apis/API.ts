@@ -1,8 +1,8 @@
 import { WEBVIEW_CONSTS } from '@constants';
 import { CookieStorage } from '@tools';
-import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
+import axios, { AxiosRequestConfig } from 'axios';
 import i18n from 'i18next';
-import RNFetchBlob, { FetchBlobResponse } from 'rn-fetch-blob';
+import RNFetchBlob from 'rn-fetch-blob';
 import { APIInstance, BlobAPIInstance, Methods } from './API.types';
 
 export const API_BASE_URL = {
@@ -12,7 +12,7 @@ export const API_BASE_URL = {
 
 /** API Instance */
 const JSON_DEFAULT_OPTIONS: AxiosRequestConfig = {
-  baseURL: API_BASE_URL.DEV,
+  baseURL: API_BASE_URL.PROD,
   withCredentials: true,
   xsrfHeaderName: 'X-CSRFTOKEN',
   xsrfCookieName: 'csrftoken',
