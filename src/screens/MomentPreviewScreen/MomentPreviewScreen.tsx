@@ -75,13 +75,13 @@ const MomentPreviewScreen: React.FC<MomentPreviewScreenProps> = ({ route }) => {
 
       // TODO 모달 디자인 픽스 후 적용 필요
       Alert.alert('모먼트 업로드 성공');
+      navigation.push('AppScreen', {
+        url: '/home',
+      });
     } catch (err) {
       console.error(err);
       Alert.alert('에러 발생');
-    } finally {
-      navigation.navigate('AppScreen', {
-        url: '/home',
-      });
+      navigation.goBack();
     }
   }, [photoPreviewUrl]);
 
