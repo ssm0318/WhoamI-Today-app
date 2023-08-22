@@ -14,7 +14,6 @@ import * as S from './MomentPhotoUploadScreen.styled';
 import { SvgIcon } from '@components';
 import CameraButtons from './components/CameraButtons/CameraButtons';
 import { useTranslation } from 'react-i18next';
-import { momentApis } from '@apis';
 import { useIsFocused } from '@react-navigation/native';
 import { Camera, useCameraDevices } from 'react-native-vision-camera';
 

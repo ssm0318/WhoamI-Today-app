@@ -28,6 +28,8 @@ const MomentPreviewScreen: React.FC<MomentPreviewScreenProps> = ({ route }) => {
   const PHOTO_SIZE = width - 2 * DEFAULT_MARGIN;
   const [draft, setDraft] = useState<MomentType.TodayMoment>(initialDraft);
 
+  console.log(31, draft);
+
   const isMoodInputEditable = !todayMoment.mood;
   const isDescriptionInputEditalbe = !todayMoment.description;
 
@@ -58,6 +60,7 @@ const MomentPreviewScreen: React.FC<MomentPreviewScreenProps> = ({ route }) => {
       ...draft,
       photo: photoPreviewUrl,
     };
+
     // 이미 todayMoment에 존재하는 데이터는 key 값을 삭제 후 업로드
     Object.keys(todayMoment).forEach((key) => {
       if (todayMoment[key as keyof MomentType.TodayMoment] !== null) {
@@ -67,7 +70,8 @@ const MomentPreviewScreen: React.FC<MomentPreviewScreenProps> = ({ route }) => {
 
     try {
       // 모먼트 업로드
-      if (!updatedData.mood && !updatedData.description) {
+      // 기존 todayMoment에 데이터가 없으면 post, 있으면 put
+      if (!todayMoment.mood && !todayMoment.description) {
         await momentApis.postTodayMoment(updatedData);
       } else {
         await momentApis.updateTodayMoment(updatedData);

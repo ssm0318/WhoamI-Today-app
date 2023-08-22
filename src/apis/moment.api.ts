@@ -24,6 +24,7 @@ export const postTodayMoment = async (
     `/moment/daily/${year}/${month}/${day}/`,
     momentFormData,
   );
+  console.log(27, data);
   return data;
 };
 
@@ -38,6 +39,7 @@ export const updateTodayMoment = async (
     `/moment/daily/${year}/${month}/${day}/`,
     momentFormData,
   );
+  console.log(42, data);
   return data;
 };
 
