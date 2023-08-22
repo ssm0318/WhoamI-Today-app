@@ -1,4 +1,6 @@
-import API from './API';
+import ApiService from './API';
+
+const { API } = ApiService;
 
 type RegisterFCMTokenRequest = {
   type: 'android' | 'ios';

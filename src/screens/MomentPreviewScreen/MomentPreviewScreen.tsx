@@ -17,7 +17,6 @@ import { SvgIcon } from '@components';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import EmojiSelector from 'react-native-emoji-selector';
-import RNFS from 'react-native-fs';
 
 const MomentPreviewScreen: React.FC<MomentPreviewScreenProps> = ({ route }) => {
   const { todayMoment, draft: initialDraft, photoPreviewUrl } = route.params;
@@ -55,8 +54,6 @@ const MomentPreviewScreen: React.FC<MomentPreviewScreenProps> = ({ route }) => {
   };
 
   const handlePostMoment = useCallback(async () => {
-    const base64 = await RNFS.readFile(photoPreviewUrl, 'base64');
-
     const updatedData: MomentType.TodayMoment = {
       ...draft,
       photo: photoPreviewUrl,

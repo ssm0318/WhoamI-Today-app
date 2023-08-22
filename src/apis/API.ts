@@ -2,26 +2,17 @@ import { WEBVIEW_CONSTS } from '@constants';
 import { CookieStorage } from '@tools';
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import i18n from 'i18next';
+import RNFetchBlob, { FetchBlobResponse } from 'rn-fetch-blob';
+import { APIInstance, BlobAPIInstance, Methods } from './API.types';
 
 export const API_BASE_URL = {
   DEV: `http://${WEBVIEW_CONSTS.WEB_VIEW_DEV_HOSTNAME}:8000/api/`,
   PROD: 'https://diivers.world/api/',
 };
 
-interface APIInstance extends AxiosInstance {
-  getUri(config?: AxiosRequestConfig): string;
-  request<T>(config: AxiosRequestConfig): Promise<T>;
-  get<T>(url: string, config?: AxiosRequestConfig): Promise<T>;
-  delete<T>(url: string, config?: AxiosRequestConfig): Promise<T>;
-  head<T>(url: string, config?: AxiosRequestConfig): Promise<T>;
-  options<T>(url: string, config?: AxiosRequestConfig): Promise<T>;
-  post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T>;
-  put<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T>;
-  patch<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T>;
-}
-
+/** API Instance */
 const JSON_DEFAULT_OPTIONS: AxiosRequestConfig = {
-  baseURL: API_BASE_URL.PROD,
+  baseURL: API_BASE_URL.DEV,
   withCredentials: true,
   xsrfHeaderName: 'X-CSRFTOKEN',
   xsrfCookieName: 'csrftoken',
@@ -62,4 +53,53 @@ const API = (() => {
   return apiInstance;
 })();
 
-export default API;
+/** BLOB API Instance */
+const BLOB_DEFAULT_OPTIONS = {
+  baseURL: API_BASE_URL.DEV,
+  withCredentials: true,
+  xsrfHeaderName: 'X-CSRFTOKEN',
+  xsrfCookieName: 'csrftoken',
+  headers: {
+    'Content-Type': 'multipart/form-data',
+    'Accept-Language': i18n.language,
+  },
+};
+
+const BlobAPI = ((): BlobAPIInstance => {
+  const { getCookie } = CookieStorage;
+
+  const fetch = async (method: Methods, url: string, body?: any | null) => {
+    const { accessToken, cookie } = await getCookie();
+    const fullHeaders = {
+      ...BLOB_DEFAULT_OPTIONS.headers,
+      Authorization: `Bearer ${accessToken}`,
+      Cookie: `csrftoken=${cookie}`,
+      'X-Csrftoken': cookie,
+    };
+
+    return RNFetchBlob.fetch(
+      method,
+      BLOB_DEFAULT_OPTIONS.baseURL + url,
+      fullHeaders,
+      body,
+    )
+      .then((response) => {
+        return response;
+      })
+      .catch((error) => {
+        console.error('[BlobAPI error]', error);
+        throw error;
+      });
+  };
+
+  return {
+    fetch,
+  };
+})();
+
+const ApiService = {
+  API,
+  BlobAPI,
+};
+
+export default ApiService;
