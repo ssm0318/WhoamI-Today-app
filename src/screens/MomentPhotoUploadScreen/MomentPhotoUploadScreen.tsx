@@ -54,7 +54,7 @@ const MomentPhotoUploadScreen: React.FC<MomentPhotoUploadScreenProps> = ({
 
   const handleConfirm = async () => {
     if (!cameraPreviewUrl) return;
-    navigation.navigate('MomentPreviewScreen', {
+    navigation.push('MomentPreviewScreen', {
       todayMoment,
       draft,
       photoPreviewUrl: cameraPreviewUrl,
@@ -70,6 +70,13 @@ const MomentPhotoUploadScreen: React.FC<MomentPhotoUploadScreenProps> = ({
     StatusBar.setBarStyle('light-content');
     return () => {
       StatusBar.setBarStyle('dark-content');
+    };
+  }, []);
+
+  // 화면 벗어날 때  미리보기 초기화
+  useEffect(() => {
+    return () => {
+      setCameraPreviewUrl(null);
     };
   }, []);
 

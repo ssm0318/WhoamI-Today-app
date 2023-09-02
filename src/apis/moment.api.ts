@@ -21,7 +21,7 @@ export const postTodayMoment = async (
   const momentFormData = momentFormDataSerializer(moment);
   const { data } = await BlobAPI.fetch(
     'POST',
-    `/moment/daily/${year}/${month}/${day}/`,
+    `moment/daily/${year}/${month}/${day}/`,
     momentFormData,
   );
   return data;
@@ -35,7 +35,7 @@ export const updateTodayMoment = async (
   const momentFormData = momentFormDataSerializer(moment);
   const { data } = await BlobAPI.fetch(
     'PUT',
-    `/moment/daily/${year}/${month}/${day}/`,
+    `moment/daily/${year}/${month}/${day}/`,
     momentFormData,
   );
   return data;

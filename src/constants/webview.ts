@@ -14,7 +14,10 @@ console = {
 `;
 
 // dev 환경에서 설정하는 hostname
-export const WEB_VIEW_DEV_HOSTNAME = '192.168.0.12';
+// NOTE
+// 로컬에서 개발할 때는 이 hostname을 사용해야 함
+// 실제 archive 할때는 PROD로 변경해야 함
+export const WEB_VIEW_DEV_HOSTNAME = '192.168.0.105';
 
 export const WEB_VIEW_URL = {
   DEV: `http://${WEB_VIEW_DEV_HOSTNAME}:3000`,
