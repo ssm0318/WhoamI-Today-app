@@ -3,6 +3,9 @@ import AppScreen, { AppScreenRoute } from './AppScreen/AppScreen';
 import MomentPhotoUploadScreen, {
   MomentPhotoUploadScreenRoute,
 } from './MomentPhotoUploadScreen/MomentPhotoUploadScreen';
+import MomentPreviewScreen, {
+  MomentPreviewScreenRoute,
+} from './MomentPreviewScreen/MomentPreviewScreen';
 
 export const allRoutes: RouteType.RouteObject<ScreenRouteParamList> = {
   // first screen would be initial landing screen
@@ -14,7 +17,12 @@ export const allRoutes: RouteType.RouteObject<ScreenRouteParamList> = {
     Component: MomentPhotoUploadScreen,
     type: 'CARD',
   },
+  MomentPreviewScreen: {
+    Component: MomentPreviewScreen,
+    type: 'CARD',
+  },
 };
 
 export type ScreenRouteParamList = AppScreenRoute &
-  MomentPhotoUploadScreenRoute;
+  MomentPhotoUploadScreenRoute &
+  MomentPreviewScreenRoute;

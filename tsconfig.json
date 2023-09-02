@@ -25,7 +25,7 @@
       "@utils": ["src/utils/index"],
       "@navigation": ["src/navigation/index"]
     },
-    "types": ["@types/styled-components-react-native"],
+    "types": ["node", "@types/styled-components-react-native"],
     "plugins": [
       {
         "name": "typescript-styled-plugin",
