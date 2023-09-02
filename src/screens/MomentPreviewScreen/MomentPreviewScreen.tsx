@@ -85,7 +85,7 @@ const MomentPreviewScreen: React.FC<MomentPreviewScreenProps> = ({ route }) => {
       Alert.alert('에러 발생');
       navigation.goBack();
     }
-  }, [photoPreviewUrl]);
+  }, [photoPreviewUrl, draft, todayMoment]);
 
   const handleClose = () => {
     navigation.navigate('MomentPhotoUploadScreen', {
