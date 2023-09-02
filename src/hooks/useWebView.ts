@@ -32,10 +32,9 @@ const useWebView = () => {
         return;
       case 'NAVIGATE': {
         if (!data.screenName) return;
-        return navigation.navigate(
-          data.screenName as keyof ScreenRouteParamList,
-          { ...data.params },
-        );
+        return navigation.push(data.screenName as keyof ScreenRouteParamList, {
+          ...data.params,
+        });
       }
       case 'OPEN_SETTING':
         return redirectSetting();

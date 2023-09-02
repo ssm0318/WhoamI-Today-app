@@ -5,7 +5,9 @@
     "todays_moment": "Today's Moment",
     "post": "Post",
     "mood_placeholder": "Express your mood with emojis",
-    "description_placeholder": "Describe your day with words"
+    "description_placeholder": "Describe your day with words",
+    "post_complete": "Your moment have been posted!",
+    "view_friends_moment": "View Friends' Moments"
   },
   "noti_permission": {
     "title": "Notification Settings",
