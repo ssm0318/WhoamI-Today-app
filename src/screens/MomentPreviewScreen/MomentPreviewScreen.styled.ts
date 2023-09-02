@@ -113,3 +113,32 @@ export const DescriptionInput = styled.TextInput`
   display: flex;
   flex: 1;
 `;
+
+export const CompleteModalContent = styled.View`
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+export const CompleteText = styled(Text)`
+  color: black;
+  font-size: 18px;
+  font-weight: 400;
+  margin-top: 8px;
+`;
+
+export const ViewFriendsFeedButton = styled.TouchableOpacity`
+  background-color: #303030;
+  padding: 8px 12px;
+  display: flex;
+  border-radius: 12px;
+  margin-top: 20px;
+`;
+
+export const ViewFriendsFeedText = styled(Text)`
+  color: white;
+  font-size: 16px;
+  font-weight: 400;
+`;

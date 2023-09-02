@@ -73,6 +73,13 @@ const MomentPhotoUploadScreen: React.FC<MomentPhotoUploadScreenProps> = ({
     };
   }, []);
 
+  // 화면 벗어날 때  미리보기 초기화
+  useEffect(() => {
+    return () => {
+      setCameraPreviewUrl(null);
+    };
+  }, []);
+
   if (!device || !isFocused) return <></>;
   return (
     <S.ScreenContainer>

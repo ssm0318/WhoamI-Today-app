@@ -15,7 +15,7 @@ import { checkCookie } from '@tools';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/home' } = route.params;
-  const WEBVIEW_URL = WEBVIEW_CONSTS.WEB_VIEW_URL.PROD + url;
+  const WEBVIEW_URL = WEBVIEW_CONSTS.WEB_VIEW_URL.DEV + url;
 
   const { ref, onMessage, postMessage } = useWebView();
   const { updateFcmToken } = usePushNotification();
