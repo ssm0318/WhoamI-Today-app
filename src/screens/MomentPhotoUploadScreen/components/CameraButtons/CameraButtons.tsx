@@ -2,8 +2,7 @@ import React, { useCallback } from 'react';
 import * as S from './CameraButtons.styles';
 import { TouchableWithoutFeedback } from 'react-native';
 import { SvgIcon } from '@components';
-import { CameraImage, useCamera } from '@hooks';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CameraImage } from '@hooks';
 
 export type CameraButtonsProps = {
   togglePosition: () => void;
@@ -20,8 +19,6 @@ const CameraButtons: React.FC<CameraButtonsProps> = ({
   setCameraPreviewUrl,
   flash,
 }) => {
-  const { bottom } = useSafeAreaInsets();
-
   const handlePressCameraButton = useCallback(async () => {
     try {
       const { uri } = await takePhoto();
@@ -33,7 +30,7 @@ const CameraButtons: React.FC<CameraButtonsProps> = ({
   }, []);
 
   return (
-    <S.ButtonContainer bottom={bottom}>
+    <S.ButtonContainer>
       {/* 플래시 */}
       <TouchableWithoutFeedback onPress={toggleFlash}>
         <S.SubButton>

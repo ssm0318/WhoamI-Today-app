@@ -1,9 +1,9 @@
 import CookieManager from '@react-native-cookies/cookies';
 import { CookieStorage } from './cookieStorage';
 
-export const checkCookie = async () => {
+export const checkCookie = async (url: string) => {
   const { setCookie } = CookieStorage;
-  const res = await CookieManager.getAll(true);
+  const res = await CookieManager.get(url);
 
   const { access_token: accessToken, csrftoken: cookie } = res;
 

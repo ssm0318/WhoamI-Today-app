@@ -1,6 +1,8 @@
 import { MomentType } from '@types';
-import API from './API';
-import { tsUtils } from '@utils';
+import ApiService from './API';
+import { momentFormDataSerializer } from '@utils';
+
+const { API, BlobAPI } = ApiService;
 
 // GET today's moment
 export const getTodayMoment = async () => {
@@ -16,15 +18,13 @@ export const postTodayMoment = async (
   moment: Partial<MomentType.TodayMoment>,
 ) => {
   const { year, month, day } = getMomentRequestParams(new Date());
-  const momentFormData = tsUtils.objectFormDataSerializer(moment);
-  const res = await API.post<MomentType.TodayMoment>(
+  const momentFormData = momentFormDataSerializer(moment);
+  const { data } = await BlobAPI.fetch(
+    'POST',
     `/moment/daily/${year}/${month}/${day}/`,
     momentFormData,
-    {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    },
   );
-  return res;
+  return data;
 };
 
 // PUT today's moment
@@ -32,15 +32,13 @@ export const updateTodayMoment = async (
   moment: Partial<MomentType.TodayMoment>,
 ) => {
   const { year, month, day } = getMomentRequestParams(new Date());
-  const momentFormData = tsUtils.objectFormDataSerializer(moment);
-  const res = await API.put<MomentType.TodayMoment>(
+  const momentFormData = momentFormDataSerializer(moment);
+  const { data } = await BlobAPI.fetch(
+    'PUT',
     `/moment/daily/${year}/${month}/${day}/`,
     momentFormData,
-    {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    },
   );
-  return res;
+  return data;
 };
 
 export const getMomentRequestParams = (date: Date) => {
