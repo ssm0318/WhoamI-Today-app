@@ -130,7 +130,7 @@ export const CompleteText = styled(Text)`
 `;
 
 export const ViewFriendsFeedButton = styled.TouchableOpacity`
-  background-color: #303030;
+  background-color: black;
   padding: 8px 12px;
   display: flex;
   border-radius: 12px;
