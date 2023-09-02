@@ -43,7 +43,9 @@ const MomentPreviewScreen: React.FC<MomentPreviewScreenProps> = ({ route }) => {
   };
 
   const handleDeleteEmoji = () => {
-    const updatedEmoji = (draft.mood || '').slice(0, -1);
+    if (!draft.mood) return;
+    const updatedEmoji =
+      draft.mood.length === 2 ? '' : (draft.mood || '').slice(0, -2);
     setDraft({
       ...draft,
       mood: updatedEmoji,
@@ -123,6 +125,10 @@ const MomentPreviewScreen: React.FC<MomentPreviewScreenProps> = ({ route }) => {
           contentContainerStyle={{
             flex: 1,
           }}
+          keyboardShouldPersistTaps="handled"
+          onTouchEnd={() => {
+            if (isEmojiSelectorVisible) setIsEmojiSelectorVisible(false);
+          }}
         >
           <S.ScreenContainer>
             <S.TopContainer>
@@ -144,9 +150,10 @@ const MomentPreviewScreen: React.FC<MomentPreviewScreenProps> = ({ route }) => {
                     multiline
                     value={draft.mood || ''}
                     placeholder={t('mood_placeholder') || ''}
-                    editable={false}
+                    editable={isMoodInputEditable}
+                    pointerEvents="none"
                   />
-                  {draft.mood && (
+                  {isMoodInputEditable && draft.mood && (
                     <S.EmojiDeleteIcon onPress={handleDeleteEmoji}>
                       <SvgIcon name={'delete_button'} size={20} />
                     </S.EmojiDeleteIcon>
@@ -182,8 +189,9 @@ const MomentPreviewScreen: React.FC<MomentPreviewScreenProps> = ({ route }) => {
         {isEmojiSelectorVisible && (
           <EmojiSelector
             onEmojiSelected={handleSelectedEmoji}
-            showSearchBar={false}
             columns={8}
+            showSectionTitles={false}
+            showTabs={false}
           />
         )}
         <BottomSheetModal
