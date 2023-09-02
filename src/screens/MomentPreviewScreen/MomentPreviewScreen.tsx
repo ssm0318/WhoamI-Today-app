@@ -28,8 +28,6 @@ const MomentPreviewScreen: React.FC<MomentPreviewScreenProps> = ({ route }) => {
   const PHOTO_SIZE = width - 2 * DEFAULT_MARGIN;
   const [draft, setDraft] = useState<MomentType.TodayMoment>(initialDraft);
 
-  console.log(31, draft);
-
   const isMoodInputEditable = !todayMoment.mood;
   const isDescriptionInputEditalbe = !todayMoment.description;
 
