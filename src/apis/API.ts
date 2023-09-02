@@ -12,7 +12,7 @@ export const API_BASE_URL = {
 
 /** API Instance */
 const JSON_DEFAULT_OPTIONS: AxiosRequestConfig = {
-  baseURL: API_BASE_URL.DEV,
+  baseURL: API_BASE_URL.PROD,
   withCredentials: true,
   xsrfHeaderName: 'X-CSRFTOKEN',
   xsrfCookieName: 'csrftoken',
@@ -55,7 +55,7 @@ const API = (() => {
 
 /** BLOB API Instance */
 const BLOB_DEFAULT_OPTIONS = {
-  baseURL: API_BASE_URL.DEV,
+  baseURL: API_BASE_URL.PROD,
   withCredentials: true,
   xsrfHeaderName: 'X-CSRFTOKEN',
   xsrfCookieName: 'csrftoken',
