@@ -54,7 +54,7 @@ const MomentPhotoUploadScreen: React.FC<MomentPhotoUploadScreenProps> = ({
 
   const handleConfirm = async () => {
     if (!cameraPreviewUrl) return;
-    navigation.navigate('MomentPreviewScreen', {
+    navigation.push('MomentPreviewScreen', {
       todayMoment,
       draft,
       photoPreviewUrl: cameraPreviewUrl,
