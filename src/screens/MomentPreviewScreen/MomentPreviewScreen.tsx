@@ -82,7 +82,7 @@ const MomentPreviewScreen: React.FC<MomentPreviewScreenProps> = ({ route }) => {
     } catch (err) {
       console.error(err);
     }
-  }, [photoPreviewUrl]);
+  }, [photoPreviewUrl, draft, todayMoment]);
 
   const handleClose = () => {
     navigation.navigate('MomentPhotoUploadScreen', {
