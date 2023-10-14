@@ -61,6 +61,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         scalesPageToFit={false}
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
+        incognito={true}
       />
     </SafeAreaView>
   );
