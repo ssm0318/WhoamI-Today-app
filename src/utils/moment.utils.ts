@@ -1,5 +1,5 @@
+import { APP_CONSTS } from '@constants';
 import { MomentType } from '@types';
-import { Platform } from 'react-native';
 import RNFetchBlob from 'rn-fetch-blob';
 
 export const getMomentPhotoFileName = (date: Date) => {
@@ -40,7 +40,7 @@ export const momentFormDataSerializer = (
         filename: fileName,
         type: imageType,
         data: RNFetchBlob.wrap(
-          Platform.OS === 'android' ? value : value.replace('file://', ''),
+          APP_CONSTS.IS_ANDROID ? value : value.replace('file://', ''),
         ),
       });
     } else {

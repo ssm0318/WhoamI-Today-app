@@ -1,2 +1,2 @@
-export * as fcmApis from './fcm.api';
+export * as pushNotificationApis from './pushNotification.api';
 export * as momentApis from './moment.api';
