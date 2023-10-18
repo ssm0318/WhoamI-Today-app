@@ -1,11 +1,10 @@
 import React, { useLayoutEffect, useMemo } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { getRoutes } from './routes';
-import { useAsyncEffect, useLocalMessage } from '@hooks';
+import { useAsyncEffect, useFirebaseMessage, useLocalMessage } from '@hooks';
 import { getDeviceLanguage } from '@tools';
 import BootSplash from 'react-native-bootsplash';
 import { useTranslation } from 'react-i18next';
-import useFirebaseMessage from 'src/hooks/useFirebaseMessage';
 
 const RootNavigator = () => {
   const { i18n } = useTranslation();

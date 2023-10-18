@@ -4,9 +4,13 @@ import { WebView } from 'react-native-webview';
 import { WEBVIEW_CONSTS } from '@constants';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenRouteParamList } from '@screens';
-import { useAppStateActiveEffect, useAsyncEffect, useWebView } from '@hooks';
+import {
+  useAppStateActiveEffect,
+  useAsyncEffect,
+  useFirebaseMessage,
+  useWebView,
+} from '@hooks';
 import { checkCookie } from '@tools';
-import useFirebaseMessage from 'src/hooks/useFirebaseMessage';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/home' } = route.params;
@@ -50,6 +54,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         thirdPartyCookiesEnabled
         incognito={true}
         onLoad={() => {
+          // WebView 컴포넌트가 완전히 load 된 후에 동작
           syncPushNotiPermission();
         }}
       />
