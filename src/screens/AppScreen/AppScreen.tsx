@@ -1,44 +1,31 @@
-import React, { useCallback, useLayoutEffect } from 'react';
+import React, { useCallback } from 'react';
 import { SafeAreaView, StatusBar, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { WEBVIEW_CONSTS } from '@constants';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenRouteParamList } from '@screens';
-import {
-  useAppStateEffect,
-  useAsyncEffect,
-  usePushNotification,
-  useWebView,
-} from '@hooks';
-import { FirebaseNotification, LocalNotification } from '@libs';
+import { useAppStateActiveEffect, useAsyncEffect, useWebView } from '@hooks';
 import { checkCookie } from '@tools';
+import useFirebaseMessage from 'src/hooks/useFirebaseMessage';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/home' } = route.params;
   const WEBVIEW_URL = WEBVIEW_CONSTS.WEB_VIEW_URL.PROD + url;
 
   const { ref, onMessage, postMessage } = useWebView();
-  const { updateFcmToken } = usePushNotification();
+  const { updatePushToken, hasPermission, deletePushToken } =
+    useFirebaseMessage();
 
-  useLayoutEffect(() => {
-    StatusBar.setBarStyle('dark-content', true);
-
-    // initialize LocalNotification
-    LocalNotification.initialize(ref);
+  const syncPushNotiPermission = useCallback(async () => {
+    hasPermission().then(async (enabled) => {
+      postMessage('SET_NOTI_PERMISSION', { value: enabled });
+      enabled ? await updatePushToken() : await deletePushToken();
+    });
   }, []);
 
   // 푸시 권한 허용 변경 후 다시 앱으로 돌아왔을 때
-  useAppStateEffect(
-    useCallback(async (state) => {
-      if (state === 'active' || state === 'unknown') {
-        FirebaseNotification.getPermissionEnabled().then((enabled) => {
-          postMessage('SET_NOTI_PERMISSION', { value: enabled });
-          updateFcmToken(enabled);
-        });
-      }
-    }, []),
-    [],
-  );
+  useAppStateActiveEffect(syncPushNotiPermission);
+  useAsyncEffect(syncPushNotiPermission, []);
 
   useAsyncEffect(async () => {
     await checkCookie(WEBVIEW_URL);
@@ -62,6 +49,9 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         incognito={true}
+        onLoad={() => {
+          syncPushNotiPermission();
+        }}
       />
     </SafeAreaView>
   );
@@ -82,4 +72,4 @@ export type AppScreenRoute = {
   };
 };
 
-export default React.memo(AppScreen);
+export default AppScreen;

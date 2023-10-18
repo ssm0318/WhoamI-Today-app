@@ -1,4 +1,4 @@
-import { useNavigation } from '@hooks';
+import { useNavigationService } from '@hooks';
 import { redirectSetting } from '@tools';
 import { useCallback, useRef, useState } from 'react';
 import { Linking } from 'react-native';
@@ -9,7 +9,7 @@ import { ScreenRouteParamList } from '@screens';
 const useWebView = () => {
   const [loadProgress, setLoadProgress] = useState(0);
   const ref = useRef<WebView>(null);
-  const navigation = useNavigation(); // useNavigation 훅을 사용하여 navigation 객체를 가져옴
+  const navigation = useNavigationService();
 
   const postMessage = useCallback((key: string, data: any) => {
     ref.current?.postMessage(JSON.stringify({ key, data }));
