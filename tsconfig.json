@@ -19,7 +19,7 @@
       "@types": ["src/types/index"],
       "@tools": ["src/tools/index"],
       "@components": ["src/components/index"],
-      "@libs": ["src/libs/index"],
+      "@libs/*": ["src/libs/*"],
       "@screens": ["src/screens/index"],
       "@apis": ["src/apis/index"],
       "@utils": ["src/utils/index"],
