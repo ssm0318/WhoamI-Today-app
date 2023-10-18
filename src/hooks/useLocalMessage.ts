@@ -44,11 +44,9 @@ const useLocalMessage = () => {
   const initialize = () => {
     console.log('[Local Message] : initialize');
     notifee.onForegroundEvent((event) => {
-      console.log('onForegroundEvent', event);
       if (event.type === EventType.PRESS) {
         const url = event.detail.notification?.data?.url;
         if (typeof url !== 'string') return;
-        console.log(51, url);
         NavigationService.navigate('AppScreen', {
           url,
         });
@@ -56,11 +54,9 @@ const useLocalMessage = () => {
     });
 
     notifee.onBackgroundEvent(async (event) => {
-      console.log('onBackgroundEvent', event);
       if (event.type === EventType.PRESS) {
         const url = event.detail.notification?.data?.url;
         if (typeof url !== 'string') return;
-        console.log(61, url);
         NavigationService.navigate('AppScreen', {
           url,
         });
