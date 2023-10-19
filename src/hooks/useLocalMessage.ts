@@ -64,30 +64,6 @@ const useLocalMessage = () => {
     });
   };
 
-  const requestPermission = useCallback(async () => {
-    const settings = await notifee.requestPermission();
-    if (settings.authorizationStatus === AuthorizationStatus.DENIED) {
-      return Alert.alert(
-        '알림 권한이 필요해요',
-        '앱 설정에서 알림을 허용하고 알림 기능을 사용하시겠어요?',
-        [
-          {
-            text: '취소',
-            style: 'cancel',
-          },
-          {
-            text: '설정하러 가기',
-            onPress: async () => {
-              if (APP_CONSTS.IS_ANDROID)
-                await notifee.openAlarmPermissionSettings();
-              else await Linking.openSettings();
-            },
-          },
-        ],
-      );
-    }
-  }, []);
-
   const getSettingsForAndroid =
     useCallback(async (): Promise<NotificationAndroid> => {
       return {
@@ -119,7 +95,6 @@ const useLocalMessage = () => {
 
   return {
     initialize,
-    requestPermission,
     displayNotification,
     hasNotificationPermission,
   };
