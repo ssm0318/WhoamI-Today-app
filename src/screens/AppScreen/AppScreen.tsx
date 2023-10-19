@@ -10,7 +10,7 @@ import {
   useFirebaseMessage,
   useWebView,
 } from '@hooks';
-import { checkCookie } from '@tools';
+import { FcmTokenStorage, checkCookie } from '@tools';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/home' } = route.params;
@@ -23,7 +23,13 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const syncPushNotiPermission = useCallback(async () => {
     hasPermission().then(async (enabled) => {
       postMessage('SET_NOTI_PERMISSION', { value: enabled });
-      enabled ? await updatePushToken() : await deletePushToken();
+      const { fcmToken: pushToken } = await FcmTokenStorage.getToken();
+      if (enabled) {
+        // 중복 호출을 막기 위해 storage에 pushToken이 없을 때만 호출
+        if (!pushToken) await updatePushToken();
+      } else {
+        return await deletePushToken();
+      }
     });
   }, []);
 

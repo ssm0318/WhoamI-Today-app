@@ -9,7 +9,6 @@ import 'intl-pluralrules';
 import './src/i18n';
 import messaging from '@react-native-firebase/messaging';
 import useFirebaseMessage from './src/hooks/useFirebaseMessage';
-
 import { useEffect } from 'react';
 
 const AppWrapper = () => {
@@ -18,10 +17,6 @@ const AppWrapper = () => {
   useEffect(() => {
     const unsubscribeBackgroundMessage =
       messaging().setBackgroundMessageHandler((remoteMessage) => {
-        console.log(
-          '[Firebase remote message on background] : ',
-          remoteMessage,
-        );
         handleOnMessage(remoteMessage);
       });
 

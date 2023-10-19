@@ -76,6 +76,7 @@ const useFirebaseMessage = () => {
   const deletePushToken = useCallback(async () => {
     if (await DeviceInfo.isEmulator()) return;
     try {
+      // 어떤 pushToken에 대한 off를 할 것인지 정해야 하므로 FcmTokenStorage으로 관리
       const { fcmToken: pushToken } = await FcmTokenStorage.getToken();
       if (!pushToken) return;
       await FcmTokenStorage.removeToken();

@@ -1,5 +1,4 @@
 import { useCallback } from 'react';
-import { Alert, Linking } from 'react-native';
 import notifee, {
   AndroidImportance,
   AndroidVisibility,
@@ -7,9 +6,8 @@ import notifee, {
   EventType,
   NotificationAndroid,
 } from '@notifee/react-native';
-import WebView from 'react-native-webview';
 import i18n from 'i18next';
-import { APP_CONSTS, WEBVIEW_CONSTS } from '@constants';
+import { APP_CONSTS } from '@constants';
 import NavigationService from '@libs/NavigationService';
 
 export type LocalMessage = {
