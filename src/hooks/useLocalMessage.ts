@@ -3,6 +3,7 @@ import notifee, {
   AndroidImportance,
   AndroidVisibility,
   AuthorizationStatus,
+  Event,
   EventType,
   NotificationAndroid,
 } from '@notifee/react-native';
@@ -41,7 +42,7 @@ const useLocalMessage = () => {
 
   const initialize = () => {
     console.log('[Local Message] : initialize');
-    notifee.onForegroundEvent((event) => {
+    const handleNavigate = async (event: Event) => {
       if (event.type === EventType.PRESS) {
         const url = event.detail.notification?.data?.url;
         if (typeof url !== 'string') return;
@@ -49,17 +50,10 @@ const useLocalMessage = () => {
           url,
         });
       }
-    });
+    };
 
-    notifee.onBackgroundEvent(async (event) => {
-      if (event.type === EventType.PRESS) {
-        const url = event.detail.notification?.data?.url;
-        if (typeof url !== 'string') return;
-        NavigationService.navigate('AppScreen', {
-          url,
-        });
-      }
-    });
+    notifee.onForegroundEvent(handleNavigate);
+    notifee.onBackgroundEvent(handleNavigate);
   };
 
   const getSettingsForAndroid =
@@ -79,6 +73,16 @@ const useLocalMessage = () => {
 
     const translatedMessage = i18n.language === 'ko' ? message_ko : message_en;
 
+    // type = cancel 경우 해당 tag를 가진 noti 삭제
+    if (data?.type === 'cancel') {
+      const displayedNotifications = await getDisplayedNotifications();
+      const noti = displayedNotifications.find(
+        (noti) => noti.notification?.data?.tag === data.tag,
+      );
+      if (!noti || !noti.id) return;
+      return await cancelNotification(noti.id);
+    }
+
     notifee.displayNotification({
       title,
       body: translatedMessage || body,
@@ -91,10 +95,20 @@ const useLocalMessage = () => {
     });
   }, []);
 
+  const cancelNotification = useCallback(async (notificationId: string) => {
+    await notifee.cancelNotification(notificationId);
+  }, []);
+
+  const getDisplayedNotifications = useCallback(async () => {
+    const notifications = await notifee.getDisplayedNotifications();
+    return notifications;
+  }, []);
+
   return {
     initialize,
     displayNotification,
     hasNotificationPermission,
+    cancelNotification,
   };
 };
 

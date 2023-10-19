@@ -18,7 +18,6 @@ const useFirebaseMessage = () => {
       const { data } = e;
       if (!data) return;
 
-      //TODO(Gina): 삭제된 알림입니다 처리
       displayNotification(data as LocalMessage);
     },
     [],
