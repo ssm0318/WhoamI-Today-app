@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenRouteParamList } from '@screens';
-import { useAsyncEffect, useCamera, useNavigation } from '@hooks';
+import { useAsyncEffect, useCamera, useNavigationService } from '@hooks';
 import { MomentType } from '@types';
 import * as S from './MomentPhotoUploadScreen.styled';
 import { SvgIcon } from '@components';
@@ -23,7 +23,7 @@ const MomentPhotoUploadScreen: React.FC<MomentPhotoUploadScreenProps> = ({
   const { todayMoment, draft } = route.params;
   const { width } = useWindowDimensions();
   const [t] = useTranslation('translation', { keyPrefix: 'moment' });
-  const navigation = useNavigation();
+  const navigation = useNavigationService();
 
   const {
     cameraRef,
