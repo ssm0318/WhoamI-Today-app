@@ -1,44 +1,41 @@
-import React, { useCallback, useLayoutEffect } from 'react';
+import React, { useCallback } from 'react';
 import { SafeAreaView, StatusBar, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { WEBVIEW_CONSTS } from '@constants';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenRouteParamList } from '@screens';
 import {
-  useAppStateEffect,
+  useAppStateActiveEffect,
   useAsyncEffect,
-  usePushNotification,
+  useFirebaseMessage,
   useWebView,
 } from '@hooks';
-import { FirebaseNotification, LocalNotification } from '@libs';
-import { checkCookie } from '@tools';
+import { FcmTokenStorage, checkCookie } from '@tools';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/home' } = route.params;
   const WEBVIEW_URL = WEBVIEW_CONSTS.WEB_VIEW_URL.PROD + url;
 
   const { ref, onMessage, postMessage } = useWebView();
-  const { updateFcmToken } = usePushNotification();
+  const { updatePushToken, hasPermission, deletePushToken } =
+    useFirebaseMessage();
 
-  useLayoutEffect(() => {
-    StatusBar.setBarStyle('dark-content', true);
-
-    // initialize LocalNotification
-    LocalNotification.initialize(ref);
+  const syncPushNotiPermission = useCallback(async () => {
+    hasPermission().then(async (enabled) => {
+      postMessage('SET_NOTI_PERMISSION', { value: enabled });
+      const { fcmToken: pushToken } = await FcmTokenStorage.getToken();
+      if (enabled) {
+        // 중복 호출을 막기 위해 storage에 pushToken이 없을 때만 호출
+        if (!pushToken) await updatePushToken();
+      } else {
+        return await deletePushToken();
+      }
+    });
   }, []);
 
   // 푸시 권한 허용 변경 후 다시 앱으로 돌아왔을 때
-  useAppStateEffect(
-    useCallback(async (state) => {
-      if (state === 'active' || state === 'unknown') {
-        FirebaseNotification.getPermissionEnabled().then((enabled) => {
-          postMessage('SET_NOTI_PERMISSION', { value: enabled });
-          updateFcmToken(enabled);
-        });
-      }
-    }, []),
-    [],
-  );
+  useAppStateActiveEffect(syncPushNotiPermission);
+  useAsyncEffect(syncPushNotiPermission, []);
 
   useAsyncEffect(async () => {
     await checkCookie(WEBVIEW_URL);
@@ -62,6 +59,13 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         incognito={true}
+        onLoad={() => {
+          // WebView 컴포넌트가 완전히 load 된 후에 동작
+          syncPushNotiPermission();
+        }}
+        onContentProcessDidTerminate={() => {
+          ref.current?.reload();
+        }}
       />
     </SafeAreaView>
   );
@@ -82,4 +86,4 @@ export type AppScreenRoute = {
   };
 };
 
-export default React.memo(AppScreen);
+export default AppScreen;

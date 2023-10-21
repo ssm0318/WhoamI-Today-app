@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenRouteParamList } from '@screens';
-import { useNavigation } from '@hooks';
+import { useNavigationService } from '@hooks';
 import { MomentType } from '@types';
 import { momentApis } from '@apis';
 import * as S from './MomentPreviewScreen.styled';
@@ -22,7 +22,7 @@ import {
 
 const MomentPreviewScreen: React.FC<MomentPreviewScreenProps> = ({ route }) => {
   const { todayMoment, draft: initialDraft, photoPreviewUrl } = route.params;
-  const navigation = useNavigation();
+  const navigation = useNavigationService();
   const [t] = useTranslation('translation', { keyPrefix: 'moment' });
   const { width } = useWindowDimensions();
   const [isEmojiSelectorVisible, setIsEmojiSelectorVisible] = useState(false);
