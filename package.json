@@ -5,9 +5,12 @@
   "scripts": {
     "android": "react-native run-android",
     "ios": "react-native run-ios",
-    "lint": "eslint .",
     "start": "watchman watch-del-all && react-native start --reset-cache",
-    "test": "jest"
+    "test": "jest",
+    "prepare": "husky install",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "generate": "node ./scripts/screen_generator.js",
+    "typescript": "npx tsc --noemit"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
