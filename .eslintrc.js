@@ -47,7 +47,6 @@ module.exports = {
     'react/display-name': 'off',
     '@typescript-eslint/no-unused-vars': ['warn'],
     'no-duplicate-imports': 'error',
-    '@typescript-eslint/no-empty-interface': 'off',
     '@typescript-eslint/no-namespace': 'off',
     'import/named': 'off',
     'import/namespace': 'off',
