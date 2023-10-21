@@ -1,3 +1,4 @@
+import { NavigationContainerRef } from '@react-navigation/native';
 import { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import { ScreenRouteParamList } from '@screens';
 
@@ -9,18 +10,6 @@ export type ScreenOptions = {
 export type RoutesParamsList = ScreenRouteParamList;
 
 export type RouteKeys = keyof RoutesParamsList;
-
-export type InitialRoute = {
-  screeName: RouteKeys | undefined;
-  screenParams: RoutesParamsList[RouteKeys] | undefined;
-};
-
-export type MessageRoute = {
-  screenName: RouteKeys;
-  screenParams?: {
-    [key: string]: any;
-  };
-};
 
 export type RouteObject<T> = { [key in keyof T]: RouteInfo };
 
@@ -42,3 +31,5 @@ export type ResultRoute = {
   options?: NativeStackNavigationOptions;
   allowMaintenance?: boolean;
 };
+
+export type AppNavigation = NavigationContainerRef<RoutesParamsList>;
