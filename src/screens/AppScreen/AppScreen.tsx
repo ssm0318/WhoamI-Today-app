@@ -63,6 +63,9 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
           // WebView 컴포넌트가 완전히 load 된 후에 동작
           syncPushNotiPermission();
         }}
+        onContentProcessDidTerminate={() => {
+          ref.current?.reload();
+        }}
       />
     </SafeAreaView>
   );
