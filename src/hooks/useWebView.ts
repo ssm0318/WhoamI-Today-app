@@ -38,9 +38,10 @@ const useWebView = () => {
       }
       case 'OPEN_SETTING':
         return redirectSetting();
-      case 'SET_COOKIE':
+      case 'SET_COOKIE': {
         const parsedCookie = parseCookie(data.value);
         return saveCookie(parsedCookie);
+      }
       default:
         return;
     }

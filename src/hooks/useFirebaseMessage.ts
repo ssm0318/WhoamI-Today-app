@@ -34,6 +34,7 @@ const useFirebaseMessage = () => {
   };
 
   // permission 이 없으면 요청한다. 있으면 패스니까 언제든지 불러도 괜찮다.
+  // permission 없음 = 한번도 permission에 대한 응답을 유저가 하지 않음
   const requestPermissionIfNot = async (): Promise<boolean> => {
     let enabled = isPermitted(await messaging().hasPermission());
     if (!enabled) {

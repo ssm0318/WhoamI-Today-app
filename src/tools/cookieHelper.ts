@@ -5,7 +5,7 @@ import { CookieType } from '@types';
 
 export const parseCookie = (cookie: string): CookieType.CookieObject => {
   const cookieArr = cookie.split(';');
-  const cookieObj: any = {};
+  const cookieObj: Record<string, string> = {};
   cookieArr.forEach((item) => {
     const [key, value] = item.split('=');
     cookieObj[key.trim()] = value;
