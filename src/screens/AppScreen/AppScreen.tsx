@@ -30,9 +30,8 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
       const { fcmToken: pushToken } = await FcmTokenStorage.getToken();
       if (enabled) {
         // 중복 호출을 막기 위해 storage에 pushToken이 없을 때만 호출
-        if (!pushToken) {
-          return await updatePushToken();
-        }
+        if (pushToken) return;
+        return await updatePushToken();
       } else {
         return await deletePushToken();
       }
