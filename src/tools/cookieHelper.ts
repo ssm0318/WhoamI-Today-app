@@ -18,11 +18,11 @@ export const saveCookie = async (cookieObj?: CookieType.CookieObject) => {
   if (!cookieObj) return;
   const { csrftoken, access_token } = cookieObj;
   const { setCookie } = CookieStorage;
-  await CookieManager.set(WEBVIEW_CONSTS.WEB_VIEW_URL.DEV, {
+  await CookieManager.set(WEBVIEW_CONSTS.WEB_VIEW_URL, {
     name: 'csrftoken',
     value: csrftoken,
   });
-  await CookieManager.set(WEBVIEW_CONSTS.WEB_VIEW_URL.DEV, {
+  await CookieManager.set(WEBVIEW_CONSTS.WEB_VIEW_URL, {
     name: 'access_token',
     value: access_token,
   });
@@ -33,7 +33,7 @@ export const saveCookie = async (cookieObj?: CookieType.CookieObject) => {
 };
 
 export const getCookie = async (): Promise<Cookie> => {
-  const res = await CookieManager.get(WEBVIEW_CONSTS.WEB_VIEW_URL.DEV, true);
+  const res = await CookieManager.get(WEBVIEW_CONSTS.WEB_VIEW_URL, true);
   const { cookie } = res;
   return cookie;
 };

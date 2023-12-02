@@ -14,7 +14,7 @@ import { FcmTokenStorage } from '@tools';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/friends' } = route.params;
-  const WEBVIEW_URL = WEBVIEW_CONSTS.WEB_VIEW_URL.DEV + url;
+  const WEBVIEW_URL = WEBVIEW_CONSTS.WEB_VIEW_URL + url;
 
   const { ref, onMessage, postMessage } = useWebView();
   const {
