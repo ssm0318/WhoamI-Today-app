@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CookieType } from '@types';
 
 export const COOKIE_STORAGE_KEYS = {
   COOKIE: 'COOKIE',
@@ -7,30 +8,25 @@ export const COOKIE_STORAGE_KEYS = {
 export const CookieStorage = (() => {
   // 웹뷰에서 받아온 쿠키 저장
   const setCookie = async ({
-    cookie,
-    accessToken,
-  }: {
-    cookie: string;
-    accessToken: string;
-  }) => {
+    csrftoken,
+    access_token,
+  }: CookieType.CookieObject) => {
     await AsyncStorage.setItem(
       COOKIE_STORAGE_KEYS.COOKIE,
-      JSON.stringify({ cookie, accessToken }),
+      JSON.stringify({ csrftoken, access_token }),
     );
   };
 
   // 쿠키 가져오기
-  const getCookie = async (): Promise<{
-    cookie: string;
-    accessToken: string;
-  }> => {
+  const getCookie = async (): Promise<CookieType.CookieObject> => {
     try {
       const data =
         (await AsyncStorage.getItem(COOKIE_STORAGE_KEYS.COOKIE)) || '';
-      const { cookie, accessToken } = JSON.parse(data);
-      return { cookie, accessToken };
+
+      const { csrftoken, access_token } = JSON.parse(data);
+      return { csrftoken, access_token };
     } catch {
-      return { cookie: '', accessToken: '' };
+      return { csrftoken: '', access_token: '' };
     }
   };
 

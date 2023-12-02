@@ -1,5 +1,5 @@
 import { useNavigationService } from '@hooks';
-import { redirectSetting } from '@tools';
+import { parseCookie, redirectSetting, saveCookie } from '@tools';
 import { useCallback, useRef, useState } from 'react';
 import { Linking } from 'react-native';
 import { WebViewMessageEvent, WebView } from 'react-native-webview';
@@ -38,6 +38,9 @@ const useWebView = () => {
       }
       case 'OPEN_SETTING':
         return redirectSetting();
+      case 'SET_COOKIE':
+        const parsedCookie = parseCookie(data.value);
+        return saveCookie(parsedCookie);
       default:
         return;
     }
