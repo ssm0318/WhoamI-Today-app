@@ -1,15 +1,45 @@
-import CookieManager from '@react-native-cookies/cookies';
+import CookieManager, { Cookie } from '@react-native-cookies/cookies';
 import { CookieStorage } from './cookieStorage';
+import { WEBVIEW_CONSTS } from '@constants';
+import { CookieType } from '@types';
 
-export const checkCookie = async (url: string) => {
-  const { setCookie } = CookieStorage;
-  const res = await CookieManager.get(url);
-
-  const { access_token: accessToken, csrftoken: cookie } = res;
-
-  if (!accessToken || !cookie) return;
-  setCookie({
-    accessToken: accessToken.value || '',
-    cookie: cookie.value || '',
+export const parseCookie = (cookie: string): CookieType.CookieObject => {
+  const cookieArr = cookie.split(';');
+  const cookieObj: Record<string, string> = {};
+  cookieArr.forEach((item) => {
+    const [key, value] = item.split('=');
+    cookieObj[key.trim()] = value;
   });
+
+  return cookieObj as CookieType.CookieObject;
+};
+
+export const saveCookie = async (cookieObj?: CookieType.CookieObject) => {
+  if (!cookieObj) return;
+  const { csrftoken, access_token } = cookieObj;
+  const { setCookie } = CookieStorage;
+  await CookieManager.set(WEBVIEW_CONSTS.WEB_VIEW_URL, {
+    name: 'csrftoken',
+    value: csrftoken,
+  });
+  await CookieManager.set(WEBVIEW_CONSTS.WEB_VIEW_URL, {
+    name: 'access_token',
+    value: access_token,
+  });
+  setCookie({
+    csrftoken: csrftoken,
+    access_token: access_token,
+  });
+};
+
+export const getCookie = async (): Promise<Cookie> => {
+  const res = await CookieManager.get(WEBVIEW_CONSTS.WEB_VIEW_URL, true);
+  const { cookie } = res;
+  return cookie;
+};
+
+export const removeCookie = async () => {
+  const { removeCookie } = CookieStorage;
+  await CookieManager.clearAll(true);
+  removeCookie();
 };
