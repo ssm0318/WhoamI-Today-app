@@ -10,9 +10,11 @@ export const API_BASE_URL = {
   PROD: 'https://diivers.world/api/',
 };
 
+const API_URL = API_BASE_URL.PROD;
+
 /** API Instance */
 const JSON_DEFAULT_OPTIONS: AxiosRequestConfig = {
-  baseURL: API_BASE_URL.DEV,
+  baseURL: API_URL,
   withCredentials: true,
   xsrfHeaderName: 'X-CSRFTOKEN',
   xsrfCookieName: 'csrftoken',
@@ -55,7 +57,7 @@ const API = (() => {
 
 /** BLOB API Instance */
 const BLOB_DEFAULT_OPTIONS = {
-  baseURL: API_BASE_URL.DEV,
+  baseURL: API_URL,
   withCredentials: true,
   xsrfHeaderName: 'X-CSRFTOKEN',
   xsrfCookieName: 'csrftoken',
