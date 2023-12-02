@@ -10,9 +10,11 @@ export const API_BASE_URL = {
   PROD: 'https://diivers.world/api/',
 };
 
+const API_URL = API_BASE_URL.PROD;
+
 /** API Instance */
 const JSON_DEFAULT_OPTIONS: AxiosRequestConfig = {
-  baseURL: API_BASE_URL.PROD,
+  baseURL: API_URL,
   withCredentials: true,
   xsrfHeaderName: 'X-CSRFTOKEN',
   xsrfCookieName: 'csrftoken',
@@ -28,10 +30,10 @@ const API = (() => {
 
   apiInstance.interceptors.request.use(
     async (config: any) => {
-      const { accessToken, cookie } = await getCookie();
-      config.headers.Authorization = `Bearer ${accessToken}`;
-      config.headers.Cookie = `csrftoken=${cookie}`;
-      config.headers['X-Csrftoken'] = cookie;
+      const { access_token, csrftoken } = await getCookie();
+      config.headers.Authorization = `Bearer ${access_token}`;
+      config.headers.Cookie = `csrftoken=${csrftoken}`;
+      config.headers['X-Csrftoken'] = csrftoken;
       return config;
     },
     (err) => {
@@ -55,7 +57,7 @@ const API = (() => {
 
 /** BLOB API Instance */
 const BLOB_DEFAULT_OPTIONS = {
-  baseURL: API_BASE_URL.PROD,
+  baseURL: API_URL,
   withCredentials: true,
   xsrfHeaderName: 'X-CSRFTOKEN',
   xsrfCookieName: 'csrftoken',
@@ -69,12 +71,12 @@ const BlobAPI = ((): BlobAPIInstance => {
   const { getCookie } = CookieStorage;
 
   const fetch = async (method: Methods, url: string, body?: any | null) => {
-    const { accessToken, cookie } = await getCookie();
+    const { csrftoken, access_token } = await getCookie();
     const fullHeaders = {
       ...BLOB_DEFAULT_OPTIONS.headers,
-      Authorization: `Bearer ${accessToken}`,
-      Cookie: `csrftoken=${cookie}`,
-      'X-Csrftoken': cookie,
+      Authorization: `Bearer ${access_token}`,
+      Cookie: `csrftoken=${csrftoken}`,
+      'X-Csrftoken': csrftoken,
     };
 
     return RNFetchBlob.fetch(

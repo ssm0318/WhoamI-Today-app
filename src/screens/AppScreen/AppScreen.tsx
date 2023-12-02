@@ -10,15 +10,19 @@ import {
   useFirebaseMessage,
   useWebView,
 } from '@hooks';
-import { FcmTokenStorage, checkCookie } from '@tools';
+import { FcmTokenStorage } from '@tools';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
-  const { url = '/home' } = route.params;
-  const WEBVIEW_URL = WEBVIEW_CONSTS.WEB_VIEW_URL.PROD + url;
+  const { url = '/friends' } = route.params;
+  const WEBVIEW_URL = WEBVIEW_CONSTS.WEB_VIEW_URL + url;
 
   const { ref, onMessage, postMessage } = useWebView();
-  const { updatePushToken, hasPermission, deletePushToken } =
-    useFirebaseMessage();
+  const {
+    updatePushToken,
+    hasPermission,
+    deletePushToken,
+    requestPermissionIfNot,
+  } = useFirebaseMessage();
 
   const syncPushNotiPermission = useCallback(async () => {
     hasPermission().then(async (enabled) => {
@@ -26,7 +30,8 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
       const { fcmToken: pushToken } = await FcmTokenStorage.getToken();
       if (enabled) {
         // 중복 호출을 막기 위해 storage에 pushToken이 없을 때만 호출
-        if (!pushToken) await updatePushToken();
+        if (pushToken) return;
+        return await updatePushToken();
       } else {
         return await deletePushToken();
       }
@@ -38,7 +43,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   useAsyncEffect(syncPushNotiPermission, []);
 
   useAsyncEffect(async () => {
-    await checkCookie(WEBVIEW_URL);
+    await requestPermissionIfNot();
   }, []);
 
   return (
@@ -58,8 +63,8 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         scalesPageToFit={false}
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
-        incognito={true}
-        onLoad={() => {
+        domStorageEnabled
+        onLoad={async () => {
           // WebView 컴포넌트가 완전히 load 된 후에 동작
           syncPushNotiPermission();
         }}
