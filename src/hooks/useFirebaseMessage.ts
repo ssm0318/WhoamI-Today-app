@@ -4,21 +4,21 @@ import messaging, {
 } from '@react-native-firebase/messaging';
 import DeviceInfo from 'react-native-device-info';
 import useLocalMessage, { LocalMessage } from './useLocalMessage';
-import { pushNotificationApis } from '@apis';
 import { APP_CONSTS } from '@constants';
 import { FcmTokenStorage } from '@tools';
+import { pushNotificationApi } from '@apis/pushNotification.api';
 
 const useFirebaseMessage = () => {
   const { displayNotification } = useLocalMessage();
 
+  /**
+   * FCM 메시지를 받았을 때 호출되는 함수
+   * NOTE: FCM console에서 보내는 경우 e.notification으로 받지만 서버에서 보내는 경우 e.data로 받는다.
+   */
   const handleOnMessage = useCallback(
     (e: FirebaseMessagingTypes.RemoteMessage) => {
       console.log('[Firebase Remote Message] : ', e);
-
-      const { data } = e;
-      if (!data) return;
-
-      displayNotification(data as LocalMessage);
+      displayNotification(e.data as LocalMessage);
     },
     [],
   );
@@ -63,7 +63,7 @@ const useFirebaseMessage = () => {
       const pushToken = await messaging().getToken();
       await FcmTokenStorage.setToken({ fcmToken: pushToken });
       console.log('[Firebase Device Token] : ', pushToken);
-      await pushNotificationApis.registerPushToken({
+      await pushNotificationApi.registerPushToken({
         type: APP_CONSTS.IS_ANDROID ? 'android' : 'ios',
         registration_id: pushToken,
         active: true,
@@ -80,7 +80,7 @@ const useFirebaseMessage = () => {
       const { fcmToken: pushToken } = await FcmTokenStorage.getToken();
       if (!pushToken) return;
       await FcmTokenStorage.removeToken();
-      await pushNotificationApis.registerPushToken({
+      await pushNotificationApi.registerPushToken({
         type: APP_CONSTS.IS_ANDROID ? 'android' : 'ios',
         registration_id: pushToken,
         active: false,

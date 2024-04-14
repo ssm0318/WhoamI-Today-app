@@ -1,5 +1,5 @@
 import { useNavigationService } from '@hooks';
-import { parseCookie, redirectSetting, saveCookie } from '@tools';
+import { CsrfTokenStorage, TokenStorage, redirectSetting } from '@tools';
 import { useCallback, useRef, useState } from 'react';
 import { Linking } from 'react-native';
 import { WebViewMessageEvent, WebView } from 'react-native-webview';
@@ -20,7 +20,7 @@ const useWebView = () => {
    */
   const onMessage = useCallback(async (event: WebViewMessageEvent) => {
     const data = JSON.parse(event.nativeEvent.data);
-    if (!('actionType' in data)) return;
+    if (!('actionType' in data) || !data) return;
 
     switch (data.actionType) {
       case 'CONSOLE':
@@ -38,9 +38,14 @@ const useWebView = () => {
       }
       case 'OPEN_SETTING':
         return redirectSetting();
-      case 'SET_COOKIE': {
-        const parsedCookie = parseCookie(data.value);
-        return saveCookie(parsedCookie);
+      case 'SET_TOKEN': {
+        if (!data.value) return;
+        const { csrfToken, accessToken } = data.value;
+        csrfToken &&
+          CsrfTokenStorage.setToken({ csrfToken: data.value.csrfToken });
+        accessToken &&
+          TokenStorage.setToken({ accessToken: data.value.accessToken });
+        return;
       }
       default:
         return;

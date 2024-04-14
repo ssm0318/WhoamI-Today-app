@@ -1,9 +1,8 @@
 import { WEBVIEW_CONSTS } from '@constants';
-import { CookieStorage } from '@tools';
 import axios, { AxiosRequestConfig } from 'axios';
 import i18n from 'i18next';
-import RNFetchBlob from 'rn-fetch-blob';
-import { APIInstance, BlobAPIInstance, Methods } from './API.types';
+import { APIInstance } from './API.types';
+import { CsrfTokenStorage, TokenStorage } from '@tools';
 
 export const API_BASE_URL = {
   DEV: `http://${WEBVIEW_CONSTS.WEB_VIEW_DEV_HOSTNAME}:8000/api/`,
@@ -18,6 +17,7 @@ const JSON_DEFAULT_OPTIONS: AxiosRequestConfig = {
   withCredentials: true,
   xsrfHeaderName: 'X-CSRFTOKEN',
   xsrfCookieName: 'csrftoken',
+  withXSRFToken: true,
   headers: {
     'Content-Type': 'application/json',
     'Accept-Language': i18n.language,
@@ -25,26 +25,33 @@ const JSON_DEFAULT_OPTIONS: AxiosRequestConfig = {
 };
 
 const API = (() => {
-  const { getCookie } = CookieStorage;
   const apiInstance: APIInstance = axios.create(JSON_DEFAULT_OPTIONS);
 
-  apiInstance.interceptors.request.use(
-    async (config: any) => {
-      const { access_token, csrftoken } = await getCookie();
-      config.headers.Authorization = `Bearer ${access_token}`;
-      config.headers.Cookie = `csrftoken=${csrftoken}`;
-      config.headers['X-Csrftoken'] = csrftoken;
-      return config;
-    },
-    (err) => {
-      console.log('[API request error]', err);
-      return Promise.reject(err);
-    },
-  );
+  apiInstance.interceptors.request.use(async (config) => {
+    const csrfToken = await CsrfTokenStorage.getToken();
+    const accessToken = await TokenStorage.getToken();
+
+    try {
+      if (accessToken) {
+        config.headers.Authorization = `Bearer ${accessToken}`;
+      }
+
+      if (csrfToken) {
+        config.headers.Cookie = `csrftoken=${csrfToken}`;
+        config.headers['X-Requested-With'] = 'XMLHttpRequest';
+        config.headers['X-CSRFTOKEN'] = csrfToken;
+      }
+    } catch (error) {
+      console.log(accessToken, 48);
+      console.error('[API request error]', error, accessToken);
+      return Promise.reject(error);
+    }
+    return config;
+  });
 
   apiInstance.interceptors.response.use(
     (config) => {
-      return config;
+      return config.data;
     },
     (err) => {
       console.log('[API response error]', err);
@@ -55,53 +62,8 @@ const API = (() => {
   return apiInstance;
 })();
 
-/** BLOB API Instance */
-const BLOB_DEFAULT_OPTIONS = {
-  baseURL: API_URL,
-  withCredentials: true,
-  xsrfHeaderName: 'X-CSRFTOKEN',
-  xsrfCookieName: 'csrftoken',
-  headers: {
-    'Content-Type': 'multipart/form-data',
-    'Accept-Language': i18n.language,
-  },
-};
-
-const BlobAPI = ((): BlobAPIInstance => {
-  const { getCookie } = CookieStorage;
-
-  const fetch = async (method: Methods, url: string, body?: any | null) => {
-    const { csrftoken, access_token } = await getCookie();
-    const fullHeaders = {
-      ...BLOB_DEFAULT_OPTIONS.headers,
-      Authorization: `Bearer ${access_token}`,
-      Cookie: `csrftoken=${csrftoken}`,
-      'X-Csrftoken': csrftoken,
-    };
-
-    return RNFetchBlob.fetch(
-      method,
-      BLOB_DEFAULT_OPTIONS.baseURL + url,
-      fullHeaders,
-      body,
-    )
-      .then((response) => {
-        return response;
-      })
-      .catch((error) => {
-        console.error('[BlobAPI error]', error);
-        throw error;
-      });
-  };
-
-  return {
-    fetch,
-  };
-})();
-
 const ApiService = {
   API,
-  BlobAPI,
 };
 
 export default ApiService;
