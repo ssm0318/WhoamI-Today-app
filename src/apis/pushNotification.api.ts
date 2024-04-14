@@ -8,5 +8,9 @@ type RegisterPushTokenRequest = {
   active: boolean;
 };
 
-export const registerPushToken = (params: RegisterPushTokenRequest) =>
+const registerPushToken = (params: RegisterPushTokenRequest) =>
   API.post('/devices/', params);
+
+export const pushNotificationApi = {
+  registerPushToken,
+};

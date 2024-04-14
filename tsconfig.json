@@ -21,7 +21,7 @@
       "@components": ["src/components/index"],
       "@libs/*": ["src/libs/*"],
       "@screens": ["src/screens/index"],
-      "@apis": ["src/apis/index"],
+      "@apis/*": ["src/apis/*"],
       "@utils": ["src/utils/index"],
       "@navigation": ["src/navigation/index"]
     },
