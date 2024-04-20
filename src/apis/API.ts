@@ -16,8 +16,9 @@ const API_URL = API_BASE_URL.PROD;
 const JSON_DEFAULT_OPTIONS: AxiosRequestConfig = {
   baseURL: API_URL,
   withCredentials: true,
-  xsrfHeaderName: 'X-CSRFTOKEN',
+  xsrfHeaderName: 'X-CSRFToken',
   xsrfCookieName: 'csrftoken',
+  withXSRFToken: true,
   headers: {
     'Content-Type': 'application/json',
     'Accept-Language': i18n.language,
@@ -31,8 +32,7 @@ const API = (() => {
   apiInstance.interceptors.request.use(
     async (config: any) => {
       const { access_token, csrftoken } = await getCookie();
-      config.headers.Authorization = `Bearer ${access_token}`;
-      config.headers.Cookie = `csrftoken=${csrftoken}`;
+      config.headers.Cookie = `access_token=${access_token};csrftoken=${csrftoken}`;
       config.headers['X-Csrftoken'] = csrftoken;
       return config;
     },
