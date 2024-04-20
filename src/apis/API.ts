@@ -10,7 +10,7 @@ export const API_BASE_URL = {
   PROD: 'https://diivers.world/api/',
 };
 
-const API_URL = API_BASE_URL.DEV;
+const API_URL = API_BASE_URL.PROD;
 
 /** API Instance */
 const JSON_DEFAULT_OPTIONS: AxiosRequestConfig = {
