@@ -28,6 +28,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     hasPermission().then(async (enabled) => {
       postMessage('SET_NOTI_PERMISSION', { value: enabled });
       const { fcmToken: pushToken } = await FcmTokenStorage.getToken();
+      console.log(31, pushToken);
       if (enabled) {
         // 중복 호출을 막기 위해 storage에 pushToken이 없을 때만 호출
         // TODO: 만약 서버 DB에 deprecated된 토큰이 많이 생겨 문제 발생시 이 부분 수정 필요
@@ -65,6 +66,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         domStorageEnabled
+        useSharedProcessPool
         onLoad={async () => {
           // WebView 컴포넌트가 완전히 load 된 후에 동작
           syncPushNotiPermission();
