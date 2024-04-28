@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { SafeAreaView, StatusBar, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { WEBVIEW_CONSTS } from '@constants';
@@ -10,11 +10,12 @@ import {
   useFirebaseMessage,
   useWebView,
 } from '@hooks';
-import { FcmTokenStorage } from '@tools';
+import { CookieStorage, FcmTokenStorage } from '@tools';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
-  const { url = '/friends' } = route.params;
+  const { url = '/' } = route.params;
   const WEBVIEW_URL = WEBVIEW_CONSTS.WEB_VIEW_URL + url;
+  const [tokens, setTokens] = useState({ csrftoken: '', access_token: '' });
 
   const { ref, onMessage, postMessage } = useWebView();
   const {
@@ -47,6 +48,17 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     await requestPermissionIfNot();
   }, []);
 
+  const { getCookie } = CookieStorage;
+
+  useEffect(() => {
+    const fetchTokens = async () => {
+      const { access_token, csrftoken } = await getCookie();
+      setTokens({ access_token, csrftoken });
+    };
+
+    fetchTokens();
+  }, []);
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar />
@@ -56,6 +68,13 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         source={{
           uri: WEBVIEW_URL,
         }}
+        injectedJavaScriptBeforeContentLoaded={
+          "document.cookie='csrftoken=" +
+          tokens.csrftoken +
+          "';document.cookie='access_token=" +
+          tokens.access_token +
+          "';"
+        }
         allowsBackForwardNavigationGestures
         decelerationRate="normal"
         javaScriptEnabled
