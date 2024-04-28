@@ -83,7 +83,6 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         scalesPageToFit={false}
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
-        useSharedProcessPool
         domStorageEnabled
         onLoad={async () => {
           // WebView 컴포넌트가 완전히 load 된 후에 동작
