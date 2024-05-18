@@ -1,5 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { SafeAreaView, StatusBar, StyleSheet } from 'react-native';
+import {
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+} from 'react-native';
 import { WebView } from 'react-native-webview';
 import { WEBVIEW_CONSTS } from '@constants';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -16,8 +22,10 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/' } = route.params;
   const WEBVIEW_URL = WEBVIEW_CONSTS.WEB_VIEW_URL + url;
   const [tokens, setTokens] = useState({ csrftoken: '', access_token: '' });
-
+  const [refreshing, setRefreshing] = useState(false);
   const { ref, onMessage, postMessage } = useWebView();
+  const { getCookie } = CookieStorage;
+
   const {
     updatePushToken,
     hasPermission,
@@ -48,8 +56,6 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     await requestPermissionIfNot();
   }, []);
 
-  const { getCookie } = CookieStorage;
-
   useEffect(() => {
     const fetchTokens = async () => {
       const { access_token, csrftoken } = await getCookie();
@@ -59,39 +65,67 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     fetchTokens();
   }, []);
 
+  const triggerRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 2000);
+  };
+
+  React.useEffect(() => {
+    if (refreshing) {
+      triggerRefresh();
+    }
+  }, [refreshing]);
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar />
-      <WebView
-        ref={ref}
-        onMessage={onMessage}
-        source={{
-          uri: WEBVIEW_URL,
-        }}
-        injectedJavaScriptBeforeContentLoaded={
-          "document.cookie='csrftoken=" +
-          tokens.csrftoken +
-          "';document.cookie='access_token=" +
-          tokens.access_token +
-          "';"
+      <ScrollView
+        contentContainerStyle={{ flex: 1 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              triggerRefresh();
+            }}
+          />
         }
-        allowsBackForwardNavigationGestures
-        decelerationRate="normal"
-        javaScriptEnabled
-        injectedJavaScript={WEBVIEW_CONSTS.WEB_VIEW_DEBUGGING_SCRIPT}
-        originWhitelist={['*']}
-        scalesPageToFit={false}
-        sharedCookiesEnabled
-        thirdPartyCookiesEnabled
-        domStorageEnabled
-        onLoad={async () => {
-          // WebView 컴포넌트가 완전히 load 된 후에 동작
-          syncPushNotiPermission();
-        }}
-        onContentProcessDidTerminate={() => {
-          ref.current?.reload();
-        }}
-      />
+      >
+        <WebView
+          ref={ref}
+          onMessage={onMessage}
+          source={{
+            uri: WEBVIEW_URL,
+          }}
+          injectedJavaScriptBeforeContentLoaded={
+            "document.cookie='csrftoken=" +
+            tokens.csrftoken +
+            "';document.cookie='access_token=" +
+            tokens.access_token +
+            "';"
+          }
+          allowsBackForwardNavigationGestures
+          decelerationRate="normal"
+          javaScriptEnabled
+          injectedJavaScript={WEBVIEW_CONSTS.WEB_VIEW_DEBUGGING_SCRIPT}
+          originWhitelist={['*']}
+          scalesPageToFit={false}
+          sharedCookiesEnabled
+          thirdPartyCookiesEnabled
+          domStorageEnabled
+          onLoad={async () => {
+            // WebView 컴포넌트가 완전히 load 된 후에 동작
+            syncPushNotiPermission();
+          }}
+          onContentProcessDidTerminate={() => {
+            ref.current?.reload();
+          }}
+          cacheEnabled={false}
+          cacheMode={'LOAD_NO_CACHE'}
+          incognito={true}
+        />
+      </ScrollView>
     </SafeAreaView>
   );
 };
