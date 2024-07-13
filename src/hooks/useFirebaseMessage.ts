@@ -3,27 +3,20 @@ import messaging, {
   FirebaseMessagingTypes,
 } from '@react-native-firebase/messaging';
 import DeviceInfo from 'react-native-device-info';
-import useLocalMessage, { LocalMessage } from './useLocalMessage';
 import { pushNotificationApis } from '@apis';
 import { APP_CONSTS } from '@constants';
 import { FcmTokenStorage } from '@tools';
+import { displayNotification } from '../tools/pushNotiHelper';
 
 const useFirebaseMessage = () => {
-  const { displayNotification } = useLocalMessage();
-
   const handleOnMessage = useCallback(
-    (e: FirebaseMessagingTypes.RemoteMessage) => {
-      console.log('[Firebase Remote Message] : ', e);
-
-      const { data } = e;
-      if (!data) return;
-
-      displayNotification(data as LocalMessage);
+    (message: FirebaseMessagingTypes.RemoteMessage) => {
+      console.log('[Firebase Remote Message] : ', message);
+      displayNotification(message);
     },
     [],
   );
 
-  // ref: https://rnfirebase.io/messaging/usage
   const isPermitted = (
     status: FirebaseMessagingTypes.AuthorizationStatus,
   ): boolean => {
@@ -33,8 +26,6 @@ const useFirebaseMessage = () => {
     );
   };
 
-  // permission 이 없으면 요청한다. 있으면 패스니까 언제든지 불러도 괜찮다.
-  // permission 없음 = 한번도 permission에 대한 응답을 유저가 하지 않음
   const requestPermissionIfNot = async (): Promise<boolean> => {
     let enabled = isPermitted(await messaging().hasPermission());
     if (!enabled) {
@@ -76,7 +67,6 @@ const useFirebaseMessage = () => {
   const deletePushToken = useCallback(async () => {
     if (await DeviceInfo.isEmulator()) return;
     try {
-      // 어떤 pushToken에 대한 off를 할 것인지 정해야 하므로 FcmTokenStorage으로 관리
       const { fcmToken: pushToken } = await FcmTokenStorage.getToken();
       if (!pushToken) return;
       await FcmTokenStorage.removeToken();

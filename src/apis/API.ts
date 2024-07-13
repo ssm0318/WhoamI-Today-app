@@ -1,20 +1,13 @@
-import { WEBVIEW_CONSTS } from '@constants';
+import { APP_CONSTS } from '@constants';
 import { CookieStorage } from '@tools';
 import axios, { AxiosRequestConfig } from 'axios';
 import i18n from 'i18next';
 import RNFetchBlob from 'rn-fetch-blob';
 import { APIInstance, BlobAPIInstance, Methods } from './API.types';
 
-export const API_BASE_URL = {
-  DEV: `http://${WEBVIEW_CONSTS.WEB_VIEW_DEV_HOSTNAME}:8000/api/`,
-  PROD: 'https://diivers.world/api/',
-};
-
-const API_URL = API_BASE_URL.PROD;
-
 /** API Instance */
 const JSON_DEFAULT_OPTIONS: AxiosRequestConfig = {
-  baseURL: API_URL,
+  baseURL: APP_CONSTS.API_URL,
   withCredentials: true,
   xsrfHeaderName: 'X-CSRFToken',
   xsrfCookieName: 'csrftoken',
@@ -34,6 +27,7 @@ const API = (() => {
       const { access_token, csrftoken } = await getCookie();
       config.headers.Cookie = `access_token=${access_token};csrftoken=${csrftoken}`;
       config.headers['X-Csrftoken'] = csrftoken;
+      console.log('[API request]', config);
       return config;
     },
     (err) => {
@@ -57,7 +51,7 @@ const API = (() => {
 
 /** BLOB API Instance */
 const BLOB_DEFAULT_OPTIONS = {
-  baseURL: API_URL,
+  baseURL: APP_CONSTS.API_URL,
   withCredentials: true,
   xsrfHeaderName: 'X-CSRFTOKEN',
   xsrfCookieName: 'csrftoken',
