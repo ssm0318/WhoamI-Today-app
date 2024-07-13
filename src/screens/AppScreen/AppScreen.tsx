@@ -21,7 +21,6 @@ import { CookieStorage, FcmTokenStorage } from '@tools';
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/' } = route.params;
   const WEBVIEW_URL = APP_CONSTS.WEB_VIEW_URL + url;
-  console.log(24, WEBVIEW_URL);
   const [tokens, setTokens] = useState({ csrftoken: '', access_token: '' });
   const [refreshing, setRefreshing] = useState(false);
   const { ref, onMessage, postMessage } = useWebView();
@@ -77,7 +76,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     if (refreshing) {
       triggerRefresh();
     }
-  }, [refreshing]);
+  }, [refreshing, url]);
 
   return (
     <SafeAreaView style={styles.container}>

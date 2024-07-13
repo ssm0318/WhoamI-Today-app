@@ -1,13 +1,10 @@
 import notifee, {
   AndroidImportance,
   AndroidVisibility,
-  EventType,
-  Event,
   AndroidChannel,
   NotificationAndroid,
 } from '@notifee/react-native';
 import { APP_CONSTS } from '@constants';
-import NavigationService from '@libs/NavigationService';
 import { FirebaseMessagingTypes } from '@react-native-firebase/messaging';
 
 export const androidChannelId = async (): Promise<string> => {
@@ -62,19 +59,4 @@ export const displayNotification = async (
         }
       : {}),
   });
-};
-
-export const initialize = (): void => {
-  console.log('[Push Notification] : initialize');
-  const handleNavigate = async (event: Event) => {
-    if (event.type === EventType.PRESS) {
-      const url = event.detail.notification?.data?.url;
-      if (typeof url === 'string') {
-        NavigationService.navigate('AppScreen', { url });
-      }
-    }
-  };
-
-  notifee.onForegroundEvent(handleNavigate);
-  notifee.onBackgroundEvent(handleNavigate);
 };

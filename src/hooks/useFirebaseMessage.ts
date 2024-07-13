@@ -7,6 +7,8 @@ import { pushNotificationApis } from '@apis';
 import { APP_CONSTS } from '@constants';
 import { FcmTokenStorage } from '@tools';
 import { displayNotification } from '../tools/pushNotiHelper';
+import notifee, { EventType } from '@notifee/react-native';
+import NavigationService from '@libs/NavigationService';
 
 const useFirebaseMessage = () => {
   const handleOnMessage = useCallback(
@@ -38,10 +40,46 @@ const useFirebaseMessage = () => {
   const hasPermission = async (): Promise<boolean> =>
     isPermitted(await messaging().hasPermission());
 
+  const handleNotificationPress = useCallback(
+    (remoteMessage: FirebaseMessagingTypes.RemoteMessage) => {
+      console.log('[Firebase Message] : Notification pressed', remoteMessage);
+
+      // Extract navigation data from the notification
+      const { data } = remoteMessage;
+      if (data && data.screen) {
+        // Navigate to the specified screen
+        console.log('[Firebase Message] : Navigate to screen', data.url);
+      }
+    },
+    [],
+  );
+
   const initialize = useCallback(async () => {
     console.log('[Firebase Message] : initialize');
+
+    // Handle foreground messages
     messaging().onMessage(handleOnMessage);
-  }, []);
+
+    // Handle notification presses when app is in background
+    messaging().onNotificationOpenedApp(handleNotificationPress);
+
+    // Check if app was opened from a notification
+    const initialNotification = await messaging().getInitialNotification();
+    if (initialNotification) {
+      handleNotificationPress(initialNotification);
+    }
+
+    // Handle notification presses for foreground notifications
+    notifee.onForegroundEvent(({ type, detail }) => {
+      if (type === EventType.PRESS) {
+        const destinationUrl = detail.notification?.data?.url;
+        if (destinationUrl && typeof destinationUrl === 'string')
+          NavigationService.navigate('AppScreen', {
+            url: destinationUrl,
+          });
+      }
+    });
+  }, [handleOnMessage, handleNotificationPress]);
 
   const updatePushToken = useCallback(async () => {
     if (await DeviceInfo.isEmulator()) return;
