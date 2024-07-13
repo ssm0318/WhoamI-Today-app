@@ -1,11 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  RefreshControl,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-} from 'react-native';
+import { SafeAreaView, StatusBar, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { APP_CONSTS, WEBVIEW_CONSTS } from '@constants';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -81,51 +75,39 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar />
-      <ScrollView
-        contentContainerStyle={{ flex: 1 }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              triggerRefresh();
-            }}
-          />
+      <WebView
+        ref={ref}
+        onMessage={onMessage}
+        source={{
+          uri: WEBVIEW_URL,
+        }}
+        injectedJavaScriptBeforeContentLoaded={
+          "document.cookie='csrftoken=" +
+          tokens.csrftoken +
+          "';document.cookie='access_token=" +
+          tokens.access_token +
+          "';"
         }
-      >
-        <WebView
-          ref={ref}
-          onMessage={onMessage}
-          source={{
-            uri: WEBVIEW_URL,
-          }}
-          injectedJavaScriptBeforeContentLoaded={
-            "document.cookie='csrftoken=" +
-            tokens.csrftoken +
-            "';document.cookie='access_token=" +
-            tokens.access_token +
-            "';"
-          }
-          allowsBackForwardNavigationGestures
-          decelerationRate="normal"
-          javaScriptEnabled
-          injectedJavaScript={WEBVIEW_CONSTS.WEB_VIEW_DEBUGGING_SCRIPT}
-          originWhitelist={['*']}
-          scalesPageToFit={false}
-          sharedCookiesEnabled
-          thirdPartyCookiesEnabled
-          domStorageEnabled
-          onLoad={async () => {
-            // WebView 컴포넌트가 완전히 load 된 후에 동작
-            syncPushNotiPermission();
-          }}
-          onContentProcessDidTerminate={() => {
-            ref.current?.reload();
-          }}
-          cacheEnabled={false}
-          cacheMode={'LOAD_NO_CACHE'}
-          incognito={true}
-        />
-      </ScrollView>
+        allowsBackForwardNavigationGestures
+        decelerationRate="normal"
+        javaScriptEnabled
+        injectedJavaScript={WEBVIEW_CONSTS.WEB_VIEW_DEBUGGING_SCRIPT}
+        originWhitelist={['*']}
+        scalesPageToFit={false}
+        sharedCookiesEnabled
+        thirdPartyCookiesEnabled
+        domStorageEnabled
+        onLoad={async () => {
+          // WebView 컴포넌트가 완전히 load 된 후에 동작
+          syncPushNotiPermission();
+        }}
+        onContentProcessDidTerminate={() => {
+          ref.current?.reload();
+        }}
+        cacheEnabled={false}
+        cacheMode={'LOAD_NO_CACHE'}
+        incognito={true}
+      />
     </SafeAreaView>
   );
 };
