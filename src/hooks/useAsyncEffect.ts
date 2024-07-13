@@ -1,6 +1,8 @@
 import React from 'react';
 
-const useAsyncEffect = (func: Function, dependency: Array<any>) => {
+type AsyncFunction = () => Promise<void>;
+
+const useAsyncEffect = (func: AsyncFunction, dependency: Array<any>) => {
   React.useEffect(() => {
     (async () => {
       await func();

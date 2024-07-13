@@ -1,7 +1,7 @@
 import React, { useLayoutEffect, useMemo } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { getRoutes } from './routes';
-import { useAsyncEffect, useFirebaseMessage, useLocalMessage } from '@hooks';
+import { useAsyncEffect, useFirebaseMessage } from '@hooks';
 import { getDeviceLanguage } from '@tools';
 import BootSplash from 'react-native-bootsplash';
 import { useTranslation } from 'react-i18next';
@@ -10,14 +10,11 @@ const RootNavigator = () => {
   const { i18n } = useTranslation();
 
   const { initialize: initializeFirebaseMessage } = useFirebaseMessage();
-  const { initialize: initializeLocalMessage } = useLocalMessage();
 
   const { routes } = useMemo(() => getRoutes(), []);
 
   useLayoutEffect(() => {
-    // initialize FirebaseNotification
     initializeFirebaseMessage();
-    initializeLocalMessage();
 
     // initialize language
     // TODO 추후에는 언어 설정에서 직접 설정할 수 있도록

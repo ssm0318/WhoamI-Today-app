@@ -8,24 +8,19 @@ import { name as appName } from './app.json';
 import 'intl-pluralrules';
 import './src/i18n';
 import messaging from '@react-native-firebase/messaging';
-import useFirebaseMessage from './src/hooks/useFirebaseMessage';
-import { useEffect } from 'react';
 
-const AppWrapper = () => {
-  const { handleOnMessage } = useFirebaseMessage();
+// Background handling with Firebase messaging
+messaging().setBackgroundMessageHandler(async (remoteMessage) => {
+  console.log('[Firebase remote message on background] : ', remoteMessage);
+});
 
-  useEffect(() => {
-    const unsubscribeBackgroundMessage =
-      messaging().setBackgroundMessageHandler((remoteMessage) => {
-        handleOnMessage(remoteMessage);
-      });
-
-    return () => {
-      unsubscribeBackgroundMessage();
-    };
-  }, []);
+function HeadlessCheck({ isHeadless }) {
+  if (isHeadless) {
+    // App has been launched in the background by iOS, ignore
+    return null;
+  }
 
   return <App />;
-};
+}
 
-AppRegistry.registerComponent(appName, () => AppWrapper);
+AppRegistry.registerComponent(appName, () => HeadlessCheck);

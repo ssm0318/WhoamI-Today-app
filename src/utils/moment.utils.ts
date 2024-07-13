@@ -24,7 +24,7 @@ type RNFetchBlobData = {
 export const momentFormDataSerializer = (
   moment: Partial<MomentType.TodayMoment>,
 ) => {
-  let formData: RNFetchBlobData = [];
+  const formData: RNFetchBlobData = [];
 
   Object.keys(moment).forEach((key) => {
     const _key = key as keyof MomentType.TodayMoment;
@@ -44,7 +44,7 @@ export const momentFormDataSerializer = (
         ),
       });
     } else {
-      if (!!value) formData.push({ name: key, data: value || '' });
+      if (value) formData.push({ name: key, data: value || '' });
     }
   });
   return formData;

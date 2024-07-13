@@ -7,7 +7,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { WEBVIEW_CONSTS } from '@constants';
+import { APP_CONSTS, WEBVIEW_CONSTS } from '@constants';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenRouteParamList } from '@screens';
 import {
@@ -20,7 +20,7 @@ import { CookieStorage, FcmTokenStorage } from '@tools';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/' } = route.params;
-  const WEBVIEW_URL = WEBVIEW_CONSTS.WEB_VIEW_URL + url;
+  const WEBVIEW_URL = APP_CONSTS.WEB_VIEW_URL + url;
   const [tokens, setTokens] = useState({ csrftoken: '', access_token: '' });
   const [refreshing, setRefreshing] = useState(false);
   const { ref, onMessage, postMessage } = useWebView();
@@ -76,7 +76,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     if (refreshing) {
       triggerRefresh();
     }
-  }, [refreshing]);
+  }, [refreshing, url]);
 
   return (
     <SafeAreaView style={styles.container}>
