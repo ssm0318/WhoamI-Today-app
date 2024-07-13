@@ -6,7 +6,6 @@ import notifee, {
   AndroidChannel,
   NotificationAndroid,
 } from '@notifee/react-native';
-import i18n from 'i18next';
 import { APP_CONSTS } from '@constants';
 import NavigationService from '@libs/NavigationService';
 import { FirebaseMessagingTypes } from '@react-native-firebase/messaging';
@@ -41,9 +40,6 @@ export const displayNotification = async (
 
   if (!notification) return;
   const { title, body } = notification;
-  const { message_en, message_ko } = JSON.parse(body || '{}');
-
-  const translatedMessage = i18n.language === 'ko' ? message_ko : message_en;
 
   if (data?.type === 'cancel') {
     const displayedNotifications = await notifee.getDisplayedNotifications();
@@ -58,7 +54,7 @@ export const displayNotification = async (
 
   await notifee.displayNotification({
     title,
-    body: translatedMessage,
+    body,
     data,
     ...(APP_CONSTS.IS_ANDROID
       ? {
