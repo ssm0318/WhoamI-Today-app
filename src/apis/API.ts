@@ -1,9 +1,9 @@
 import { APP_CONSTS } from '@constants';
 import { CookieStorage } from '@tools';
 import axios, { AxiosRequestConfig } from 'axios';
-import i18n from 'i18next';
 import RNFetchBlob from 'rn-fetch-blob';
 import { APIInstance, BlobAPIInstance, Methods } from './API.types';
+import i18n from 'i18next';
 
 /** API Instance */
 const JSON_DEFAULT_OPTIONS: AxiosRequestConfig = {
