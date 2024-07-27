@@ -17,6 +17,8 @@
   // They will be passed down to the ViewController used by React Native.
   self.initialProps = @{};
 
+  [[NSBundle mainBundle] setPreferredLocalizations:@[[NSLocale preferredLanguages].firstObject]];
+
   return [super application:application didFinishLaunchingWithOptions:launchOptions];
 }
 
