@@ -3,6 +3,7 @@
 #import "RNBootSplash.h" 
 
 #import <React/RCTBundleURLProvider.h>
+#import <React/RCTRootView.h>
 
 @implementation AppDelegate
 
@@ -17,7 +18,9 @@
   // They will be passed down to the ViewController used by React Native.
   self.initialProps = @{};
 
-  [[NSBundle mainBundle] setPreferredLocalizations:@[[NSLocale preferredLanguages].firstObject]];
+  NSArray *preferredLocalizations = @[@"en", @"ko"];
+  [[NSUserDefaults standardUserDefaults] setObject:preferredLocalizations forKey:@"AppleLanguages"];
+  [[NSUserDefaults standardUserDefaults] synchronize];
 
   return [super application:application didFinishLaunchingWithOptions:launchOptions];
 }
