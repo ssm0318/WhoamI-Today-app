@@ -3,7 +3,6 @@
 #import "RNBootSplash.h" 
 
 #import <React/RCTBundleURLProvider.h>
-#import <React/RCTRootView.h>
 
 @implementation AppDelegate
 
@@ -17,10 +16,6 @@
   // You can add your custom initial props in the dictionary below.
   // They will be passed down to the ViewController used by React Native.
   self.initialProps = @{};
-
-  NSArray *preferredLocalizations = @[@"en", @"ko"];
-  [[NSUserDefaults standardUserDefaults] setObject:preferredLocalizations forKey:@"AppleLanguages"];
-  [[NSUserDefaults standardUserDefaults] synchronize];
 
   return [super application:application didFinishLaunchingWithOptions:launchOptions];
 }
