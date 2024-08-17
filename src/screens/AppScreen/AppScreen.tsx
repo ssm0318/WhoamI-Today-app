@@ -19,12 +19,8 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { ref, onMessage, postMessage } = useWebView();
   const { getCookie } = CookieStorage;
 
-  const {
-    updatePushToken,
-    hasPermission,
-    deletePushToken,
-    requestPermissionIfNot,
-  } = useFirebaseMessage();
+  const { registerOrUpdatePushToken, hasPermission, requestPermissionIfNot } =
+    useFirebaseMessage();
 
   const syncPushNotiPermission = useCallback(async () => {
     hasPermission().then(async (enabled) => {
@@ -33,10 +29,10 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
       if (enabled) {
         // 중복 호출을 막기 위해 storage에 pushToken이 없을 때만 호출
         // TODO: 만약 서버 DB에 deprecated된 토큰이 많이 생겨 문제 발생시 이 부분 수정 필요
-        if (pushToken) return;
-        return await updatePushToken();
+        // if (pushToken) return;
+        return await registerOrUpdatePushToken(true);
       } else {
-        return await deletePushToken();
+        return await registerOrUpdatePushToken(false);
       }
     });
   }, []);
@@ -91,7 +87,6 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
           ref.current?.reload();
         }}
         cacheEnabled={false}
-        cacheMode={'LOAD_NO_CACHE'}
         incognito={true}
       />
     </SafeAreaView>
