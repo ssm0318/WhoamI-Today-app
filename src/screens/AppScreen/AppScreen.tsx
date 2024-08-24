@@ -16,16 +16,11 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/' } = route.params;
   const WEBVIEW_URL = APP_CONSTS.WEB_VIEW_URL + url;
   const [tokens, setTokens] = useState({ csrftoken: '', access_token: '' });
-  const [refreshing, setRefreshing] = useState(false);
   const { ref, onMessage, postMessage } = useWebView();
   const { getCookie } = CookieStorage;
 
-  const {
-    updatePushToken,
-    hasPermission,
-    deletePushToken,
-    requestPermissionIfNot,
-  } = useFirebaseMessage();
+  const { registerOrUpdatePushToken, hasPermission, requestPermissionIfNot } =
+    useFirebaseMessage();
 
   const syncPushNotiPermission = useCallback(async () => {
     hasPermission().then(async (enabled) => {
@@ -35,9 +30,9 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         // 중복 호출을 막기 위해 storage에 pushToken이 없을 때만 호출
         // TODO: 만약 서버 DB에 deprecated된 토큰이 많이 생겨 문제 발생시 이 부분 수정 필요
         // if (pushToken) return;
-        return await updatePushToken();
+        return await registerOrUpdatePushToken(true);
       } else {
-        return await deletePushToken();
+        return await registerOrUpdatePushToken(false);
       }
     });
   }, []);
@@ -58,19 +53,6 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
 
     fetchTokens();
   }, []);
-
-  const triggerRefresh = () => {
-    setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 2000);
-  };
-
-  React.useEffect(() => {
-    if (refreshing) {
-      triggerRefresh();
-    }
-  }, [refreshing, url]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -105,7 +87,6 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
           ref.current?.reload();
         }}
         cacheEnabled={false}
-        cacheMode={'LOAD_NO_CACHE'}
         incognito={true}
       />
     </SafeAreaView>

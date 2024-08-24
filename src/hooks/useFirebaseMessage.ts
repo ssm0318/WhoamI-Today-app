@@ -81,51 +81,28 @@ const useFirebaseMessage = () => {
     });
   }, [handleOnMessage, handleNotificationPress]);
 
-  const updatePushToken = useCallback(async () => {
+  const registerOrUpdatePushToken = useCallback(async (active: boolean) => {
     if (await DeviceInfo.isEmulator()) return;
     try {
-      if (!(await requestPermissionIfNot())) {
-        return console.log(
-          '[Firebase Device Token]: user rejected push permission',
-        );
-      }
       const pushToken = await messaging().getToken();
       await FcmTokenStorage.setToken({ fcmToken: pushToken });
       console.log('[Firebase Device Token] : ', pushToken);
       await pushNotificationApis.registerPushToken({
+        device_id: await DeviceInfo.getUniqueId(),
         type: APP_CONSTS.IS_ANDROID ? 'android' : 'ios',
         registration_id: pushToken,
-        active: true,
+        active,
       });
     } catch (e) {
       console.log(e);
     }
   }, []);
-
-  const deletePushToken = useCallback(async () => {
-    if (await DeviceInfo.isEmulator()) return;
-    try {
-      const { fcmToken: pushToken } = await FcmTokenStorage.getToken();
-      if (!pushToken) return;
-      await FcmTokenStorage.removeToken();
-      await pushNotificationApis.registerPushToken({
-        type: APP_CONSTS.IS_ANDROID ? 'android' : 'ios',
-        registration_id: pushToken,
-        active: false,
-      });
-      await messaging().deleteToken();
-    } catch (e) {
-      console.log(e);
-    }
-  }, []);
-
   return {
     initialize,
     handleOnMessage,
     hasPermission,
     requestPermissionIfNot,
-    deletePushToken,
-    updatePushToken,
+    registerOrUpdatePushToken,
   };
 };
 
