@@ -3,7 +3,7 @@ import messaging, {
   FirebaseMessagingTypes,
 } from '@react-native-firebase/messaging';
 import DeviceInfo from 'react-native-device-info';
-import { pushNotificationApis } from '@apis';
+import { notificationApis, pushNotificationApis } from '@apis';
 import { APP_CONSTS } from '@constants';
 import { FcmTokenStorage } from '@tools';
 import { displayNotification } from '../tools/pushNotiHelper';
@@ -73,13 +73,18 @@ const useFirebaseMessage = () => {
     notifee.onForegroundEvent(({ type, detail }) => {
       if (type === EventType.PRESS) {
         const destinationUrl = detail.notification?.data?.url;
-        if (destinationUrl && typeof destinationUrl === 'string')
+        const notificationId = Number(detail.notification?.id);
+        if (destinationUrl && typeof destinationUrl === 'string') {
           NavigationService.navigate('AppScreen', {
             url: destinationUrl,
           });
+
+          // 알림 읽음 처리
+          notificationApis.readNotification([notificationId]);
+        }
       }
     });
-  }, [handleOnMessage, handleNotificationPress]);
+  }, [handleNotificationPress]);
 
   const registerOrUpdatePushToken = useCallback(async (active: boolean) => {
     if (await DeviceInfo.isEmulator()) return;
@@ -97,6 +102,7 @@ const useFirebaseMessage = () => {
       console.log(e);
     }
   }, []);
+
   return {
     initialize,
     handleOnMessage,
