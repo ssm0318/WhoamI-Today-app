@@ -4,17 +4,10 @@ require_relative '../node_modules/@react-native-community/cli-platform-ios/nativ
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
-# If you are using a `react-native-flipper` your iOS build will fail when `NO_FLIPPER=1` is set.
-# because `react-native-flipper` depends on (FlipperKit,...) that will be excluded
-#
-# To fix this you can also exclude `react-native-flipper` using a `react-native.config.js`
-# ```js
-# module.exports = {
-#   dependencies: {
-#     ...(process.env.NO_FLIPPER ? { 'react-native-flipper': { platforms: { ios: null } } } : {}),
-# ```
-flipper_config = ENV['NO_FLIPPER'] == "1" ? FlipperConfiguration.disabled : FlipperConfiguration.enabled
+# Flipper 설정 (Flipper를 완전히 비활성화)
+flipper_config = FlipperConfiguration.disabled
 
+# 사용하려는 프레임워크 설정
 linkage = ENV['USE_FRAMEWORKS']
 if linkage != nil
   Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
@@ -24,41 +17,37 @@ end
 target 'whoAmIToday' do
   config = use_native_modules!
 
+  # 필요한 Firebase 및 Google Utilities 추가
   pod 'GoogleUtilities', :modular_headers => true
   pod 'FirebaseCore', :modular_headers => true
 
+  # react-native-fetch-blob 경로 지정
   pod 'rn-fetch-blob', :path => '../node_modules/rn-fetch-blob'
 
-  # Flags change depending on the env values.
+  # 기본 플래그 가져오기
   flags = get_default_flags()
 
+  # React Native 설정
   use_react_native!(
     :path => config[:reactNativePath],
-    # Hermes is now enabled by default. Disable by setting this flag to false.
-    # Upcoming versions of React Native may rely on get_default_flags(), but
-    # we make it explicit here to aid in the React Native upgrade process.
-    :hermes_enabled => false,
-    :fabric_enabled => flags[:fabric_enabled],
-    # Enables Flipper.
-    #
-    # Note that if you have use_frameworks! enabled, Flipper will not work and
-    # you should disable the next line.
-    :flipper_configuration => flipper_config,
-    # An absolute path to your application root.
+    :hermes_enabled => false,  # Hermes 사용 여부 설정 (false로 설정)
+    :fabric_enabled => flags[:fabric_enabled],  # Fabric 활성화 여부
+    :flipper_configuration => flipper_config,  # Flipper 비활성화
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
 
+  # 테스트 타겟 설정
   target 'whoAmITodayTests' do
     inherit! :complete
-    # Pods for testing
+    # 테스트용 Pods 추가
   end
 
+  # post_install 설정
   post_install do |installer|
+    # React Native 관련 post-install 작업
     react_native_post_install(
       installer,
-      # Set `mac_catalyst_enabled` to `true` in order to apply patches
-      # necessary for Mac Catalyst builds
-      :mac_catalyst_enabled => false
+      :mac_catalyst_enabled => false  # Mac Catalyst 빌드를 위한 설정 (필요한 경우 true로 설정)
     )
     __apply_Xcode_12_5_M1_post_install_workaround(installer)
   end
