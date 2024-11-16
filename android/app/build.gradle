@@ -88,6 +88,14 @@ def reactNativeArchitectures() {
     return value ? value.split(",") : ["armeabi-v7a", "x86", "x86_64", "arm64-v8a"]
 }
 
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
+    }
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
 
@@ -98,8 +106,8 @@ android {
         applicationId "com.whoami.today.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode 33
+        versionName "1.0" 
     }
 
     splits {
@@ -117,6 +125,12 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            storeFile file(localProperties['MYAPP_RELEASE_STORE_FILE'])
+            storePassword localProperties['MYAPP_RELEASE_STORE_PASSWORD']
+            keyAlias localProperties['MYAPP_RELEASE_KEY_ALIAS']
+            keyPassword localProperties['MYAPP_RELEASE_KEY_PASSWORD']
+        }
     }
     buildTypes {
         debug {
@@ -125,7 +139,7 @@ android {
         release {
             // Caution! In production, you need to generate your own keystore file.
             // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
