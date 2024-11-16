@@ -70,17 +70,17 @@ const useFirebaseMessage = () => {
     }
 
     // Handle notification presses for foreground notifications
-    notifee.onForegroundEvent(({ type, detail }) => {
+    notifee.onForegroundEvent(async ({ type, detail }) => {
       if (type === EventType.PRESS) {
         const destinationUrl = detail.notification?.data?.url;
-        const notificationId = Number(detail.notification?.id);
+        const notificationId = Number(detail.notification?.data?.tag);
         if (destinationUrl && typeof destinationUrl === 'string') {
+          // 알림 읽음 처리
+          await notificationApis.readNotification([notificationId]);
+
           NavigationService.navigate('AppScreen', {
             url: destinationUrl,
           });
-
-          // 알림 읽음 처리
-          notificationApis.readNotification([notificationId]);
         }
       }
     });

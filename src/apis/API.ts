@@ -38,6 +38,7 @@ const API = (() => {
 
   apiInstance.interceptors.response.use(
     (config) => {
+      console.log('[API response]', config);
       return config;
     },
     (err) => {
