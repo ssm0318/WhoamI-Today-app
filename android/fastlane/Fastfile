@@ -1,38 +1,33 @@
-# This file contains the fastlane.tools configuration
-# You can find the documentation at https://docs.fastlane.tools
-#
-# For a list of all available actions, check out
-#
-#     https://docs.fastlane.tools/actions
-#
-# For a list of all available plugins, check out
-#
-#     https://docs.fastlane.tools/plugins/available-plugins
-#
-
-# Uncomment the line if you want fastlane to automatically update itself
-# update_fastlane
-
 default_platform(:android)
 
 platform :android do
-  desc "Runs all the tests"
-  lane :test do
-    gradle(task: "test")
-  end
-
-  desc "Submit a new Beta Build to Crashlytics Beta"
+  desc "Submit a new Beta Build"
   lane :beta do
+    # Increment version code in build.gradle
+    path = '../app/build.gradle'
+    
+    # Read current version code
+    s = File.read(path)
+    versionCode = s.match(/versionCode\s+(\d+)/)[1].to_i
+    nextVersionCode = versionCode + 1
+    
+    # Update version code
+    new_contents = s.sub(/versionCode\s+\d+/, "versionCode #{nextVersionCode}")
+    File.write(path, new_contents)
+    
+    # Clean and build release APK
     gradle(task: "clean assembleRelease")
-    crashlytics
-  
-    # sh "your_script.sh"
-    # You can also use other beta testing services here
-  end
+    
+    # Git commands
+    sh "cd .. && git add app/build.gradle"
+    sh "cd .. && git add fastlane/README.md"
 
-  desc "Deploy a new version to the Google Play"
-  lane :deploy do
-    gradle(task: "clean assembleRelease")
-    upload_to_play_store
+    sh "cd .. && git commit --no-verify -m 'Bump version code to #{nextVersionCode} [ci skip]'"
+    
+    # Get current branch name
+    current_branch = sh("git rev-parse --abbrev-ref HEAD").strip
+    
+    # Push changes with upstream setting
+    sh "cd .. && git push --set-upstream origin #{current_branch}"
   end
 end
