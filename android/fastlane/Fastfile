@@ -1,0 +1,33 @@
+default_platform(:android)
+
+platform :android do
+  desc "Submit a new Beta Build"
+  lane :beta do
+    # Increment version code in build.gradle
+    path = '../app/build.gradle'
+    
+    # Read current version code
+    s = File.read(path)
+    versionCode = s.match(/versionCode\s+(\d+)/)[1].to_i
+    nextVersionCode = versionCode + 1
+    
+    # Update version code
+    new_contents = s.sub(/versionCode\s+\d+/, "versionCode #{nextVersionCode}")
+    File.write(path, new_contents)
+    
+    # Clean and build release APK
+    gradle(task: "clean assembleRelease")
+    
+    # Git commands
+    sh "cd .. && git add app/build.gradle"
+    sh "cd .. && git add fastlane/README.md"
+
+    sh "cd .. && git commit --no-verify -m 'Bump version code to #{nextVersionCode} [ci skip]'"
+    
+    # Get current branch name
+    current_branch = sh("git rev-parse --abbrev-ref HEAD").strip
+    
+    # Push changes with upstream setting
+    sh "cd .. && git push --set-upstream origin #{current_branch}"
+  end
+end

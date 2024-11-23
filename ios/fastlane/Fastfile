@@ -1,0 +1,44 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Build app with auto-incrementing build number"
+  lane :beta do
+    ENV["FASTLANE_ITC_TEAM_NAME"] = "JaeWon Kim"
+    
+    # Get current version and build numbers
+    current_version = get_version_number
+    
+    # Increment build number with Apple ID
+    increment_build_number(
+      build_number: latest_testflight_build_number(
+        username: "koyrkr@gmail.com"
+      ) + 1
+    )
+
+    # Get new build number for commit message
+    new_build_number = get_build_number
+    
+    # Pod install
+    cocoapods
+    
+    # Build app
+    build_ios_app(
+      scheme: "WhoAmIToday",
+      export_method: "app-store"
+    )
+
+    # Git commands - using correct relative paths from fastlane directory
+    sh "git add ../Podfile.lock"
+    sh "git add ../WhoAmIToday.xcodeproj"
+    sh "cd .. && git add fastlane/README.md"
+    
+    # Commit changes with --no-verify to skip hooks
+    sh "git commit --no-verify -m 'Bump build number to #{new_build_number} [ci skip]'"
+    
+    # Get current branch name
+    current_branch = sh("git rev-parse --abbrev-ref HEAD").strip
+      
+    # Push changes with upstream setting
+    sh "git push --set-upstream origin #{current_branch}"
+  end
+end

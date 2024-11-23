@@ -407,9 +407,9 @@ PODS:
     - React-perflogger (= 0.71.7)
   - rn-fetch-blob (0.12.0):
     - React-Core
-  - RNBootSplash (4.7.5):
+  - RNBootSplash (6.3.1):
     - React-Core
-  - RNCAsyncStorage (1.23.1):
+  - RNCAsyncStorage (1.24.0):
     - React-Core
   - RNDeviceInfo (10.3.0):
     - React-Core
@@ -421,7 +421,7 @@ PODS:
     - FirebaseCoreExtension (= 10.15.0)
     - React-Core
     - RNFBApp
-  - RNGestureHandler (2.17.1):
+  - RNGestureHandler (2.21.0):
     - RCT-Folly (= 2021.07.22.00)
     - React-Core
   - RNNotifee (7.3.0):
@@ -456,7 +456,7 @@ PODS:
     - React-RCTText
     - ReactCommon/turbomodule/core
     - Yoga
-  - RNScreens (3.20.0):
+  - RNScreens (3.22.0):
     - React-Core
     - React-RCTImage
   - RNSVG (13.14.1):
@@ -680,19 +680,19 @@ SPEC CHECKSUMS:
   React-runtimeexecutor: c5c89f8f543842dd864b63ded1b0bbb9c9445328
   ReactCommon: 7efec56db1e74f34e24beadcdda6942829d19c4c
   rn-fetch-blob: f065bb7ab7fb48dd002629f8bdcb0336602d3cba
-  RNBootSplash: 85f6b879c080e958afdb4c62ee04497b05fd7552
-  RNCAsyncStorage: 826b603ae9c0f88b5ac4e956801f755109fa4d5c
+  RNBootSplash: 66c8458007bda40cc25a3f25e4326244a71d9a73
+  RNCAsyncStorage: ec53e44dc3e75b44aa2a9f37618a49c3bc080a7a
   RNDeviceInfo: 4701f0bf2a06b34654745053db0ce4cb0c53ada7
   RNFBApp: cc9384746945ac0eedd4759171a8abb4c4c5309d
   RNFBMessaging: 3c573398dced30f6cbaf55a195080916ea23f819
-  RNGestureHandler: bbb8e17b10afdafc5cc5746e8f60772236e7e2ca
+  RNGestureHandler: d1ac410ba2504c92cfc2ebda0d414d75e5a1c0ff
   RNNotifee: d585266dd69e1f355d26d074cbfdbdfa6c94b7d5
   RNReanimated: f186e85d9f28c9383d05ca39e11dd194f59093ec
-  RNScreens: 218801c16a2782546d30bd2026bb625c0302d70f
+  RNScreens: 68fd1060f57dd1023880bf4c05d74784b5392789
   RNSVG: af3907ac5d4fa26a862b75a16d8f15bc74f2ceda
   VisionCamera: ed90fd798bd7cb1631373077b3fd51a00d10b30e
   Yoga: d56980c8914db0b51692f55533409e844b66133c
 
-PODFILE CHECKSUM: 7913dd1cb6922b93599923cd7f946c1042f670b5
+PODFILE CHECKSUM: b7486df9145b8dd191581e58dc3e2d9ca3bf13ad
 
-COCOAPODS: 1.12.1
+COCOAPODS: 1.15.2
