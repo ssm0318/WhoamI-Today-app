@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { SafeAreaView, StatusBar, StyleSheet } from 'react-native';
+import { Platform, SafeAreaView, StatusBar, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { APP_CONSTS, WEBVIEW_CONSTS } from '@constants';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -45,6 +45,16 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     await requestPermissionIfNot();
   }, []);
 
+  const injectCookieScript = useCallback(
+    (csrftoken: string, access_token: string) => {
+      return `
+      document.cookie = 'csrftoken=${csrftoken};path=/';
+      document.cookie = 'access_token=${access_token};path=/';
+    `;
+    },
+    [],
+  );
+
   useEffect(() => {
     const fetchTokens = async () => {
       const { access_token, csrftoken } = await getCookie();
@@ -63,13 +73,10 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         source={{
           uri: WEBVIEW_URL,
         }}
-        injectedJavaScriptBeforeContentLoaded={
-          "document.cookie='csrftoken=" +
-          tokens.csrftoken +
-          "';document.cookie='access_token=" +
-          tokens.access_token +
-          "';"
-        }
+        injectedJavaScriptBeforeContentLoaded={injectCookieScript(
+          tokens.csrftoken,
+          tokens.access_token,
+        )}
         allowsBackForwardNavigationGestures
         decelerationRate="normal"
         javaScriptEnabled
@@ -79,8 +86,15 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         domStorageEnabled
-        onLoad={async () => {
-          // WebView 컴포넌트가 완전히 load 된 후에 동작
+        onLoadEnd={async () => {
+          if (Platform.OS === 'android') {
+            // 쿠키가 제대로 설정되지 않았다면 다시 설정
+            if (!tokens.csrftoken) {
+              ref.current?.injectJavaScript(
+                injectCookieScript(tokens.csrftoken, tokens.access_token),
+              );
+            }
+          }
           syncPushNotiPermission();
         }}
         onContentProcessDidTerminate={() => {
