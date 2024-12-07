@@ -31,8 +31,8 @@ export const CookieStorage = (() => {
   };
 
   // 쿠키 삭제
-  const removeCookie = () =>
-    AsyncStorage.removeItem(COOKIE_STORAGE_KEYS.COOKIE);
+  const removeCookie = async () =>
+    await AsyncStorage.removeItem(COOKIE_STORAGE_KEYS.COOKIE);
 
   return { setCookie, getCookie, removeCookie };
 })();
