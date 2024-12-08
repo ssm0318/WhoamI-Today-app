@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Platform, SafeAreaView, StatusBar, StyleSheet } from 'react-native';
+import React, { useCallback } from 'react';
+import { SafeAreaView, StatusBar, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { APP_CONSTS, WEBVIEW_CONSTS } from '@constants';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -10,14 +10,13 @@ import {
   useFirebaseMessage,
   useWebView,
 } from '@hooks';
-import { CookieStorage, FcmTokenStorage } from '@tools';
+import { FcmTokenStorage } from '@tools';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/' } = route.params;
   const WEBVIEW_URL = APP_CONSTS.WEB_VIEW_URL + url;
-  const [tokens, setTokens] = useState({ csrftoken: '', access_token: '' });
-  const { ref, onMessage, postMessage } = useWebView();
-  const { getCookie } = CookieStorage;
+  const { ref, onMessage, postMessage, injectCookieScript, tokens } =
+    useWebView();
 
   const { registerOrUpdatePushToken, hasPermission, requestPermissionIfNot } =
     useFirebaseMessage();
@@ -45,25 +44,6 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     await requestPermissionIfNot();
   }, []);
 
-  const injectCookieScript = useCallback(
-    (csrftoken: string, access_token: string) => {
-      return `
-      document.cookie = 'csrftoken=${csrftoken};path=/';
-      document.cookie = 'access_token=${access_token};path=/';
-    `;
-    },
-    [],
-  );
-
-  useEffect(() => {
-    const fetchTokens = async () => {
-      const { access_token, csrftoken } = await getCookie();
-      setTokens({ access_token, csrftoken });
-    };
-
-    fetchTokens();
-  }, []);
-
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar />
@@ -87,14 +67,6 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         thirdPartyCookiesEnabled
         domStorageEnabled
         onLoadEnd={async () => {
-          if (Platform.OS === 'android') {
-            // 쿠키가 제대로 설정되지 않았다면 다시 설정
-            if (!tokens.csrftoken) {
-              ref.current?.injectJavaScript(
-                injectCookieScript(tokens.csrftoken, tokens.access_token),
-              );
-            }
-          }
           syncPushNotiPermission();
         }}
         onContentProcessDidTerminate={() => {
