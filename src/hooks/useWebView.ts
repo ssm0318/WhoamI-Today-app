@@ -5,7 +5,7 @@ import {
   redirectSetting,
   saveCookie,
 } from '@tools';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking } from 'react-native';
 import { WebViewMessageEvent, WebView } from 'react-native-webview';
 import { WebViewProgressEvent } from 'react-native-webview/lib/WebViewTypes';
@@ -15,9 +15,30 @@ const useWebView = () => {
   const [loadProgress, setLoadProgress] = useState(0);
   const ref = useRef<WebView>(null);
   const navigation = useNavigationService();
+  const [tokens, setTokens] = useState({ csrftoken: '', access_token: '' });
+  const { getCookie } = CookieStorage;
 
   const postMessage = useCallback((key: string, data: any) => {
     ref.current?.postMessage(JSON.stringify({ key, data }));
+  }, []);
+
+  const injectCookieScript = useCallback(
+    (csrftoken: string, access_token: string) => {
+      return `
+        document.cookie = 'csrftoken=${csrftoken};path=/';
+        document.cookie = 'access_token=${access_token};path=/';
+      `;
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const fetchTokens = async () => {
+      const { access_token, csrftoken } = await getCookie();
+      setTokens({ access_token, csrftoken });
+    };
+
+    fetchTokens();
   }, []);
 
   /**
@@ -45,10 +66,21 @@ const useWebView = () => {
         return redirectSetting();
       case 'SET_COOKIE': {
         const parsedCookie = parseCookie(data.value);
+        setTokens(parsedCookie);
         return saveCookie(parsedCookie);
       }
       case 'LOGOUT': {
-        CookieStorage.removeCookie();
+        await CookieStorage.removeCookie();
+        setTokens({ csrftoken: '', access_token: '' });
+
+        // WebView 쿠키 제거를 위한 스크립트 실행
+        ref.current?.injectJavaScript(`
+            document.cookie.split(';').forEach(function(c) { 
+              document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/'); 
+            });
+            window.location.reload();
+          `);
+
         return;
       }
       default:
@@ -66,6 +98,8 @@ const useWebView = () => {
     onMessage,
     onLoadProgress,
     postMessage,
+    injectCookieScript,
+    tokens,
   };
 };
 
