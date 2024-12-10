@@ -1,5 +1,5 @@
-import React, { useCallback } from 'react';
-import { SafeAreaView, StatusBar, StyleSheet } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { BackHandler, SafeAreaView, StatusBar, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { APP_CONSTS, WEBVIEW_CONSTS } from '@constants';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -11,12 +11,12 @@ import {
   useWebView,
 } from '@hooks';
 import { FcmTokenStorage } from '@tools';
-
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/' } = route.params;
   const WEBVIEW_URL = APP_CONSTS.WEB_VIEW_URL + url;
   const { ref, onMessage, postMessage, injectCookieScript, tokens } =
     useWebView();
+  const [isCanGoBack, setIsCanGoBack] = useState(false);
 
   const { registerOrUpdatePushToken, hasPermission, requestPermissionIfNot } =
     useFirebaseMessage();
@@ -36,6 +36,15 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     });
   }, []);
 
+  const onPressHardwareBackButton = () => {
+    if (ref.current && isCanGoBack) {
+      ref.current.goBack();
+      return true;
+    } else {
+      return false;
+    }
+  };
+
   // 푸시 권한 허용 변경 후 다시 앱으로 돌아왔을 때
   useAppStateActiveEffect(syncPushNotiPermission);
   useAsyncEffect(syncPushNotiPermission, []);
@@ -44,12 +53,32 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     await requestPermissionIfNot();
   }, []);
 
+  useEffect(() => {
+    BackHandler.addEventListener(
+      'hardwareBackPress',
+      onPressHardwareBackButton,
+    );
+    return () => {
+      BackHandler.removeEventListener(
+        'hardwareBackPress',
+        onPressHardwareBackButton,
+      );
+    };
+  }, [isCanGoBack]);
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar />
       <WebView
         ref={ref}
-        onMessage={onMessage}
+        onMessage={(event) => {
+          if (event.nativeEvent.data === 'navigationStateChange') {
+            // Navigation state updated, can check state.canGoBack, etc.
+            setIsCanGoBack(event.nativeEvent.canGoBack);
+            return;
+          }
+          onMessage(event);
+        }}
         source={{
           uri: WEBVIEW_URL,
         }}
