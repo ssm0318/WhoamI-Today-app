@@ -2,8 +2,8 @@
   xmlns:android="http://schemas.android.com/apk/res/android"
   package="com.whoami.today.app">
   <uses-permission android:name="android.permission.INTERNET" />
-
   <uses-permission android:name="android.permission.CAMERA" />
+  <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
   <application
     android:name=".MainApplication"
