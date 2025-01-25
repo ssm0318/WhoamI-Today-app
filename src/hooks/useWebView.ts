@@ -3,10 +3,11 @@ import {
   CookieStorage,
   parseCookie,
   redirectSetting,
+  requestCameraPermission,
   saveCookie,
 } from '@tools';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Linking } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import { WebViewMessageEvent, WebView } from 'react-native-webview';
 import { WebViewProgressEvent } from 'react-native-webview/lib/WebViewTypes';
 import { ScreenRouteParamList } from '@screens';
@@ -109,6 +110,22 @@ const useWebView = () => {
           })();
         `);
 
+        return;
+      }
+      case 'CAMERA_PERMISSION': {
+        let result;
+        if (Platform.OS === 'android') {
+          result = await requestCameraPermission();
+        } else {
+          result = { status: 'granted' }; // iOS의 경우 기본적으로 허용된다고 가정
+        }
+
+        ref.current?.postMessage(
+          JSON.stringify({
+            key: 'CAMERA_PERMISSION_RESULT',
+            data: result,
+          }),
+        );
         return;
       }
       default:

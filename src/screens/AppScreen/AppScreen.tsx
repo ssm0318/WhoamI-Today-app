@@ -1,5 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { BackHandler, SafeAreaView, StatusBar, StyleSheet } from 'react-native';
+import {
+  BackHandler,
+  Platform,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+} from 'react-native';
 import { WebView } from 'react-native-webview';
 import { APP_CONSTS, WEBVIEW_CONSTS } from '@constants';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -11,7 +17,7 @@ import {
   useWebView,
   useVersionInfo,
 } from '@hooks';
-import { FcmTokenStorage } from '@tools';
+import { FcmTokenStorage, requestCameraPermission } from '@tools';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/' } = route.params;
@@ -110,6 +116,15 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     }
   }, [tokens.access_token, tokens.csrftoken, userVersion]);
 
+  useAsyncEffect(async () => {
+    // 안드로이드의 경우 처음 로드 이후 로그인 성공시 카메라 권한 최초 요청
+    // 로그인 성공 여부는 쿠키 존재 여부로 판단
+    const isLoggedIn = !!tokens.access_token && !!tokens.csrftoken;
+    if (Platform.OS === 'android' && isLoggedIn) {
+      await requestCameraPermission();
+    }
+  }, [tokens]);
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar />
@@ -136,6 +151,9 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         injectedJavaScript={WEBVIEW_CONSTS.WEB_VIEW_DEBUGGING_SCRIPT}
         originWhitelist={['*']}
         scalesPageToFit={false}
+        allowFileAccess={true}
+        allowFileAccessFromFileURLs={true}
+        mediaPlaybackRequiresUserAction={false}
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         domStorageEnabled
