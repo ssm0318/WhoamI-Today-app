@@ -66,6 +66,13 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     };
   }, [isCanGoBack]);
 
+  useEffect(() => {
+    // Force reload when tokens change
+    if (ref.current) {
+      ref.current.reload();
+    }
+  }, [tokens.access_token, tokens.csrftoken]);
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar />
@@ -95,14 +102,9 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         domStorageEnabled
-        onLoadEnd={async () => {
+        onLoadEnd={() => {
           syncPushNotiPermission();
         }}
-        onContentProcessDidTerminate={() => {
-          ref.current?.reload();
-        }}
-        cacheEnabled={false}
-        incognito={true}
       />
     </SafeAreaView>
   );

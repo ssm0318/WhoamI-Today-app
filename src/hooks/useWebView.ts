@@ -41,6 +41,12 @@ const useWebView = () => {
     fetchTokens();
   }, []);
 
+  // Add effect to log tokens whenever they change
+  // useEffect(() => {
+  //   console.log('[Token Update] csrftoken:', tokens.csrftoken);
+  //   console.log('[Token Update] access_token:', tokens.access_token);
+  // }, [tokens]);
+
   /**
    * 웹뷰에서 오는 요청 처리
    */
@@ -70,16 +76,38 @@ const useWebView = () => {
         return saveCookie(parsedCookie);
       }
       case 'LOGOUT': {
+        console.log('LOGOUT');
         await CookieStorage.removeCookie();
         setTokens({ csrftoken: '', access_token: '' });
 
-        // WebView 쿠키 제거를 위한 스크립트 실행
+        // Improved WebView cookie and storage cleanup
         ref.current?.injectJavaScript(`
-            document.cookie.split(';').forEach(function(c) { 
-              document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/'); 
-            });
-            window.location.reload();
-          `);
+          (function() {
+            // Clear cookies
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+              const cookie = cookies[i];
+              const eqPos = cookie.indexOf('=');
+              const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+              document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+              document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=' + window.location.hostname;
+            }
+            
+            // Clear storage
+            localStorage.clear();
+            sessionStorage.clear();
+            
+            // Clear cache and reload
+            if (window.caches) {
+              caches.keys().then(function(names) {
+                for (let name of names) caches.delete(name);
+              });
+            }
+            
+            // Force reload from server
+            window.location.reload(true);
+          })();
+        `);
 
         return;
       }

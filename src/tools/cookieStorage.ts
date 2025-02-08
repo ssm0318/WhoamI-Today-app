@@ -31,8 +31,18 @@ export const CookieStorage = (() => {
   };
 
   // 쿠키 삭제
-  const removeCookie = async () =>
-    await AsyncStorage.removeItem(COOKIE_STORAGE_KEYS.COOKIE);
+  const removeCookie = async () => {
+    try {
+      await AsyncStorage.removeItem(COOKIE_STORAGE_KEYS.COOKIE);
+      // Verify removal by attempting to read
+      const remaining = await AsyncStorage.getItem(COOKIE_STORAGE_KEYS.COOKIE);
+      if (remaining) {
+        console.warn('Cookie removal may not have been successful');
+      }
+    } catch (error) {
+      console.error('Error removing cookies:', error);
+    }
+  };
 
   return { setCookie, getCookie, removeCookie };
 })();
