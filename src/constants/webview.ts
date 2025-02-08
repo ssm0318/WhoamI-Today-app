@@ -4,12 +4,30 @@ meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-sca
 meta.setAttribute('name', 'viewport');
 document.head.appendChild(meta);
 
-const consoleLog = (type, log) => window.ReactNativeWebView.postMessage(JSON.stringify({'actionType': 'CONSOLE', 'data': log}));
-console.log = (log) => consoleLog('log', log);
-console.debug = (log) => consoleLog('debug', log);
-console.info = (log) => consoleLog('info', log);
-console.warn = (log) => consoleLog('warn', log);
-console.error = (log) => consoleLog('error', log);
+const consoleLog = (type, ...args) => {
+    const processArg = (arg) => {
+        try {
+            if (typeof arg === 'object') {
+                return JSON.stringify(arg);
+            }
+            return String(arg);
+        } catch (error) {
+            return '[Circular]';
+        }
+    };
+
+    const logMessage = args.map(processArg).join(' ');
+    window.ReactNativeWebView.postMessage(JSON.stringify({
+        'actionType': 'CONSOLE',
+        'data': logMessage
+    }));
+};
+
+console.log = (...args) => consoleLog('log', ...args);
+console.debug = (...args) => consoleLog('debug', ...args);
+console.info = (...args) => consoleLog('info', ...args);
+console.warn = (...args) => consoleLog('warn', ...args);
+console.error = (...args) => consoleLog('error', ...args);
 
 // 네비게이션 상태 변경 감지
 (function() {
