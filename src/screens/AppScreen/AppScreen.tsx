@@ -10,13 +10,18 @@ import {
   useFirebaseMessage,
   useWebView,
 } from '@hooks';
-import { FcmTokenStorage } from '@tools';
+import { FcmTokenStorage, userVersionStorage } from '@tools';
+import { userApis } from '@apis';
+import { UserType } from '@types';
+import { VersionType } from 'src/types/user.type';
+
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/' } = route.params;
   const WEBVIEW_URL = APP_CONSTS.WEB_VIEW_URL + url;
   const { ref, onMessage, postMessage, injectCookieScript, tokens } =
     useWebView();
   const [isCanGoBack, setIsCanGoBack] = useState(false);
+  const [userVersion, setUserVersion] = useState<string | null>(null);
 
   const { registerOrUpdatePushToken, hasPermission, requestPermissionIfNot } =
     useFirebaseMessage();
@@ -53,6 +58,24 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     await requestPermissionIfNot();
   }, []);
 
+  useAsyncEffect(async () => {
+    // Initial version check
+    const version = await userVersionStorage.get();
+    console.log('[AppScreen] Stored user version:', version);
+    setUserVersion(version);
+
+    // Get latest version from API
+    const meResponse = await userApis.getMe();
+    const versionChanged = await userVersionStorage.checkAndUpdate(
+      meResponse.current_ver || UserType.VersionType.DEFAULT,
+    );
+
+    if (versionChanged) {
+      console.log('[AppScreen] Version changed, updating state...');
+      setUserVersion(meResponse.current_ver || VersionType.DEFAULT);
+    }
+  }, []);
+
   useEffect(() => {
     BackHandler.addEventListener(
       'hardwareBackPress',
@@ -67,11 +90,16 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   }, [isCanGoBack]);
 
   useEffect(() => {
-    // Force reload when tokens change
+    // Force reload when tokens or user version changes
     if (ref.current) {
+      console.log('[AppScreen] Reloading WebView due to changes:', {
+        access_token: tokens.access_token ? 'exists' : 'none',
+        csrftoken: tokens.csrftoken ? 'exists' : 'none',
+        userVersion,
+      });
       ref.current.reload();
     }
-  }, [tokens.access_token, tokens.csrftoken]);
+  }, [tokens.access_token, tokens.csrftoken, userVersion]);
 
   return (
     <SafeAreaView style={styles.container}>
