@@ -9,11 +9,9 @@ import {
   useAsyncEffect,
   useFirebaseMessage,
   useWebView,
+  useVersionInfo,
 } from '@hooks';
-import { FcmTokenStorage, userVersionStorage } from '@tools';
-import { userApis } from '@apis';
-import { UserType } from '@types';
-import { VersionType } from 'src/types/user.type';
+import { FcmTokenStorage } from '@tools';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/' } = route.params;
@@ -21,7 +19,8 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { ref, onMessage, postMessage, injectCookieScript, tokens } =
     useWebView();
   const [isCanGoBack, setIsCanGoBack] = useState(false);
-  const [userVersion, setUserVersion] = useState<string | null>(null);
+  const { userVersion, checkAndUpdateVersion } = useVersionInfo();
+  const [isWebViewLoaded, setWebViewLoaded] = useState(false);
 
   const { registerOrUpdatePushToken, hasPermission, requestPermissionIfNot } =
     useFirebaseMessage();
@@ -58,22 +57,16 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     await requestPermissionIfNot();
   }, []);
 
-  useAsyncEffect(async () => {
-    // Initial version check
-    const version = await userVersionStorage.get();
-    console.log('[AppScreen] Stored user version:', version);
-    setUserVersion(version);
+  useEffect(() => {
+    const initializeVersion = async () => {
+      try {
+        await checkAndUpdateVersion();
+      } catch (error) {
+        console.error('[AppScreen] Error in version check flow:', error);
+      }
+    };
 
-    // Get latest version from API
-    const meResponse = await userApis.getMe();
-    const versionChanged = await userVersionStorage.checkAndUpdate(
-      meResponse.current_ver || UserType.VersionType.DEFAULT,
-    );
-
-    if (versionChanged) {
-      console.log('[AppScreen] Version changed, updating state...');
-      setUserVersion(meResponse.current_ver || VersionType.DEFAULT);
-    }
+    initializeVersion();
   }, []);
 
   useEffect(() => {
@@ -90,11 +83,12 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   }, [isCanGoBack]);
 
   useEffect(() => {
-    // Force reload when tokens or user version changes
-    if (ref.current) {
+    const shouldReload =
+      tokens.access_token && tokens.csrftoken && userVersion && ref.current;
+    if (shouldReload) {
       console.log('[AppScreen] Reloading WebView due to changes:', {
-        access_token: tokens.access_token ? 'exists' : 'none',
-        csrftoken: tokens.csrftoken ? 'exists' : 'none',
+        access_token: !!tokens.access_token,
+        csrftoken: !!tokens.csrftoken,
         userVersion,
       });
       ref.current.reload();
@@ -131,7 +125,10 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         thirdPartyCookiesEnabled
         domStorageEnabled
         onLoadEnd={() => {
-          syncPushNotiPermission();
+          if (!isWebViewLoaded) {
+            setWebViewLoaded(true);
+            syncPushNotiPermission();
+          }
         }}
       />
     </SafeAreaView>
