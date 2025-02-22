@@ -9,14 +9,18 @@ import {
   useAsyncEffect,
   useFirebaseMessage,
   useWebView,
+  useVersionInfo,
 } from '@hooks';
 import { FcmTokenStorage } from '@tools';
+
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/' } = route.params;
   const WEBVIEW_URL = APP_CONSTS.WEB_VIEW_URL + url;
   const { ref, onMessage, postMessage, injectCookieScript, tokens } =
     useWebView();
   const [isCanGoBack, setIsCanGoBack] = useState(false);
+  const { userVersion, checkAndUpdateVersion } = useVersionInfo();
+  const [isWebViewLoaded, setWebViewLoaded] = useState(false);
 
   const { registerOrUpdatePushToken, hasPermission, requestPermissionIfNot } =
     useFirebaseMessage();
@@ -49,9 +53,36 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   useAppStateActiveEffect(syncPushNotiPermission);
   useAsyncEffect(syncPushNotiPermission, []);
 
+  // 푸시 권한 허용 요청
   useAsyncEffect(async () => {
     await requestPermissionIfNot();
   }, []);
+
+  // 버전 체크 및 업데이트
+  useEffect(() => {
+    const initializeVersion = async () => {
+      try {
+        await checkAndUpdateVersion();
+      } catch (error) {
+        console.error('[AppScreen] Error in version check flow:', error);
+      }
+    };
+
+    initializeVersion();
+  }, []);
+
+  // 앱이 활성화될 때마다 버전 체크
+  useAppStateActiveEffect(() => {
+    const checkVersionOnActive = async () => {
+      try {
+        await checkAndUpdateVersion();
+      } catch (error) {
+        console.error('[AppScreen] Error in version check on active:', error);
+      }
+    };
+
+    checkVersionOnActive();
+  });
 
   useEffect(() => {
     BackHandler.addEventListener(
@@ -67,11 +98,17 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   }, [isCanGoBack]);
 
   useEffect(() => {
-    // Force reload when tokens change
-    if (ref.current) {
+    const shouldReload =
+      tokens.access_token && tokens.csrftoken && userVersion && ref.current;
+    if (shouldReload) {
+      console.log('[AppScreen] Reloading WebView due to changes:', {
+        access_token: !!tokens.access_token,
+        csrftoken: !!tokens.csrftoken,
+        userVersion,
+      });
       ref.current.reload();
     }
-  }, [tokens.access_token, tokens.csrftoken]);
+  }, [tokens.access_token, tokens.csrftoken, userVersion]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -103,7 +140,10 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         thirdPartyCookiesEnabled
         domStorageEnabled
         onLoadEnd={() => {
-          syncPushNotiPermission();
+          if (!isWebViewLoaded) {
+            setWebViewLoaded(true);
+            syncPushNotiPermission();
+          }
         }}
       />
     </SafeAreaView>
