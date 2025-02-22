@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BackHandler,
   SafeAreaView,
@@ -36,10 +36,20 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
 
   // 세션 관리를 위한 훅 호출
   useSession();
+  const isRunningRef = useRef(false);
 
   const handlePushNotification = useCallback(async () => {
     try {
+      if (isRunningRef.current) {
+        console.log('[AppScreen] Push notification check already in progress');
+        return;
+      }
+      isRunningRef.current = true;
+
       const enabled = await hasPermission();
+      console.log('[AppScreen] Push notification status:', {
+        enabled,
+      });
       postMessage('SET_NOTI_PERMISSION', { value: enabled });
 
       const { access_token } = await CookieStorage.getCookie();
@@ -64,23 +74,15 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
       }
     } catch (error) {
       console.error('[AppScreen] Error in handlePushNotification:', error);
+    } finally {
+      isRunningRef.current = false;
     }
   }, [hasPermission, postMessage, registerOrUpdatePushToken]);
 
-  const onPressHardwareBackButton = () => {
-    if (ref.current && isCanGoBack) {
-      ref.current.goBack();
-      return true;
-    } else {
-      return false;
-    }
-  };
-
-  // 푸시 권한 허용 변경 후 다시 앱으로 돌아왔을 때
+  // 푸시 권한 허용 변경 후 다시 앱으로 돌아왔을 때만 체크하도록 수정
   useAppStateActiveEffect(handlePushNotification);
-  useAsyncEffect(handlePushNotification, []);
 
-  // 푸시 권한 허용 요청
+  // 초기 권한 요청만 하고 토큰 등록은 하지 않음
   useAsyncEffect(async () => {
     await requestPermissionIfNot();
   }, []);
@@ -136,6 +138,15 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
       ref.current.reload();
     }
   }, [tokens.access_token, tokens.csrftoken, userVersion]);
+
+  const onPressHardwareBackButton = () => {
+    if (ref.current && isCanGoBack) {
+      ref.current.goBack();
+      return true;
+    } else {
+      return false;
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>

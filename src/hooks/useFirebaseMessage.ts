@@ -36,13 +36,6 @@ const useFirebaseMessage = () => {
       if (APP_CONSTS.IS_ANDROID && Number(Platform.Version) >= 33) {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
-          {
-            title: '알림 권한',
-            message: '앱 알림을 받으시려면 권한을 허용해주세요.',
-            buttonNeutral: '다음에',
-            buttonNegative: '거절',
-            buttonPositive: '허용',
-          },
         );
 
         if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
@@ -132,8 +125,9 @@ const useFirebaseMessage = () => {
 
   const registerOrUpdatePushToken = useCallback(async (active: boolean) => {
     try {
-      const { access_token } = await CookieStorage.getCookie();
-      if (!access_token) {
+      const { access_token, csrftoken } = await CookieStorage.getCookie();
+
+      if (!access_token || !csrftoken) {
         logTokenInfo('No access token available, skipping API call', null);
         return;
       }
