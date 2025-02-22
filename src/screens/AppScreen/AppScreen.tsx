@@ -53,10 +53,12 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   useAppStateActiveEffect(syncPushNotiPermission);
   useAsyncEffect(syncPushNotiPermission, []);
 
+  // 푸시 권한 허용 요청
   useAsyncEffect(async () => {
     await requestPermissionIfNot();
   }, []);
 
+  // 버전 체크 및 업데이트
   useEffect(() => {
     const initializeVersion = async () => {
       try {
@@ -68,6 +70,19 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
 
     initializeVersion();
   }, []);
+
+  // 앱이 활성화될 때마다 버전 체크
+  useAppStateActiveEffect(() => {
+    const checkVersionOnActive = async () => {
+      try {
+        await checkAndUpdateVersion();
+      } catch (error) {
+        console.error('[AppScreen] Error in version check on active:', error);
+      }
+    };
+
+    checkVersionOnActive();
+  });
 
   useEffect(() => {
     BackHandler.addEventListener(
