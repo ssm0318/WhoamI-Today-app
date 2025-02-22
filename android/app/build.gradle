@@ -106,7 +106,7 @@ android {
         applicationId "com.whoami.today.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 36
+        versionCode 37
         versionName "1.0" 
     }
 
