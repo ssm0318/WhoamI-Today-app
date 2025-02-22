@@ -39,7 +39,7 @@ const API = (() => {
   apiInstance.interceptors.response.use(
     (config) => {
       console.log('[API response]', config);
-      return config;
+      return config.data;
     },
     (err) => {
       console.log('[API response error]', err);

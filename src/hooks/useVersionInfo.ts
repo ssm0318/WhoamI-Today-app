@@ -61,7 +61,14 @@ const useVersionInfo = () => {
         if (hasChanged) {
           await userVersionStorage.checkAndUpdate(currentVersion);
           setUserVersion(currentVersion);
-          console.log('[useVersionInfo] Version updated:', currentVersion);
+          console.log(
+            '🔄 [useVersionInfo] Version Change Detected!\n',
+            '📱 Previous Version:',
+            storedVersion,
+            '\n',
+            '✨ New Version:',
+            currentVersion,
+          );
         }
 
         lastCheckTime.current = Date.now();
