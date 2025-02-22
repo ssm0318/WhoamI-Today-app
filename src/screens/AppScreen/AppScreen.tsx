@@ -19,7 +19,7 @@ import {
   useVersionInfo,
   useSession,
 } from '@hooks';
-import { FcmTokenStorage } from '@tools';
+import { FcmTokenStorage, CookieStorage } from '@tools';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/' } = route.params;
@@ -37,20 +37,35 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   // 세션 관리를 위한 훅 호출
   useSession();
 
-  const syncPushNotiPermission = useCallback(async () => {
-    hasPermission().then(async (enabled) => {
+  const handlePushNotification = useCallback(async () => {
+    try {
+      const enabled = await hasPermission();
       postMessage('SET_NOTI_PERMISSION', { value: enabled });
-      const { fcmToken: pushToken } = await FcmTokenStorage.getToken();
-      if (enabled) {
-        // 중복 호출을 막기 위해 storage에 pushToken이 없을 때만 호출
-        // TODO: 만약 서버 DB에 deprecated된 토큰이 많이 생겨 문제 발생시 이 부분 수정 필요
-        // if (pushToken) return;
-        return await registerOrUpdatePushToken(true);
-      } else {
-        return await registerOrUpdatePushToken(false);
+
+      const { access_token } = await CookieStorage.getCookie();
+      if (!access_token) {
+        console.log(
+          '[AppScreen] No access token available, skipping push token registration',
+        );
+        return;
       }
-    });
-  }, []);
+
+      const { fcmToken: storedToken } = await FcmTokenStorage.getToken();
+      console.log('[AppScreen] Push notification status:', {
+        enabled,
+        storedToken,
+        hasAccessToken: !!access_token,
+      });
+
+      if (enabled) {
+        await registerOrUpdatePushToken(true);
+      } else {
+        await registerOrUpdatePushToken(false);
+      }
+    } catch (error) {
+      console.error('[AppScreen] Error in handlePushNotification:', error);
+    }
+  }, [hasPermission, postMessage, registerOrUpdatePushToken]);
 
   const onPressHardwareBackButton = () => {
     if (ref.current && isCanGoBack) {
@@ -62,8 +77,8 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   };
 
   // 푸시 권한 허용 변경 후 다시 앱으로 돌아왔을 때
-  useAppStateActiveEffect(syncPushNotiPermission);
-  useAsyncEffect(syncPushNotiPermission, []);
+  useAppStateActiveEffect(handlePushNotification);
+  useAsyncEffect(handlePushNotification, []);
 
   // 푸시 권한 허용 요청
   useAsyncEffect(async () => {
@@ -158,7 +173,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
           setIsLoading(false);
           if (!isWebViewLoaded) {
             setWebViewLoaded(true);
-            syncPushNotiPermission();
+            handlePushNotification();
           }
         }}
       />
