@@ -1,18 +1,46 @@
 import { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { sessionApis } from '@apis';
+import { CookieStorage } from '@tools';
 
 const useSession = () => {
   const appState = useRef(AppState.currentState);
   const pingInterval = useRef<NodeJS.Timeout>();
+  const isAuthenticatedRef = useRef<boolean>(false);
+
+  const isAuthenticated = async (): Promise<boolean> => {
+    const { access_token } = await CookieStorage.getCookie();
+    return !!access_token;
+  };
+
+  const startSessionIfAuthenticated = async () => {
+    const authenticated = await isAuthenticated();
+    isAuthenticatedRef.current = authenticated;
+
+    if (authenticated) {
+      console.log('🚀 Initializing session...');
+      try {
+        await sessionApis.startSession();
+        console.log('✅ Session started successfully');
+        startPingInterval();
+      } catch (error) {
+        console.error('❌ Failed to start session:', error);
+      }
+    } else {
+      console.log('🔒 No access token found, skipping session start');
+    }
+  };
 
   const startPingInterval = () => {
     // 1분마다 ping 보내기
     pingInterval.current = setInterval(() => {
-      sessionApis.sendPing().catch((error: Error) => {
-        console.error('Failed to send ping:', error);
-      });
-    }, 60000); // 60초 = 1분
+      sessionApis
+        .sendPing()
+        .then(() => console.log('🟢 Session ping sent'))
+        .catch((error: Error) => {
+          console.error('🔴 Failed to send ping:', error);
+        });
+    }, 60000);
   };
 
   const stopPingInterval = () => {
@@ -27,52 +55,46 @@ const useSession = () => {
       appState.current.match(/inactive|background/) &&
       nextAppState === 'active'
     ) {
-      // 앱이 foreground로 돌아옴
-      try {
-        await sessionApis.startSession();
-        startPingInterval();
-      } catch (error) {
-        console.error('Failed to start session:', error);
-      }
+      console.log('📱 App came to foreground, checking authentication...');
+      await startSessionIfAuthenticated();
     } else if (
       appState.current === 'active' &&
       nextAppState.match(/inactive|background/)
     ) {
-      // 앱이 background로 감
-      try {
-        stopPingInterval();
-        await sessionApis.endSession();
-      } catch (error) {
-        console.error('Failed to end session:', error);
+      if (isAuthenticatedRef.current) {
+        console.log('💤 App going to background, ending session...');
+        try {
+          stopPingInterval();
+          await sessionApis.endSession();
+          console.log('👋 Session ended successfully');
+        } catch (error) {
+          console.error('❌ Failed to end session:', error);
+        }
       }
     }
     appState.current = nextAppState;
   };
 
   useEffect(() => {
-    // 앱 시작시 세션 시작
-    sessionApis
-      .startSession()
-      .then(() => {
-        startPingInterval();
-      })
-      .catch((error: Error) => {
-        console.error('Failed to start initial session:', error);
-      });
+    startSessionIfAuthenticated();
 
-    // AppState 변경 이벤트 리스너 등록
     const subscription = AppState.addEventListener(
       'change',
       handleAppStateChange,
     );
 
     return () => {
-      // 클린업: 앱 종료시 세션 종료 및 리소스 정리
+      console.log('🧹 Cleaning up session...');
       stopPingInterval();
       subscription.remove();
-      sessionApis.endSession().catch((error: Error) => {
-        console.error('Failed to end session on cleanup:', error);
-      });
+      if (isAuthenticatedRef.current) {
+        sessionApis
+          .endSession()
+          .then(() => console.log('👋 Session cleanup completed'))
+          .catch((error: Error) => {
+            console.error('❌ Failed to end session on cleanup:', error);
+          });
+      }
     };
   }, []);
 };
