@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { BackHandler, SafeAreaView, StatusBar, StyleSheet } from 'react-native';
+import {
+  BackHandler,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  ActivityIndicator,
+  View,
+} from 'react-native';
 import { WebView } from 'react-native-webview';
 import { APP_CONSTS, WEBVIEW_CONSTS } from '@constants';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -21,6 +28,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const [isCanGoBack, setIsCanGoBack] = useState(false);
   const { userVersion, checkAndUpdateVersion } = useVersionInfo();
   const [isWebViewLoaded, setWebViewLoaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const { registerOrUpdatePushToken, hasPermission, requestPermissionIfNot } =
     useFirebaseMessage();
@@ -117,7 +125,6 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         ref={ref}
         onMessage={(event) => {
           if (event.nativeEvent.data === 'navigationStateChange') {
-            // Navigation state updated, can check state.canGoBack, etc.
             setIsCanGoBack(event.nativeEvent.canGoBack);
             return;
           }
@@ -126,6 +133,9 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         source={{
           uri: WEBVIEW_URL,
         }}
+        style={{ backgroundColor: 'transparent' }}
+        containerStyle={{ backgroundColor: '#FFFFFF' }}
+        androidLayerType="hardware"
         injectedJavaScriptBeforeContentLoaded={injectCookieScript(
           tokens.csrftoken,
           tokens.access_token,
@@ -139,13 +149,20 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         domStorageEnabled
+        onLoadStart={() => setIsLoading(true)}
         onLoadEnd={() => {
+          setIsLoading(false);
           if (!isWebViewLoaded) {
             setWebViewLoaded(true);
             syncPushNotiPermission();
           }
         }}
       />
+      {isLoading && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#0000ff" />
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -154,6 +171,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+  loadingContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
   },
 });
 
