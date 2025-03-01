@@ -17,6 +17,7 @@ import {
   useFirebaseMessage,
   useWebView,
   useVersionInfo,
+  useSession,
 } from '@hooks';
 import { FcmTokenStorage } from '@tools';
 
@@ -32,6 +33,9 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
 
   const { registerOrUpdatePushToken, hasPermission, requestPermissionIfNot } =
     useFirebaseMessage();
+
+  // 세션 관리를 위한 훅 호출
+  useSession();
 
   const syncPushNotiPermission = useCallback(async () => {
     hasPermission().then(async (enabled) => {
