@@ -3,7 +3,7 @@ import ApiService from './API';
 const { API } = ApiService;
 
 type RegisterPushTokenRequest = {
-  type: 'android' | 'ios';
+  type: string;
   registration_id: string;
   active: boolean;
   device_id: string;

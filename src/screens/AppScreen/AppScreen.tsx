@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BackHandler,
   SafeAreaView,
@@ -19,7 +19,7 @@ import {
   useVersionInfo,
   useSession,
 } from '@hooks';
-import { FcmTokenStorage } from '@tools';
+import { FcmTokenStorage, CookieStorage } from '@tools';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/' } = route.params;
@@ -36,36 +36,53 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
 
   // 세션 관리를 위한 훅 호출
   useSession();
+  const isRunningRef = useRef(false);
 
-  const syncPushNotiPermission = useCallback(async () => {
-    hasPermission().then(async (enabled) => {
-      postMessage('SET_NOTI_PERMISSION', { value: enabled });
-      const { fcmToken: pushToken } = await FcmTokenStorage.getToken();
-      if (enabled) {
-        // 중복 호출을 막기 위해 storage에 pushToken이 없을 때만 호출
-        // TODO: 만약 서버 DB에 deprecated된 토큰이 많이 생겨 문제 발생시 이 부분 수정 필요
-        // if (pushToken) return;
-        return await registerOrUpdatePushToken(true);
-      } else {
-        return await registerOrUpdatePushToken(false);
+  const handlePushNotification = useCallback(async () => {
+    try {
+      if (isRunningRef.current) {
+        console.log('[AppScreen] Push notification check already in progress');
+        return;
       }
-    });
-  }, []);
+      isRunningRef.current = true;
 
-  const onPressHardwareBackButton = () => {
-    if (ref.current && isCanGoBack) {
-      ref.current.goBack();
-      return true;
-    } else {
-      return false;
+      const enabled = await hasPermission();
+      console.log('[AppScreen] Push notification status:', {
+        enabled,
+      });
+      postMessage('SET_NOTI_PERMISSION', { value: enabled });
+
+      const { access_token } = await CookieStorage.getCookie();
+      if (!access_token) {
+        console.log(
+          '[AppScreen] No access token available, skipping push token registration',
+        );
+        return;
+      }
+
+      const { fcmToken: storedToken } = await FcmTokenStorage.getToken();
+      console.log('[AppScreen] Push notification status:', {
+        enabled,
+        storedToken,
+        hasAccessToken: !!access_token,
+      });
+
+      if (enabled) {
+        await registerOrUpdatePushToken(true);
+      } else {
+        await registerOrUpdatePushToken(false);
+      }
+    } catch (error) {
+      console.error('[AppScreen] Error in handlePushNotification:', error);
+    } finally {
+      isRunningRef.current = false;
     }
-  };
+  }, [hasPermission, postMessage, registerOrUpdatePushToken]);
 
-  // 푸시 권한 허용 변경 후 다시 앱으로 돌아왔을 때
-  useAppStateActiveEffect(syncPushNotiPermission);
-  useAsyncEffect(syncPushNotiPermission, []);
+  // 푸시 권한 허용 변경 후 다시 앱으로 돌아왔을 때만 체크하도록 수정
+  useAppStateActiveEffect(handlePushNotification);
 
-  // 푸시 권한 허용 요청
+  // 초기 권한 요청만 하고 토큰 등록은 하지 않음
   useAsyncEffect(async () => {
     await requestPermissionIfNot();
   }, []);
@@ -122,6 +139,15 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     }
   }, [tokens.access_token, tokens.csrftoken, userVersion]);
 
+  const onPressHardwareBackButton = () => {
+    if (ref.current && isCanGoBack) {
+      ref.current.goBack();
+      return true;
+    } else {
+      return false;
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar />
@@ -158,7 +184,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
           setIsLoading(false);
           if (!isWebViewLoaded) {
             setWebViewLoaded(true);
-            syncPushNotiPermission();
+            handlePushNotification();
           }
         }}
       />
