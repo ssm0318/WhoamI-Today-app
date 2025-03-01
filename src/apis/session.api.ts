@@ -10,9 +10,9 @@ export const startSession = async () => {
   return response;
 };
 
-export const sendPing = async () => {
+export const sendTouch = async () => {
   const sessionId = await SessionStorage.getSessionId();
-  await API.patch(`/user/app-sessions/ping/`, { session_id: sessionId });
+  await API.patch(`/user/app-sessions/touch/`, { session_id: sessionId });
 };
 
 export const endSession = async () => {
