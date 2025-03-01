@@ -5,7 +5,7 @@ import { CookieStorage } from '@tools';
 
 const useSession = () => {
   const appState = useRef(AppState.currentState);
-  const pingInterval = useRef<NodeJS.Timeout>();
+  const touchInterval = useRef<NodeJS.Timeout>();
   const isAuthenticatedRef = useRef<boolean>(false);
 
   const isAuthenticated = async (): Promise<boolean> => {
@@ -22,7 +22,7 @@ const useSession = () => {
       try {
         await sessionApis.startSession();
         console.log('✅ Session started successfully');
-        startPingInterval();
+        startTouchInterval();
       } catch (error) {
         console.error('❌ Failed to start session:', error);
       }
@@ -31,22 +31,22 @@ const useSession = () => {
     }
   };
 
-  const startPingInterval = () => {
-    // 1분마다 ping 보내기
-    pingInterval.current = setInterval(() => {
+  const startTouchInterval = () => {
+    // 1분마다 touch 보내기
+    touchInterval.current = setInterval(() => {
       sessionApis
-        .sendPing()
-        .then(() => console.log('🟢 Session ping sent'))
+        .sendTouch()
+        .then(() => console.log('🟢 Session touch sent'))
         .catch((error: Error) => {
-          console.error('🔴 Failed to send ping:', error);
+          console.error('🔴 Failed to send touch:', error);
         });
     }, 60000);
   };
 
-  const stopPingInterval = () => {
-    if (pingInterval.current) {
-      clearInterval(pingInterval.current);
-      pingInterval.current = undefined;
+  const stopTouchInterval = () => {
+    if (touchInterval.current) {
+      clearInterval(touchInterval.current);
+      touchInterval.current = undefined;
     }
   };
 
@@ -64,7 +64,7 @@ const useSession = () => {
       if (isAuthenticatedRef.current) {
         console.log('💤 App going to background, ending session...');
         try {
-          stopPingInterval();
+          stopTouchInterval();
           await sessionApis.endSession();
           console.log('👋 Session ended successfully');
         } catch (error) {
@@ -85,7 +85,7 @@ const useSession = () => {
 
     return () => {
       console.log('🧹 Cleaning up session...');
-      stopPingInterval();
+      stopTouchInterval();
       subscription.remove();
       if (isAuthenticatedRef.current) {
         sessionApis
