@@ -125,10 +125,13 @@ const useFirebaseMessage = () => {
 
   const registerOrUpdatePushToken = useCallback(async (active: boolean) => {
     try {
+      // 토큰 검증을 위한 로직
       const { access_token, csrftoken } = await CookieStorage.getCookie();
-
       if (!access_token || !csrftoken) {
-        logTokenInfo('No access token available, skipping API call', null);
+        logTokenInfo(
+          'Authentication tokens not ready, skipping push token registration',
+          { access_token: !!access_token, csrftoken: !!csrftoken },
+        );
         return;
       }
 

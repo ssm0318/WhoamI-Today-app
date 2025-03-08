@@ -16,10 +16,11 @@ import {
   useAsyncEffect,
   useFirebaseMessage,
   useWebView,
-  useVersionInfo,
+  useVersionCheckUpdate,
   useSession,
 } from '@hooks';
-import { FcmTokenStorage, CookieStorage } from '@tools';
+import { FcmTokenStorage } from '@tools';
+import * as Sentry from '@sentry/react-native';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/' } = route.params;
@@ -27,18 +28,30 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { ref, onMessage, postMessage, injectCookieScript, tokens } =
     useWebView();
   const [isCanGoBack, setIsCanGoBack] = useState(false);
-  const { userVersion, checkAndUpdateVersion } = useVersionInfo();
+
   const [isWebViewLoaded, setWebViewLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-
+  const isRunningRef = useRef(false);
   const { registerOrUpdatePushToken, hasPermission, requestPermissionIfNot } =
     useFirebaseMessage();
 
   // 세션 관리를 위한 훅 호출
   useSession();
-  const isRunningRef = useRef(false);
+
+  // 버전 체크 및 업데이트를 자동으로 수행
+  // 버전 변경 여부를 감지
+  const versionChanged = useVersionCheckUpdate(tokens);
+
+  // 버전이 변경되었을 때 WebView 리로드
+  useEffect(() => {
+    if (versionChanged && ref.current) {
+      console.log('[AppScreen] Version changed, reloading WebView');
+      ref.current.reload();
+    }
+  }, [versionChanged]);
 
   const handlePushNotification = useCallback(async () => {
+    console.log('[AppScreen] handlePushNotification');
     try {
       if (isRunningRef.current) {
         console.log('[AppScreen] Push notification check already in progress');
@@ -52,8 +65,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
       });
       postMessage('SET_NOTI_PERMISSION', { value: enabled });
 
-      const { access_token } = await CookieStorage.getCookie();
-      if (!access_token) {
+      if (!tokens.access_token) {
         console.log(
           '[AppScreen] No access token available, skipping push token registration',
         );
@@ -64,7 +76,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
       console.log('[AppScreen] Push notification status:', {
         enabled,
         storedToken,
-        hasAccessToken: !!access_token,
+        hasAccessToken: !!tokens.access_token,
       });
 
       if (enabled) {
@@ -77,7 +89,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     } finally {
       isRunningRef.current = false;
     }
-  }, [hasPermission, postMessage, registerOrUpdatePushToken]);
+  }, [hasPermission, postMessage, registerOrUpdatePushToken, tokens]);
 
   // 푸시 권한 허용 변경 후 다시 앱으로 돌아왔을 때만 체크하도록 수정
   useAppStateActiveEffect(handlePushNotification);
@@ -86,32 +98,6 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   useAsyncEffect(async () => {
     await requestPermissionIfNot();
   }, []);
-
-  // 버전 체크 및 업데이트
-  useEffect(() => {
-    const initializeVersion = async () => {
-      try {
-        await checkAndUpdateVersion();
-      } catch (error) {
-        console.error('[AppScreen] Error in version check flow:', error);
-      }
-    };
-
-    initializeVersion();
-  }, []);
-
-  // 앱이 활성화될 때마다 버전 체크
-  useAppStateActiveEffect(() => {
-    const checkVersionOnActive = async () => {
-      try {
-        await checkAndUpdateVersion();
-      } catch (error) {
-        console.error('[AppScreen] Error in version check on active:', error);
-      }
-    };
-
-    checkVersionOnActive();
-  });
 
   useEffect(() => {
     BackHandler.addEventListener(
@@ -127,17 +113,17 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   }, [isCanGoBack]);
 
   useEffect(() => {
-    const shouldReload =
-      tokens.access_token && tokens.csrftoken && userVersion && ref.current;
+    console.log('⭐️ tokens:', tokens);
+    const shouldReload = tokens.access_token && tokens.csrftoken && ref.current;
     if (shouldReload) {
       console.log('[AppScreen] Reloading WebView due to changes:', {
         access_token: !!tokens.access_token,
         csrftoken: !!tokens.csrftoken,
-        userVersion,
       });
       ref.current.reload();
+      handlePushNotification();
     }
-  }, [tokens.access_token, tokens.csrftoken, userVersion]);
+  }, [tokens.access_token, tokens.csrftoken]);
 
   const onPressHardwareBackButton = () => {
     if (ref.current && isCanGoBack) {
@@ -165,7 +151,6 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         }}
         style={{ backgroundColor: 'transparent' }}
         containerStyle={{ backgroundColor: '#FFFFFF' }}
-        androidLayerType="hardware"
         injectedJavaScriptBeforeContentLoaded={injectCookieScript(
           tokens.csrftoken,
           tokens.access_token,
@@ -186,6 +171,16 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
             setWebViewLoaded(true);
             handlePushNotification();
           }
+        }}
+        onError={(syntheticEvent) => {
+          const { nativeEvent } = syntheticEvent;
+          console.warn('WebView error: ', nativeEvent);
+          Sentry.captureException(nativeEvent);
+        }}
+        onRenderProcessGone={(syntheticEvent) => {
+          Sentry.captureException(syntheticEvent);
+          console.warn('WebView crashed, reloading...');
+          ref.current?.reload();
         }}
       />
       {isLoading && (
