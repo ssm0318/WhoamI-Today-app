@@ -20,6 +20,7 @@ import {
   useSession,
 } from '@hooks';
 import { FcmTokenStorage } from '@tools';
+import * as Sentry from '@sentry/react-native';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/' } = route.params;
@@ -174,8 +175,10 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         onError={(syntheticEvent) => {
           const { nativeEvent } = syntheticEvent;
           console.warn('WebView error: ', nativeEvent);
+          Sentry.captureException(nativeEvent);
         }}
         onRenderProcessGone={(syntheticEvent) => {
+          Sentry.captureException(syntheticEvent);
           console.warn('WebView crashed, reloading...');
           ref.current?.reload();
         }}
