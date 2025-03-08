@@ -29,7 +29,12 @@ const useVersionCheckUpdate = (tokens: {
   const initializeAttempts = useRef<number>(0);
 
   // 버전 체크 및 업데이트 로직
-  const checkAndUpdateVersion = useCallback(async () => {
+  const checkAndUpdateVersion = useCallback(async (): Promise<{
+    hasChanged: boolean;
+    currentVersion?: string;
+    storedVersion?: string | null;
+    error?: any;
+  } | null> => {
     // 토큰이 유효한지 확인
     if (!tokens || !tokens.access_token || !tokens.csrftoken) {
       console.log(
