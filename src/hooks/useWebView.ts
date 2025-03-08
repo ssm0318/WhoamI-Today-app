@@ -1,4 +1,4 @@
-import { useNavigationService } from '@hooks';
+import { useFirebaseMessage, useNavigationService } from '@hooks';
 import {
   CookieStorage,
   parseCookie,
@@ -17,6 +17,7 @@ const useWebView = () => {
   const navigation = useNavigationService();
   const [tokens, setTokens] = useState({ csrftoken: '', access_token: '' });
   const { getCookie } = CookieStorage;
+  const { registerOrUpdatePushToken } = useFirebaseMessage();
 
   const postMessage = useCallback((key: string, data: any) => {
     ref.current?.postMessage(JSON.stringify({ key, data }));
@@ -77,6 +78,10 @@ const useWebView = () => {
       }
       case 'LOGOUT': {
         console.log('LOGOUT');
+
+        // firebase 푸시 토큰 해제
+        await registerOrUpdatePushToken(false);
+
         await CookieStorage.removeCookie();
         setTokens({ csrftoken: '', access_token: '' });
 
