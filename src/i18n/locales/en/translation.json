@@ -1,24 +1,14 @@
 {
-  "moment": {
-    "todays_moments_photo": "Today's Moment Photo",
-    "confirm": "Confirm",
-    "todays_moment": "Today's Moment",
-    "post": "Post",
-    "mood_placeholder": "Express your mood with emojis",
-    "description_placeholder": "Describe your day with words",
-    "post_complete": "Your moment have been posted!",
-    "view_friends_moment": "View Friends' Moments"
-  },
   "noti_permission": {
-    "title": "Notification Settings",
-    "description": "Notification permissions can be changed in your phone settings.",
-    "redirect_setting": "Go to Settings",
+    "title": "Notification Permissions",
+    "description": "You can change notification settings in your phone's settings.",
+    "redirect_setting": "Open Settings",
     "close": "Close"
   },
   "camera_permission": {
     "title": "Camera Permission",
-    "description": "Please allow camera access permission in your phone settings.",
-    "redirect_setting": "Go to Settings",
+    "description": "Allow camera access in your phone's settings.",
+    "redirect_setting": "Open Settings",
     "close": "Close"
   }
 }
