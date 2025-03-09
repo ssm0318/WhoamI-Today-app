@@ -14,7 +14,7 @@ export const WEB_VIEW_URL_INFO = {
   DEV: `http://${WEB_VIEW_DEV_HOSTNAME}:3000`,
   // PROD: 'https://diivers.world',
   //NOTE DNS 유효기간 만료 문제로 아래 URL 임시 사용
-  PROD: 'https://whoami.gina-park.site',
+  PROD: 'https://whoami-test-group.gina-park.site',
 };
 
 export const WEB_VIEW_URL = IS_DEV
@@ -26,7 +26,7 @@ export const API_BASE_URL = {
   DEV: `http://${WEB_VIEW_DEV_HOSTNAME}:8000/api/`,
   // PROD: 'https://diivers.world/api/'
   //NOTE DNS 유효기간 만료 문제로 아래 URL 임시 사용
-  PROD: 'https://whoami.gina-park.site/api/',
+  PROD: 'https://whoami-test-group.gina-park.site/api/',
 };
 
 export const API_URL = IS_DEV ? API_BASE_URL.DEV : API_BASE_URL.PROD;
