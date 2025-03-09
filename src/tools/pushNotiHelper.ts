@@ -35,9 +35,7 @@ export const displayNotification = async (
 ): Promise<void> => {
   const { notification, data } = message;
 
-  if (!notification) return;
-  const { title, body } = notification;
-
+  // 삭제된 알림을 알림 센터에서 삭제
   if (data?.type === 'cancel') {
     const displayedNotifications = await notifee.getDisplayedNotifications();
     const noti = displayedNotifications.find(
@@ -47,16 +45,18 @@ export const displayNotification = async (
       return await notifee.cancelNotification(noti.id);
     }
     return;
+  } else {
+    if (!notification) return;
+    const { title, body } = notification;
+    await notifee.displayNotification({
+      title,
+      body,
+      data,
+      ...(APP_CONSTS.IS_ANDROID
+        ? {
+            android: await getSettingsForAndroid(),
+          }
+        : {}),
+    });
   }
-
-  await notifee.displayNotification({
-    title,
-    body,
-    data,
-    ...(APP_CONSTS.IS_ANDROID
-      ? {
-          android: await getSettingsForAndroid(),
-        }
-      : {}),
-  });
 };
