@@ -76,18 +76,18 @@ export interface PasswordConfirmError {
 }
 
 export const PasswordValidateError = {
-  MUST_INCLUDE_NUM_KO: '비밀번호는 숫자(0-9)를 한 개 이상 포함해야 합니다',
+  MUST_INCLUDE_NUM_KO: '비밀번호는 숫자(0-9)를 최소 1개 포함되어야 합니다',
   MUST_INCLUDE_NUM_EN: 'Your password must contain at least 1 digit, 0-9.',
   MUST_INCLUDE_ALPHABET_UPPER_KO:
-    '비밀번호는 알파벳 대문자(A-Z)를 한 개 이상 포함해야 합니다.',
+    '비밀번호는 알파벳 대문자(A-Z)를 최소 1개 포함되어야 합니다.',
   MUST_INCLUDE_ALPHABET_UPPER_EN:
     'Your password must contain at least 1 uppercase letter, A-Z.',
   MUST_INCLUDE_ALPHABET_LOWER_KO:
-    '비밀번호는 알파벳 소문자(a-z)를 한 개 이상 포함해야 합니다.',
+    '비밀번호는 알파벳 소문자(a-z)를 최소 1개 포함되어야 합니다.',
   MUST_INCLUDE_ALPHABET_LOWER_EN:
     'Your password must contain at least 1 lowercase letter, a-z.',
   MUST_INCLUDE_SPECIAL_CHAR_KO:
-    '비밀번호는 특수문자를 한 개 이상 포함해야 합니다: ()[]{}|\\`~!@#$%^&*_-+=;:\'",<>./?',
+    '비밀번호는 특수문자를 최소 1개 포함되어야 합니다: ()[]{}|\\`~!@#$%^&*_-+=;:\'",<>./?',
   MUST_INCLUDE_SPECIAL_CHAR_EN:
     'Your password must contain at least 1 symbol: ()[]{}|\\`~!@#$%^&*_-+=;:\'",<>./?',
 } as const;
@@ -107,7 +107,7 @@ export const UsernameValidateError = {
   CHAR_CONSTRAINTS_KO:
     '유효하지 않은 닉네임입니다. 닉네임은 영어, 한글, 숫자, 특수문자(_)만 포함할 수 있습니다.',
   CHAR_CONSTRAINTS_EN:
-    'Username format is invalid. Usernames can only include letters (alphabet/Korean), numbers and underscores(_).',
+    'Username format is invalid. Usernames can only include letters (alphabet/Hangul), numbers and underscores(_).',
 } as const;
 
 export type UsernameValidateErrorType =

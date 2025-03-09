@@ -1,23 +1,13 @@
 {
-  "moment": {
-    "todays_moments_photo": "오늘의 사진",
-    "confirm": "확인",
-    "todays_moment": "오늘의 순간",
-    "post": "게시",
-    "mood_placeholder": "이모티콘으로 기분을 표현해 주세요.",
-    "description_placeholder": "자유롭게 생각을 적어주세요.",
-    "post_complete": "모먼트 업로드가 완료되었어요!",
-    "view_friends_moment": "친구들의 순간 보러가기"
-  },
   "noti_permission": {
     "title": "알림 설정",
-    "description": "알림 권한 설정은 휴대폰 설정에서 변경 가능합니다.",
+    "description": "휴대폰 설정에서 알림 권한을 변경할 수 있습니다.",
     "redirect_setting": "설정으로 이동",
     "close": "닫기"
   },
   "camera_permission": {
     "title": "카메라 설정",
-    "description": "휴대폰 설정에서 카메라 접근 권한을 허용해주세요.",
+    "description": "휴대폰 설정에서 카메라 접근을 허용해주세요.",
     "redirect_setting": "설정으로 이동",
     "close": "닫기"
   }
