@@ -10,6 +10,7 @@ import { Linking } from 'react-native';
 import { WebViewMessageEvent, WebView } from 'react-native-webview';
 import { WebViewProgressEvent } from 'react-native-webview/lib/WebViewTypes';
 import { ScreenRouteParamList } from '@screens';
+import { sessionApis } from '@apis';
 
 const useWebView = () => {
   const [loadProgress, setLoadProgress] = useState(0);
@@ -78,6 +79,9 @@ const useWebView = () => {
       }
       case 'LOGOUT': {
         console.log('LOGOUT');
+
+        // 세션 종료
+        await sessionApis.endSession();
 
         // firebase 푸시 토큰 해제
         await registerOrUpdatePushToken(false);
