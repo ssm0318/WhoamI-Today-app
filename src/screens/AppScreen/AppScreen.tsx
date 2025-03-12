@@ -164,6 +164,11 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         domStorageEnabled
+        renderLoading={() => (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#0000ff" />
+          </View>
+        )}
         onLoadStart={() => setIsLoading(true)}
         onLoadEnd={() => {
           setIsLoading(false);
@@ -178,6 +183,11 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
           Sentry.captureException(nativeEvent);
         }}
         onRenderProcessGone={(syntheticEvent) => {
+          Sentry.captureException(syntheticEvent);
+          console.warn('WebView crashed, reloading...');
+          ref.current?.reload();
+        }}
+        onContentProcessDidTerminate={(syntheticEvent) => {
           Sentry.captureException(syntheticEvent);
           console.warn('WebView crashed, reloading...');
           ref.current?.reload();

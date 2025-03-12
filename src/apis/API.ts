@@ -4,6 +4,7 @@ import axios, { AxiosRequestConfig } from 'axios';
 import RNFetchBlob from 'rn-fetch-blob';
 import { APIInstance, BlobAPIInstance, Methods } from './API.types';
 import i18n from 'i18next';
+import * as Sentry from '@sentry/react-native';
 
 /** API Instance */
 const JSON_DEFAULT_OPTIONS: AxiosRequestConfig = {
@@ -32,15 +33,13 @@ const API = (() => {
           '[API] Missing authentication tokens for request to:',
           config.url,
         );
-        console.error('[API] Missing authentication tokens for request to:', {
-          access_token,
-          csrftoken,
-        });
-        return;
+        Sentry.captureException(new Error('Missing authentication tokens'));
+        return Promise.reject(new Error('Missing authentication tokens')); // 🚀 명확한 에러 반환
       }
 
       config.headers.Cookie = `access_token=${access_token};csrftoken=${csrftoken}`;
       config.headers['X-Csrftoken'] = csrftoken;
+
       console.log('[API request]', config.url);
       console.log('👷 [API request headers]', config.headers);
 
@@ -48,6 +47,7 @@ const API = (() => {
     },
     (err) => {
       console.log('[API request error]', err);
+      Sentry.captureException(err);
       return Promise.reject(err);
     },
   );
@@ -59,6 +59,7 @@ const API = (() => {
     },
     (err) => {
       console.log('‼️ [API response error]', err.config?.url, err);
+      Sentry.captureException(err);
       return Promise.reject(err);
     },
   );
