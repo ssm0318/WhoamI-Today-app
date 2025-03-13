@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   BackHandler,
   SafeAreaView,
@@ -19,7 +19,6 @@ import {
   useVersionCheckUpdate,
   useSession,
 } from '@hooks';
-import { FcmTokenStorage } from '@tools';
 import * as Sentry from '@sentry/react-native';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
@@ -31,7 +30,6 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
 
   const [isWebViewLoaded, setWebViewLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const isRunningRef = useRef(false);
   const { registerOrUpdatePushToken, hasPermission, requestPermissionIfNot } =
     useFirebaseMessage();
 
@@ -50,15 +48,9 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     }
   }, [versionChanged]);
 
-  const handlePushNotification = useCallback(async () => {
-    console.log('[AppScreen] handlePushNotification');
+  // 푸시 권한 허용 변경 후 다시 앱으로 돌아왔을 때만 체크하도록 수정
+  const handlePushNotification = async () => {
     try {
-      if (isRunningRef.current) {
-        console.log('[AppScreen] Push notification check already in progress');
-        return;
-      }
-      isRunningRef.current = true;
-
       const enabled = await hasPermission();
       console.log('[AppScreen] Push notification status:', {
         enabled,
@@ -72,13 +64,6 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         return;
       }
 
-      const { fcmToken: storedToken } = await FcmTokenStorage.getToken();
-      console.log('[AppScreen] Push notification status:', {
-        enabled,
-        storedToken,
-        hasAccessToken: !!tokens.access_token,
-      });
-
       if (enabled) {
         await registerOrUpdatePushToken(true);
       } else {
@@ -86,10 +71,8 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
       }
     } catch (error) {
       console.error('[AppScreen] Error in handlePushNotification:', error);
-    } finally {
-      isRunningRef.current = false;
     }
-  }, [hasPermission, postMessage, registerOrUpdatePushToken, tokens]);
+  };
 
   // 푸시 권한 허용 변경 후 다시 앱으로 돌아왔을 때만 체크하도록 수정
   useAppStateActiveEffect(handlePushNotification);
@@ -113,7 +96,6 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   }, [isCanGoBack]);
 
   useEffect(() => {
-    console.log('⭐️ tokens:', tokens);
     const shouldReload = tokens.access_token && tokens.csrftoken && ref.current;
     if (shouldReload) {
       console.log('[AppScreen] Reloading WebView due to changes:', {
@@ -169,7 +151,6 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
             <ActivityIndicator size="large" color="#0000ff" />
           </View>
         )}
-        onLoadStart={() => setIsLoading(true)}
         onLoadEnd={() => {
           setIsLoading(false);
           if (!isWebViewLoaded) {
