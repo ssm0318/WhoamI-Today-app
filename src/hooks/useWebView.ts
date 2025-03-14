@@ -11,6 +11,14 @@ import { WebViewMessageEvent, WebView } from 'react-native-webview';
 import { WebViewProgressEvent } from 'react-native-webview/lib/WebViewTypes';
 import { ScreenRouteParamList } from '@screens';
 import { sessionApis } from '@apis';
+import ImagePicker from 'react-native-image-crop-picker';
+
+interface FileData {
+  uri: string;
+  type: string;
+  name: string;
+  base64?: string;
+}
 
 const useWebView = () => {
   const [loadProgress, setLoadProgress] = useState(0);
@@ -19,6 +27,7 @@ const useWebView = () => {
   const [tokens, setTokens] = useState({ csrftoken: '', access_token: '' });
   const { getCookie } = CookieStorage;
   const { registerOrUpdatePushToken } = useFirebaseMessage();
+  const [isCanGoBack, setIsCanGoBack] = useState(false);
 
   const postMessage = useCallback((key: string, data: any) => {
     ref.current?.postMessage(JSON.stringify({ key, data }));
@@ -43,54 +52,122 @@ const useWebView = () => {
     fetchTokens();
   }, []);
 
-  // Add effect to log tokens whenever they change
-  // useEffect(() => {
-  //   console.log('[Token Update] csrftoken:', tokens.csrftoken);
-  //   console.log('[Token Update] access_token:', tokens.access_token);
-  // }, [tokens]);
+  // 📸 카메라 촬영
+  const openCamera = useCallback(() => {
+    ImagePicker.openCamera({
+      width: 300,
+      height: 400,
+      cropping: true,
+      compressImageQuality: 0.8,
+      includeBase64: true,
+    })
+      .then((image) => {
+        sendFileToWeb(image);
+      })
+      .catch((error) => {
+        console.log('Camera Error: ', error);
+      });
+  }, []);
+
+  // 📂 갤러리에서 파일 선택
+  const openGallery = useCallback(() => {
+    console.log('openGallery');
+    ImagePicker.openPicker({
+      width: 300,
+      height: 400,
+      cropping: true,
+      multiple: false,
+      compressImageQuality: 0.8,
+      includeBase64: true,
+    })
+      .then((image) => {
+        sendFileToWeb(image);
+      })
+      .catch((error) => {
+        console.log('Gallery Error: ', error);
+      });
+  }, []);
+
+  const sendFileToWeb = useCallback(
+    (image: any) => {
+      const fileData: FileData = {
+        uri: image.path,
+        type: image.mime,
+        name: image.path.split('/').pop() || 'upload.jpg',
+        base64: image.data,
+      };
+
+      postMessage('FILE_SELECTED', fileData);
+    },
+    [postMessage],
+  );
 
   /**
    * 웹뷰에서 오는 요청 처리
    */
-  const onMessage = useCallback(async (event: WebViewMessageEvent) => {
-    const data = JSON.parse(event.nativeEvent.data);
-    if (!('actionType' in data)) return;
-
-    switch (data.actionType) {
-      case 'CONSOLE':
-        console.log('[WEBVIEW CONSOLE]', data.data);
+  const onMessage = useCallback(
+    async (event: WebViewMessageEvent) => {
+      // Handle special case for navigation state change
+      if (event.nativeEvent.data === 'navigationStateChange') {
+        setIsCanGoBack(event.nativeEvent.canGoBack);
         return;
-      case 'OPEN_BROWSER':
-        //TODO(Gina): 나중에 가능하다면 openBrowserAsync 사용해보기
-        await Linking.openURL(data.url);
+      }
+
+      // Try to parse the data as JSON
+      let data;
+      try {
+        data = JSON.parse(event.nativeEvent.data);
+      } catch (error) {
+        console.warn(
+          'JSON parsing error:',
+          error,
+          'Data:',
+          event.nativeEvent.data,
+        );
         return;
-      case 'NAVIGATE': {
-        if (!data.screenName) return;
-        return navigation.push(data.screenName as keyof ScreenRouteParamList, {
-          ...data.params,
-        });
       }
-      case 'OPEN_SETTING':
-        return redirectSetting();
-      case 'SET_COOKIE': {
-        const parsedCookie = parseCookie(data.value);
-        setTokens(parsedCookie);
-        return saveCookie(parsedCookie);
-      }
-      case 'LOGOUT': {
-        console.log('LOGOUT');
 
-        // 세션 종료
-        await sessionApis.endSession();
+      // Handle specific action types
+      if (!('actionType' in data)) return;
 
-        // firebase 푸시 토큰 해제
-        await registerOrUpdatePushToken(false);
+      switch (data.actionType) {
+        case 'CONSOLE':
+          console.log('[WEBVIEW CONSOLE]', data.data);
+          return;
+        case 'OPEN_BROWSER':
+          //TODO(Gina): 나중에 가능하다면 openBrowserAsync 사용해보기
+          await Linking.openURL(data.url);
+          return;
+        case 'NAVIGATE': {
+          if (!data.screenName) return;
+          return navigation.push(
+            data.screenName as keyof ScreenRouteParamList,
+            {
+              ...data.params,
+            },
+          );
+        }
+        case 'OPEN_SETTING':
+          return redirectSetting();
+        case 'SET_COOKIE': {
+          const parsedCookie = parseCookie(data.value);
+          setTokens(parsedCookie);
+          return saveCookie(parsedCookie);
+        }
+        case 'LOGOUT': {
+          console.log('LOGOUT');
 
-        await CookieStorage.removeCookie();
-        setTokens({ csrftoken: '', access_token: '' });
+          // 세션 종료
+          await sessionApis.endSession();
 
-        // Improved WebView cookie and storage cleanup
-        ref.current?.injectJavaScript(`
+          // firebase 푸시 토큰 해제
+          await registerOrUpdatePushToken(false);
+
+          await CookieStorage.removeCookie();
+          setTokens({ csrftoken: '', access_token: '' });
+
+          // Improved WebView cookie and storage cleanup
+          ref.current?.injectJavaScript(`
           (function() {
             // Clear cookies
             const cookies = document.cookie.split(';');
@@ -118,12 +195,20 @@ const useWebView = () => {
           })();
         `);
 
-        return;
+          return;
+        }
+        case 'OPEN_GALLERY':
+          openGallery();
+          return;
+        case 'OPEN_CAMERA':
+          openCamera();
+          return;
+        default:
+          return;
       }
-      default:
-        return;
-    }
-  }, []);
+    },
+    [openCamera, openGallery],
+  );
 
   const onLoadProgress = useCallback((e: WebViewProgressEvent) => {
     setLoadProgress(e.nativeEvent.progress);
@@ -137,6 +222,9 @@ const useWebView = () => {
     postMessage,
     injectCookieScript,
     tokens,
+    isCanGoBack,
+    openCamera,
+    openGallery,
   };
 };
 

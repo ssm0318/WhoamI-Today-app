@@ -24,9 +24,14 @@ import * as Sentry from '@sentry/react-native';
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/' } = route.params;
   const WEBVIEW_URL = APP_CONSTS.WEB_VIEW_URL + url;
-  const { ref, onMessage, postMessage, injectCookieScript, tokens } =
-    useWebView();
-  const [isCanGoBack, setIsCanGoBack] = useState(false);
+  const {
+    ref,
+    onMessage,
+    postMessage,
+    injectCookieScript,
+    tokens,
+    isCanGoBack,
+  } = useWebView();
 
   const [isWebViewLoaded, setWebViewLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -121,13 +126,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
       <StatusBar />
       <WebView
         ref={ref}
-        onMessage={(event) => {
-          if (event.nativeEvent.data === 'navigationStateChange') {
-            setIsCanGoBack(event.nativeEvent.canGoBack);
-            return;
-          }
-          onMessage(event);
-        }}
+        onMessage={onMessage}
         source={{
           uri: WEBVIEW_URL,
         }}
@@ -138,6 +137,11 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
           tokens.access_token,
         )}
         allowsBackForwardNavigationGestures
+        allowFileAccess={true}
+        allowFileAccessFromFileURLs={true}
+        allowUniversalAccessFromFileURLs={true}
+        setSupportMultipleWindows={true}
+        androidLayerType="hardware"
         decelerationRate="normal"
         javaScriptEnabled
         injectedJavaScript={WEBVIEW_CONSTS.WEB_VIEW_DEBUGGING_SCRIPT}

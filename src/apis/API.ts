@@ -34,19 +34,18 @@ const API = (() => {
           config.url,
         );
         Sentry.captureException(new Error('Missing authentication tokens'));
-        return Promise.reject(new Error('Missing authentication tokens')); // 🚀 명확한 에러 반환
       }
 
       config.headers.Cookie = `access_token=${access_token};csrftoken=${csrftoken}`;
       config.headers['X-Csrftoken'] = csrftoken;
 
-      console.log('[API request]', config.url);
-      console.log('👷 [API request headers]', config.headers);
+      // console.log('[API request]', config.url);
+      // console.log('👷 [API request headers]', config.headers);
 
       return config;
     },
     (err) => {
-      console.log('[API request error]', err);
+      // console.log('[API request error]', err);
       Sentry.captureException(err);
       return Promise.reject(err);
     },
@@ -54,11 +53,11 @@ const API = (() => {
 
   apiInstance.interceptors.response.use(
     (config) => {
-      console.log('ℹ️ [API response]', config.config.url, config.data);
+      // console.log('ℹ️ [API response]', config.config.url, config.data);
       return config.data;
     },
     (err) => {
-      console.log('‼️ [API response error]', err.config?.url, err);
+      // console.log('‼️ [API response error]', err.config?.url, err);
       Sentry.captureException(err);
       return Promise.reject(err);
     },
