@@ -6,6 +6,8 @@ import {
   StyleSheet,
   ActivityIndicator,
   View,
+  Platform,
+  Keyboard,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { APP_CONSTS, WEBVIEW_CONSTS } from '@constants';
@@ -32,6 +34,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     tokens,
     isCanGoBack,
   } = useWebView();
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const [isWebViewLoaded, setWebViewLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -121,6 +124,45 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     }
   };
 
+  const sendKeyboardHeightToWebView = (height: number) => {
+    if (ref.current) {
+      const message = JSON.stringify({
+        type: 'KEYBOARD_HEIGHT',
+        height: height,
+      });
+      ref.current.injectJavaScript(`
+        window.dispatchEvent(new MessageEvent('message', {
+          data: '${message}'
+        }));
+        true;
+      `);
+    }
+  };
+
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      Platform.OS === 'android' ? 'keyboardDidShow' : 'keyboardWillShow',
+      (event) => {
+        const height = event.endCoordinates.height;
+        setKeyboardHeight(height);
+        sendKeyboardHeightToWebView(height);
+      },
+    );
+
+    const keyboardDidHideListener = Keyboard.addListener(
+      Platform.OS === 'android' ? 'keyboardDidHide' : 'keyboardWillHide',
+      () => {
+        setKeyboardHeight(0);
+        sendKeyboardHeightToWebView(0);
+      },
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar />
@@ -150,6 +192,10 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         domStorageEnabled
+        /* 키보드 관련 설정 */
+        scrollEnabled={false}
+        // Android에서 키보드가 WebView 내용을 가리지 않도록 설정
+        keyboardDisplayRequiresUserAction={false}
         renderLoading={() => (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#0000ff" />
