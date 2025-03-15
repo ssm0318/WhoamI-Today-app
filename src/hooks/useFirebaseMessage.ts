@@ -50,7 +50,7 @@ const useFirebaseMessage = () => {
 
       return enabled;
     } catch (error) {
-      console.log('Permission request error:', error);
+      // console.log('Permission request error:', error);
       return false;
     }
   };
@@ -58,11 +58,11 @@ const useFirebaseMessage = () => {
   const hasPermission = async (): Promise<boolean> => {
     const permissionStatus = await messaging().hasPermission();
     const permitted = isPermitted(permissionStatus);
-    console.log('[Firebase] Permission status:', {
-      status: permissionStatus,
-      permitted,
-      currentToken: await messaging().getToken(),
-    });
+    // console.log('[Firebase] Permission status:', {
+    //   status: permissionStatus,
+    //   permitted,
+    //   currentToken: await messaging().getToken(),
+    // });
     return permitted;
   };
 
@@ -113,13 +113,13 @@ const useFirebaseMessage = () => {
   }, [handleNotificationPress]);
 
   const logTokenInfo = (prefix: string, data: unknown) => {
-    console.log(`[Firebase] ${prefix}:`, data);
+    // console.log(`[Firebase] ${prefix}:`, data);
   };
 
   const logTokenError = (error: unknown, response?: unknown) => {
-    console.error('[Firebase] Token error:', error);
+    // console.error('[Firebase] Token error:', error);
     if (response) {
-      console.error('[Firebase] API error response:', response);
+      // console.error('[Firebase] API error response:', response);
     }
   };
 
