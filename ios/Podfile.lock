@@ -407,7 +407,7 @@ PODS:
     - React-perflogger (= 0.71.7)
   - rn-fetch-blob (0.12.0):
     - React-Core
-  - RNBootSplash (6.3.1):
+  - RNBootSplash (6.3.3):
     - React-Core
   - RNCAsyncStorage (1.24.0):
     - React-Core
@@ -421,9 +421,17 @@ PODS:
     - FirebaseCoreExtension (= 10.15.0)
     - React-Core
     - RNFBApp
-  - RNGestureHandler (2.21.0):
-    - RCT-Folly (= 2021.07.22.00)
+  - RNGestureHandler (2.9.0):
     - React-Core
+  - RNImageCropPicker (0.42.0):
+    - React-Core
+    - React-RCTImage
+    - RNImageCropPicker/QBImagePickerController (= 0.42.0)
+    - TOCropViewController (~> 2.7.4)
+  - RNImageCropPicker/QBImagePickerController (0.42.0):
+    - React-Core
+    - React-RCTImage
+    - TOCropViewController (~> 2.7.4)
   - RNNotifee (7.3.0):
     - React-Core
     - RNNotifee/NotifeeCore (= 7.3.0)
@@ -459,8 +467,14 @@ PODS:
   - RNScreens (3.22.0):
     - React-Core
     - React-RCTImage
+  - RNSentry (6.9.0):
+    - RCT-Folly (= 2021.07.22.00)
+    - React-Core
+    - Sentry/HybridSDK (= 8.45.0)
   - RNSVG (13.14.1):
     - React-Core
+  - Sentry/HybridSDK (8.45.0)
+  - TOCropViewController (2.7.4)
   - VisionCamera (2.16.8):
     - React
     - React-callinvoker
@@ -513,9 +527,11 @@ DEPENDENCIES:
   - "RNFBApp (from `../node_modules/@react-native-firebase/app`)"
   - "RNFBMessaging (from `../node_modules/@react-native-firebase/messaging`)"
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
+  - RNImageCropPicker (from `../node_modules/react-native-image-crop-picker`)
   - "RNNotifee (from `../node_modules/@notifee/react-native`)"
   - RNReanimated (from `../node_modules/react-native-reanimated`)
   - RNScreens (from `../node_modules/react-native-screens`)
+  - "RNSentry (from `../node_modules/@sentry/react-native`)"
   - RNSVG (from `../node_modules/react-native-svg`)
   - VisionCamera (from `../node_modules/react-native-vision-camera`)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
@@ -533,6 +549,8 @@ SPEC REPOS:
     - GoogleUtilities
     - nanopb
     - PromisesObjC
+    - Sentry
+    - TOCropViewController
 
 EXTERNAL SOURCES:
   boost:
@@ -619,12 +637,16 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@react-native-firebase/messaging"
   RNGestureHandler:
     :path: "../node_modules/react-native-gesture-handler"
+  RNImageCropPicker:
+    :path: "../node_modules/react-native-image-crop-picker"
   RNNotifee:
     :path: "../node_modules/@notifee/react-native"
   RNReanimated:
     :path: "../node_modules/react-native-reanimated"
   RNScreens:
     :path: "../node_modules/react-native-screens"
+  RNSentry:
+    :path: "../node_modules/@sentry/react-native"
   RNSVG:
     :path: "../node_modules/react-native-svg"
   VisionCamera:
@@ -680,16 +702,20 @@ SPEC CHECKSUMS:
   React-runtimeexecutor: c5c89f8f543842dd864b63ded1b0bbb9c9445328
   ReactCommon: 7efec56db1e74f34e24beadcdda6942829d19c4c
   rn-fetch-blob: f065bb7ab7fb48dd002629f8bdcb0336602d3cba
-  RNBootSplash: 66c8458007bda40cc25a3f25e4326244a71d9a73
+  RNBootSplash: ced7b181afb7fd80a570cd8c5a3d89d04e2fc245
   RNCAsyncStorage: ec53e44dc3e75b44aa2a9f37618a49c3bc080a7a
   RNDeviceInfo: 4701f0bf2a06b34654745053db0ce4cb0c53ada7
   RNFBApp: cc9384746945ac0eedd4759171a8abb4c4c5309d
   RNFBMessaging: 3c573398dced30f6cbaf55a195080916ea23f819
-  RNGestureHandler: d1ac410ba2504c92cfc2ebda0d414d75e5a1c0ff
+  RNGestureHandler: 071d7a9ad81e8b83fe7663b303d132406a7d8f39
+  RNImageCropPicker: 64b6bec9ec185ee59b71a93d7058816bd0e1916e
   RNNotifee: d585266dd69e1f355d26d074cbfdbdfa6c94b7d5
   RNReanimated: f186e85d9f28c9383d05ca39e11dd194f59093ec
   RNScreens: 68fd1060f57dd1023880bf4c05d74784b5392789
+  RNSentry: 5766e2184c640add698928abcb550a1f337a0e28
   RNSVG: af3907ac5d4fa26a862b75a16d8f15bc74f2ceda
+  Sentry: f7c0c4b82e2f7e5909a660544dfaff84e35d5e03
+  TOCropViewController: 80b8985ad794298fb69d3341de183f33d1853654
   VisionCamera: ed90fd798bd7cb1631373077b3fd51a00d10b30e
   Yoga: d56980c8914db0b51692f55533409e844b66133c
 
