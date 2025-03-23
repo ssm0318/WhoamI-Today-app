@@ -6,6 +6,9 @@ import {
   StyleSheet,
   ActivityIndicator,
   View,
+  Platform,
+  Keyboard,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { APP_CONSTS, WEBVIEW_CONSTS } from '@constants';
@@ -32,6 +35,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     tokens,
     isCanGoBack,
   } = useWebView();
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const [isWebViewLoaded, setWebViewLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -121,9 +125,95 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     }
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar />
+  // Android 전용 키보드 높이 WebView에 전달하는 함수
+  const sendKeyboardHeightToWebView = (height: number) => {
+    if (Platform.OS === 'android' && ref.current) {
+      const message = JSON.stringify({
+        type: 'KEYBOARD_HEIGHT',
+        height: height,
+      });
+      ref.current.injectJavaScript(`
+        window.dispatchEvent(new MessageEvent('message', {
+          data: '${message}'
+        }));
+        true;
+      `);
+    }
+  };
+
+  // Android 전용 키보드 이벤트 리스너
+  useEffect(() => {
+    // iOS에서는 키보드 이벤트를 처리하지 않음
+    if (Platform.OS !== 'android') return;
+
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      (event) => {
+        const height = event.endCoordinates.height;
+        setKeyboardHeight(height);
+        sendKeyboardHeightToWebView(height);
+      },
+    );
+
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+        sendKeyboardHeightToWebView(0);
+      },
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
+
+  // Android 전용 키보드 표시 시 WebView 패딩 조정
+  useEffect(() => {
+    // iOS에서는 키보드 관련 처리를 하지 않음
+    if (Platform.OS !== 'android') return;
+
+    const onShow = (e: { endCoordinates: { height: number } }) => {
+      const kbHeight = e.endCoordinates.height;
+      // 웹뷰에 JS 주입: body에 bottom 패딩 추가
+      ref.current?.injectJavaScript(`
+        document.body.style.paddingBottom='${kbHeight}px';
+        var el = document.activeElement;
+        if(el && el.scrollIntoView) { el.scrollIntoView({ block: 'nearest' }); }
+      `);
+    };
+    const onHide = () => {
+      ref.current?.injectJavaScript(`document.body.style.paddingBottom='0px';`);
+    };
+
+    const showSubscription = Keyboard.addListener('keyboardDidShow', onShow);
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', onHide);
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
+  // KeyboardAvoidingView를 플랫폼에 따라 조건부 렌더링하는 함수
+  const renderContent = () => {
+    if (Platform.OS === 'android') {
+      // Android에서는 KeyboardAvoidingView 사용
+      return (
+        <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+          {renderWebView()}
+        </KeyboardAvoidingView>
+      );
+    } else {
+      // iOS에서는 KeyboardAvoidingView 없이 직접 WebView 렌더링
+      return renderWebView();
+    }
+  };
+
+  // WebView 렌더링 함수
+  const renderWebView = () => {
+    return (
       <WebView
         ref={ref}
         onMessage={onMessage}
@@ -150,6 +240,12 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         domStorageEnabled
+        /* 키보드 관련 설정 - 플랫폼별 차이 적용 */
+        scrollEnabled={true}
+        keyboardDisplayRequiresUserAction={Platform.OS === 'ios'}
+        contentInsetAdjustmentBehavior={
+          Platform.OS === 'ios' ? 'automatic' : 'never'
+        }
         renderLoading={() => (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#0000ff" />
@@ -178,6 +274,13 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
           ref.current?.reload();
         }}
       />
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar />
+      {renderContent()}
       {isLoading && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#0000ff" />
