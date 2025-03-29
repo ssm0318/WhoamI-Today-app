@@ -106,8 +106,9 @@ android {
         applicationId "com.whoami.today.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 8
-        versionName "1.1" 
+        // versionCode = MAJOR * 10000 + MINOR * 100 + PATCH
+        versionCode 10200
+        versionName "1.2" 
     }
 
     splits {
