@@ -5,7 +5,7 @@ import messaging, {
 import DeviceInfo from 'react-native-device-info';
 import { notificationApis, pushNotificationApis } from '@apis';
 import { APP_CONSTS } from '@constants';
-import { FcmTokenStorage, CookieStorage } from '@tools';
+import { FcmTokenStorage } from '@tools';
 import { displayNotification } from '../tools/pushNotiHelper';
 import notifee, { EventType } from '@notifee/react-native';
 import NavigationService from '@libs/NavigationService';
@@ -112,63 +112,38 @@ const useFirebaseMessage = () => {
     });
   }, [handleNotificationPress]);
 
-  const logTokenInfo = (prefix: string, data: unknown) => {
-    // console.log(`[Firebase] ${prefix}:`, data);
-  };
+  const registerOrUpdatePushToken = useCallback(
+    async (
+      tokens: { access_token: string; csrftoken: string },
+      active: boolean,
+    ) => {
+      try {
+        if (!tokens.access_token || !tokens.csrftoken) {
+          console.log('[Firebase Message] : Missing authentication tokens');
+          return;
+        }
 
-  const logTokenError = (error: unknown, response?: unknown) => {
-    // console.error('[Firebase] Token error:', error);
-    if (response) {
-      // console.error('[Firebase] API error response:', response);
-    }
-  };
+        const pushToken = await messaging().getToken();
+        await FcmTokenStorage.setToken({ fcmToken: pushToken });
 
-  const registerOrUpdatePushToken = useCallback(async (active: boolean) => {
-    try {
-      // 토큰 검증을 위한 로직
-      const { access_token, csrftoken } = await CookieStorage.getCookie();
-      if (!access_token || !csrftoken) {
-        logTokenInfo(
-          'Authentication tokens not ready, skipping push token registration',
-          { access_token: !!access_token, csrftoken: !!csrftoken },
-        );
-        return;
+        const params = {
+          device_id: await DeviceInfo.getUniqueId(),
+          type: APP_CONSTS.IS_ANDROID ? 'android' : 'ios',
+          registration_id: pushToken,
+          active,
+        };
+
+        await pushNotificationApis.registerPushToken(params);
+      } catch (e: unknown) {
+        if (e instanceof AxiosError && e.response) {
+          console.log('[Firebase Message] : Error registering push token', e);
+        } else {
+          console.log('[Firebase Message] : Error registering push token', e);
+        }
       }
-
-      const isEmulator = await DeviceInfo.isEmulator();
-      logTokenInfo('Is emulator', isEmulator);
-
-      const { fcmToken: existingToken } = await FcmTokenStorage.getToken();
-      logTokenInfo('Existing token', existingToken);
-
-      const pushToken = await messaging().getToken();
-      logTokenInfo('About to save token', pushToken);
-
-      await FcmTokenStorage.setToken({ fcmToken: pushToken });
-      const { fcmToken: verifyToken } = await FcmTokenStorage.getToken();
-      logTokenInfo('Verified saved token', verifyToken);
-
-      const params = {
-        device_id: await DeviceInfo.getUniqueId(),
-        type: APP_CONSTS.IS_ANDROID ? 'android' : 'ios',
-        registration_id: pushToken,
-        active,
-      };
-      logTokenInfo('Calling API with params', params);
-
-      const response = await pushNotificationApis.registerPushToken(params);
-      logTokenInfo('API response', response);
-    } catch (e: unknown) {
-      if (e instanceof AxiosError && e.response) {
-        logTokenError(e, {
-          status: e.response.status,
-          data: e.response.data,
-        });
-      } else {
-        logTokenError(e);
-      }
-    }
-  }, []);
+    },
+    [],
+  );
 
   return {
     initialize,

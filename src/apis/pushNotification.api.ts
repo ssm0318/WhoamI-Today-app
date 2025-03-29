@@ -9,5 +9,6 @@ type RegisterPushTokenRequest = {
   device_id: string;
 };
 
-export const registerPushToken = (params: RegisterPushTokenRequest) =>
-  API.post('/devices/', params);
+export const registerPushToken = async (params: RegisterPushTokenRequest) => {
+  await API.post('/devices/', params);
+};
