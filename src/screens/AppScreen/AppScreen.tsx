@@ -20,7 +20,6 @@ import {
   useFirebaseMessage,
   useWebView,
   useVersionCheckUpdate,
-  useSession,
 } from '@hooks';
 import * as Sentry from '@sentry/react-native';
 
@@ -43,7 +42,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     useFirebaseMessage();
 
   // 세션 관리를 위한 훅 호출
-  useSession();
+  // useSession();
 
   // 버전 체크 및 업데이트를 자동으로 수행
   // 버전 변경 여부를 감지

@@ -36,8 +36,14 @@ const API = (() => {
         Sentry.captureException(new Error('Missing authentication tokens'));
       }
 
-      config.headers.Cookie = `access_token=${access_token};csrftoken=${csrftoken}`;
-      config.headers['X-Csrftoken'] = csrftoken;
+      // Set CSRF token in the header with correct case
+      config.headers['X-CSRFToken'] = csrftoken;
+
+      // Set cookies separately
+      config.headers.Cookie = [
+        `csrftoken=${csrftoken}`,
+        `access_token=${access_token}`,
+      ].join('; ');
 
       // console.log('[API request]', config.url);
       // console.log('👷 [API request headers]', config.headers);
