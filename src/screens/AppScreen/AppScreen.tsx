@@ -21,6 +21,7 @@ import {
   useWebView,
   useVersionCheckUpdate,
   useAnalytics,
+  useAppStateEffect,
 } from '@hooks';
 import * as Sentry from '@sentry/react-native';
 
@@ -276,6 +277,12 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
       />
     );
   };
+
+  // 앱 상태 변경 시 웹뷰에 전달
+  useAppStateEffect((state) => {
+    console.log('[AppScreen] App state changed:', state);
+    postMessage('SET_APP_STATE', { value: state });
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
