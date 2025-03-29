@@ -6,8 +6,6 @@ import { VersionType } from '../types/user.type';
 
 // 상수
 const USER_VERSION_KEY = '@user_version';
-const DEBOUNCE_TIME = 1000; // 1초
-const MAX_ATTEMPTS = 2;
 
 /**
  * 버전 체크 및 업데이트를 자동으로 처리하는 훅
@@ -23,10 +21,8 @@ const useVersionCheckUpdate = (tokens: {
   // 버전 변경 감지를 위한 상태
   const [versionChanged, setVersionChanged] = useState(false);
 
-  // Refs for tracking check state
-  const lastCheckTime = useRef<number>(0);
+  // Ref for tracking check state
   const isChecking = useRef<boolean>(false);
-  const initializeAttempts = useRef<number>(0);
 
   // 버전 체크 및 업데이트 로직
   const checkAndUpdateVersion = useCallback(async (): Promise<{
@@ -48,22 +44,17 @@ const useVersionCheckUpdate = (tokens: {
       return null;
     }
 
-    const now = Date.now();
-
-    // 너무 빈번한 체크 방지
-    if (isChecking.current || now - lastCheckTime.current < DEBOUNCE_TIME) {
+    // 이미 체크 중인 경우 방지
+    if (isChecking.current) {
       console.log(
-        '[useVersionCheckUpdate] Skip version check - too frequent or already checking',
+        '[useVersionCheckUpdate] Skip version check - already checking',
       );
       return null;
     }
 
     try {
       isChecking.current = true;
-      console.log(
-        '[useVersionCheckUpdate] Checking version... Attempt:',
-        initializeAttempts.current + 1,
-      );
+      console.log('[useVersionCheckUpdate] Checking version...');
 
       // API에서 최신 버전 정보 가져오기
       const meResponse = await userApis.getMe();
@@ -93,9 +84,6 @@ const useVersionCheckUpdate = (tokens: {
         setVersionChanged(true);
       }
 
-      lastCheckTime.current = Date.now();
-      initializeAttempts.current = 0; // 성공하면 시도 횟수 리셋
-
       return {
         hasChanged,
         currentVersion,
@@ -103,19 +91,6 @@ const useVersionCheckUpdate = (tokens: {
       };
     } catch (error) {
       console.error('[useVersionCheckUpdate] Error checking version:', error);
-
-      // 최대 시도 횟수를 초과하지 않았다면 재시도
-      if (initializeAttempts.current < MAX_ATTEMPTS) {
-        initializeAttempts.current += 1;
-        console.log(
-          '[useVersionCheckUpdate] Retrying... Attempt:',
-          initializeAttempts.current,
-        );
-        // 잠시 대기 후 재시도
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        return checkAndUpdateVersion();
-      }
-
       return {
         hasChanged: false,
         error,
