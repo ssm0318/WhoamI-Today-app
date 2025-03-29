@@ -27,6 +27,8 @@ const API = (() => {
     async (config: any) => {
       const { access_token, csrftoken } = await getCookie();
 
+      // console.log('👉 csrftoken:', csrftoken, 'length:', csrftoken?.length);
+
       // 토큰 유효성 검사: 토큰이 비어있는 경우 요청을 중단하고 오류 반환
       if (!access_token || !csrftoken) {
         console.error(
@@ -34,16 +36,10 @@ const API = (() => {
           config.url,
         );
         Sentry.captureException(new Error('Missing authentication tokens'));
+        return Promise.reject(new Error('Missing authentication tokens'));
       }
 
-      // Set CSRF token in the header with correct case
       config.headers['X-CSRFToken'] = csrftoken;
-
-      // Set cookies separately
-      config.headers.Cookie = [
-        `csrftoken=${csrftoken}`,
-        `access_token=${access_token}`,
-      ].join('; ');
 
       // console.log('[API request]', config.url);
       // console.log('👷 [API request headers]', config.headers);
