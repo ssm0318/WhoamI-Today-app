@@ -17,8 +17,6 @@ Sentry.init({
 const App: React.FC = () => {
   const navigationRef = useNavigationContainerRef<RouteType.RoutesParamsList>();
 
-  // useAnalytics();
-
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
