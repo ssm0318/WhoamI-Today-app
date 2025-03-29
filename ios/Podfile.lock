@@ -456,7 +456,7 @@ PODS:
     - React-Core
   - RNDeviceInfo (10.3.0):
     - React-Core
-  - RNFBAnalytics (21.12.3):
+  - RNFBAnalytics (18.5.0):
     - Firebase/Analytics (= 10.15.0)
     - React-Core
     - RNFBApp
@@ -759,7 +759,7 @@ SPEC CHECKSUMS:
   RNBootSplash: ced7b181afb7fd80a570cd8c5a3d89d04e2fc245
   RNCAsyncStorage: ec53e44dc3e75b44aa2a9f37618a49c3bc080a7a
   RNDeviceInfo: 4701f0bf2a06b34654745053db0ce4cb0c53ada7
-  RNFBAnalytics: 29fa4b996d7b0252484ef87308ca30b8fe89fab8
+  RNFBAnalytics: 30184f205f17c114a9e426806925331b9110f749
   RNFBApp: cc9384746945ac0eedd4759171a8abb4c4c5309d
   RNFBMessaging: 3c573398dced30f6cbaf55a195080916ea23f819
   RNGestureHandler: 071d7a9ad81e8b83fe7663b303d132406a7d8f39
