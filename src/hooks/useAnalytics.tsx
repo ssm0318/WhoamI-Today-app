@@ -18,7 +18,10 @@ const useAnalytics = (tokens: {
     username: string;
     userId: string;
   }) => {
-    console.log('[useAnalytics] setUserProperties', userId);
+    console.log('[useAnalytics] setUserProperties', {
+      username,
+      userId,
+    });
     await analyticsInstance.setUserId(userId);
     await analyticsInstance.setUserProperties({
       username: username,
@@ -27,7 +30,7 @@ const useAnalytics = (tokens: {
   };
 
   const trackEvent = async (
-    eventName: 'session_end' | 'logout',
+    eventName: 'session_end' | 'custom_session_start' | 'logout',
     params?: Record<string, any>,
   ) => {
     try {
@@ -61,6 +64,9 @@ const useAnalytics = (tokens: {
       console.log('[useAnalytics] App is inactive or background');
       // 앱이 백그라운드로 갔을 때
       trackEvent('session_end');
+    } else {
+      console.log('[useAnalytics] App is active');
+      trackEvent('custom_session_start');
     }
   }, []);
 
