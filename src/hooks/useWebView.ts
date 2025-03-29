@@ -160,7 +160,7 @@ const useWebView = () => {
           await handleLogout();
 
           // firebase 푸시 토큰 해제
-          await registerOrUpdatePushToken(false);
+          await registerOrUpdatePushToken(tokens, false);
 
           await CookieStorage.removeCookie();
           setTokens({ csrftoken: '', access_token: '' });
