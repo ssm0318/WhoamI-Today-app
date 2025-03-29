@@ -20,6 +20,7 @@ import {
   useFirebaseMessage,
   useWebView,
   useVersionCheckUpdate,
+  useAnalytics,
 } from '@hooks';
 import * as Sentry from '@sentry/react-native';
 
@@ -41,8 +42,8 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { registerOrUpdatePushToken, hasPermission, requestPermissionIfNot } =
     useFirebaseMessage();
 
-  // 세션 관리를 위한 훅 호출
-  // useSession();
+  // GA 트래킹
+  useAnalytics(tokens);
 
   // 버전 체크 및 업데이트를 자동으로 수행
   // 버전 변경 여부를 감지
@@ -280,11 +281,6 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     <SafeAreaView style={styles.container}>
       <StatusBar />
       {renderContent()}
-      {isLoading && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#0000ff" />
-        </View>
-      )}
     </SafeAreaView>
   );
 };
