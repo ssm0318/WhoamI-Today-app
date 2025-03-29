@@ -181,6 +181,7 @@ dependencies {
     }
 
     implementation 'com.google.firebase:firebase-messaging:21.1.0'
+    implementation 'com.google.firebase:firebase-analytics'
     implementation 'org.jetbrains:annotations:16.0.2'
 
     implementation("androidx.activity:activity:1.9.+")
