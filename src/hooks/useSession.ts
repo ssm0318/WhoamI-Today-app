@@ -4,6 +4,9 @@ import { sessionApis } from '@apis';
 import { CookieStorage } from '@tools';
 import { useAppStateEffect } from '@hooks';
 
+/**
+ * @deprecated
+ */
 const useSession = () => {
   const touchInterval = useRef<NodeJS.Timeout>();
   const isAuthenticatedRef = useRef<boolean>(false);

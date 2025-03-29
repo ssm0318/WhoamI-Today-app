@@ -1,4 +1,4 @@
-import { useFirebaseMessage, useNavigationService } from '@hooks';
+import { useAnalytics, useFirebaseMessage, useNavigationService } from '@hooks';
 import {
   CookieStorage,
   parseCookie,
@@ -10,7 +10,6 @@ import { Linking } from 'react-native';
 import { WebViewMessageEvent, WebView } from 'react-native-webview';
 import { WebViewProgressEvent } from 'react-native-webview/lib/WebViewTypes';
 import { ScreenRouteParamList } from '@screens';
-import { sessionApis } from '@apis';
 import ImagePicker from 'react-native-image-crop-picker';
 
 interface FileData {
@@ -28,7 +27,7 @@ const useWebView = () => {
   const { getCookie } = CookieStorage;
   const { registerOrUpdatePushToken } = useFirebaseMessage();
   const [isCanGoBack, setIsCanGoBack] = useState(false);
-
+  const { handleLogout } = useAnalytics(tokens);
   const postMessage = useCallback((key: string, data: any) => {
     ref.current?.postMessage(JSON.stringify({ key, data }));
   }, []);
@@ -158,7 +157,7 @@ const useWebView = () => {
           console.log('LOGOUT');
 
           // 세션 종료
-          await sessionApis.endSession();
+          await handleLogout();
 
           // firebase 푸시 토큰 해제
           await registerOrUpdatePushToken(false);
