@@ -57,8 +57,6 @@ const useAnalytics = (tokens: {
   };
 
   const handleAppStateChange = useCallback(async (state: AppStateStatus) => {
-    await analyticsInstance.setAnalyticsCollectionEnabled(true);
-
     if (state.match(/inactive|background/)) {
       console.log('[useAnalytics] App is inactive or background');
       // 앱이 백그라운드로 갔을 때
