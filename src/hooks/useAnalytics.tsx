@@ -43,22 +43,6 @@ const useAnalytics = (tokens: {
     }
   };
 
-  // Add a new function to track screen views with the URL path
-  const trackScreenView = async (urlPath: string) => {
-    try {
-      // Only use the path portion after the domain (just as requested)
-      const path = urlPath.startsWith('/') ? urlPath : `/${urlPath}`;
-
-      await analyticsInstance.logScreenView({
-        screen_name: path,
-        screen_class: path,
-      });
-      console.log(`[useAnalytics] Logged screen view: ${path}`);
-    } catch (e) {
-      console.log('[useAnalytics] logScreenView failed', e);
-    }
-  };
-
   const handleAppStateChange = useCallback(async (state: AppStateStatus) => {
     if (state.match(/inactive|background/)) {
       console.log('[useAnalytics] App is inactive or background');
@@ -72,14 +56,17 @@ const useAnalytics = (tokens: {
 
   const handleLogout = async () => {
     console.log('[useAnalytics] handleLogout');
+
     await trackEvent('logout');
+
+    // 이후 user 식별자/속성 제거
     await analyticsInstance.setUserId(null);
     await analyticsInstance.setUserProperties({
       username: null,
       user_id: null,
     });
 
-    await analyticsInstance.resetAnalyticsData();
+    await trackEvent('session_end');
   };
 
   // On mount, track session start
@@ -94,6 +81,8 @@ const useAnalytics = (tokens: {
         username: me.username,
         userId: String(me.id),
       });
+
+      await trackEvent('custom_session_start');
     } catch (e) {
       console.log('[useAnalytics] setUserProperties failed', e);
     }
@@ -102,7 +91,6 @@ const useAnalytics = (tokens: {
   return {
     setUserProperties,
     trackEvent,
-    trackScreenView,
     handleLogout,
   };
 };
