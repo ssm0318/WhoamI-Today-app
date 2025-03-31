@@ -72,7 +72,8 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
 
   // 초기 권한 요청만 하고 토큰 등록은 하지 않음
   useAsyncEffect(async () => {
-    await requestPermissionIfNot();
+    const enabled = await requestPermissionIfNot();
+    postMessage('SET_NOTI_PERMISSION', { value: enabled });
   }, []);
 
   useEffect(() => {
