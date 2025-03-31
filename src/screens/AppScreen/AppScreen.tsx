@@ -61,6 +61,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   // 푸시 권한 허용 변경 후 다시 앱으로 돌아왔을 때만 체크하도록 수정
   useAppStateActiveEffect(async () => {
     const enabled = await hasPermission();
+    postMessage('SET_NOTI_PERMISSION', { value: enabled });
     if (!tokens.access_token || !tokens.csrftoken) return;
     if (enabled) {
       await registerOrUpdatePushToken(tokens, true);
@@ -71,7 +72,8 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
 
   // 초기 권한 요청만 하고 토큰 등록은 하지 않음
   useAsyncEffect(async () => {
-    await requestPermissionIfNot();
+    const enabled = await requestPermissionIfNot();
+    postMessage('SET_NOTI_PERMISSION', { value: enabled });
   }, []);
 
   useEffect(() => {
