@@ -100,6 +100,14 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     }
   }, [tokens.access_token, tokens.csrftoken]);
 
+  // 앱이 완전히 종료되었다가 다시 실행될 때만 WebView 리로드
+  useEffect(() => {
+    if (tokens.access_token && tokens.csrftoken) {
+      console.log('[AppScreen] App cold started, reloading WebView');
+      ref.current?.reload();
+    }
+  }, []);
+
   const onPressHardwareBackButton = () => {
     if (ref.current && isCanGoBack) {
       ref.current.goBack();
@@ -223,6 +231,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         scalesPageToFit={false}
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
+        cacheEnabled={false}
         domStorageEnabled
         /* 키보드 관련 설정 - 플랫폼별 차이 적용 */
         scrollEnabled={true}
