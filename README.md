@@ -158,3 +158,9 @@ The project uses several tools to maintain code quality:
 ## 🚀 Deployment
 
 The app uses Fastlane for automated deployment to both iOS App Store and Google Play Store.
+
+## 📧 Contact
+
+For questions, contributions, or support:
+
+- **Email**: [whoami.today.official@gmail.com](mailto:whoami.today.official@gmail.com)
