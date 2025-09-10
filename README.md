@@ -126,7 +126,6 @@ src/
 - **WebView Integration**: Seamless integration with the WhoAmIToday web service
 - **Push Notifications**: Firebase Cloud Messaging for real-time notifications
 - **Multi-language Support**: i18next integration for internationalization
-- **Camera Integration**: Native camera functionality for photo capture
 - **Cross-platform**: Supports both iOS and Android platforms
 - **Error Tracking**: Comprehensive error monitoring with Sentry
 
@@ -159,15 +158,3 @@ The project uses several tools to maintain code quality:
 ## 🚀 Deployment
 
 The app uses Fastlane for automated deployment to both iOS App Store and Google Play Store.
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## 📄 License
-
-This project is private and proprietary.
