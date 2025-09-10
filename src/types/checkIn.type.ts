@@ -23,9 +23,6 @@ export type CheckInBase = {
 
 export type MyCheckIn = CheckInBase & {
   share_everyone: boolean;
-  // FIXME: share_everyone, share_groups, share_friends의 타입 수정 필요
-  share_groups: any[];
-  shrare_friends: any[];
 };
 
 export type CheckInForm = Omit<

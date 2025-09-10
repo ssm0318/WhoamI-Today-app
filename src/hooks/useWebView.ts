@@ -134,7 +134,7 @@ const useWebView = () => {
           console.log('[WEBVIEW CONSOLE]', data.data);
           return;
         case 'OPEN_BROWSER':
-          //TODO(Gina): 나중에 가능하다면 openBrowserAsync 사용해보기
+          // Consider using openBrowserAsync in future updates
           await Linking.openURL(data.url);
           return;
         case 'NAVIGATE': {

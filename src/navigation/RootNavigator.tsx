@@ -16,8 +16,7 @@ const RootNavigator = () => {
   useLayoutEffect(() => {
     initializeFirebaseMessage();
 
-    // initialize language
-    // TODO 추후에는 언어 설정에서 직접 설정할 수 있도록
+    // initialize language from device settings
     const language = getDeviceLanguage();
     i18n.changeLanguage(language);
   }, []);
