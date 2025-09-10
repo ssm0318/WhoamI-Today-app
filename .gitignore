@@ -57,10 +57,24 @@ yarn-error.log
 
 # Ruby / CocoaPods
 /ios/Pods/
-/ios/GoogleService-Info.plist
 /vendor/bundle/
+
+# Firebase configuration files (contain sensitive API keys)
+/ios/GoogleService-Info.plist
+/android/app/google-services.json
 
 # Temporary files created by Metro to check the health of the file watcher
 .metro-health-check*
 
+# Build artifacts
 *.dSYM.zip
+*.ipa
+*.apk
+*.aab
+
+# IDE files
+.vscode/
+.idea/
+
+# OS generated files
+Thumbs.db
