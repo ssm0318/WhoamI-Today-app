@@ -4,11 +4,5 @@
     "description": "You can change notification settings in your phone's settings.",
     "redirect_setting": "Open Settings",
     "close": "Close"
-  },
-  "camera_permission": {
-    "title": "Camera Permission",
-    "description": "Allow camera access in your phone's settings.",
-    "redirect_setting": "Open Settings",
-    "close": "Close"
   }
 }

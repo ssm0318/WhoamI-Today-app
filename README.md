@@ -2,7 +2,7 @@
 
 ## 📱 Overview
 
-WhoAmIToday is a React Native mobile application that provides a platform for users to explore and express their daily identity through an interactive web-based service.
+WhoAmIToday is a React Native mobile application that enables users to discover and express themselves through an innovative social platform delivered via an integrated web experience.
 
 ## 🛠 Tech Stack
 
