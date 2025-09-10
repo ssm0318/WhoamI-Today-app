@@ -43,14 +43,14 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { registerOrUpdatePushToken, hasPermission, requestPermissionIfNot } =
     useFirebaseMessage();
 
-  // GA 트래킹
+  // GA tracking
   useAnalytics(tokens);
 
-  // 버전 체크 및 업데이트를 자동으로 수행
-  // 버전 변경 여부를 감지
+  // Automatically perform version check and update
+  // Detect version changes
   const versionChanged = useVersionCheckUpdate(tokens);
 
-  // 버전이 변경되었을 때 WebView 리로드
+  // Reload WebView when version changes
   useEffect(() => {
     if (versionChanged && ref.current) {
       console.log('[AppScreen] Version changed, reloading WebView');
@@ -58,7 +58,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     }
   }, [versionChanged]);
 
-  // 푸시 권한 허용 변경 후 다시 앱으로 돌아왔을 때만 체크하도록 수정
+  // Modified to check only when returning to app after changing push permission settings
   useAppStateActiveEffect(async () => {
     const enabled = await hasPermission();
     postMessage('SET_NOTI_PERMISSION', { value: enabled });
@@ -70,7 +70,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     }
   });
 
-  // 초기 권한 요청만 하고 토큰 등록은 하지 않음
+  // Only request initial permission, do not register token
   useAsyncEffect(async () => {
     const enabled = await requestPermissionIfNot();
     postMessage('SET_NOTI_PERMISSION', { value: enabled });
@@ -100,7 +100,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     }
   }, [tokens.access_token, tokens.csrftoken]);
 
-  // 앱이 완전히 종료되었다가 다시 실행될 때만 WebView 리로드
+  // Reload WebView only when app is completely terminated and restarted
   useEffect(() => {
     if (tokens.access_token && tokens.csrftoken) {
       console.log('[AppScreen] App cold started, reloading WebView');
@@ -117,7 +117,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     }
   };
 
-  // Android 전용 키보드 높이 WebView에 전달하는 함수
+  // Function to send keyboard height to WebView (Android only)
   const sendKeyboardHeightToWebView = (height: number) => {
     if (Platform.OS === 'android' && ref.current) {
       const message = JSON.stringify({
@@ -133,9 +133,9 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     }
   };
 
-  // Android 전용 키보드 이벤트 리스너
+  // Keyboard event listener (Android only)
   useEffect(() => {
-    // iOS에서는 키보드 이벤트를 처리하지 않음
+    // Do not handle keyboard events on iOS
     if (Platform.OS !== 'android') return;
 
     const keyboardDidShowListener = Keyboard.addListener(
@@ -161,14 +161,14 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     };
   }, []);
 
-  // Android 전용 키보드 표시 시 WebView 패딩 조정
+  // Adjust WebView padding when keyboard is shown (Android only)
   useEffect(() => {
-    // iOS에서는 키보드 관련 처리를 하지 않음
+    // Do not handle keyboard-related processing on iOS
     if (Platform.OS !== 'android') return;
 
     const onShow = (e: { endCoordinates: { height: number } }) => {
       const kbHeight = e.endCoordinates.height;
-      // 웹뷰에 JS 주입: body에 bottom 패딩 추가
+      // Inject JS into webview: add bottom padding to body
       ref.current?.injectJavaScript(`
         document.body.style.paddingBottom='${kbHeight}px';
         var el = document.activeElement;
@@ -188,22 +188,22 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     };
   }, []);
 
-  // KeyboardAvoidingView를 플랫폼에 따라 조건부 렌더링하는 함수
+  // Function to conditionally render KeyboardAvoidingView based on platform
   const renderContent = () => {
     if (Platform.OS === 'android') {
-      // Android에서는 KeyboardAvoidingView 사용
+      // Use KeyboardAvoidingView on Android
       return (
         <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
           {renderWebView()}
         </KeyboardAvoidingView>
       );
     } else {
-      // iOS에서는 KeyboardAvoidingView 없이 직접 WebView 렌더링
+      // Render WebView directly without KeyboardAvoidingView on iOS
       return renderWebView();
     }
   };
 
-  // WebView 렌더링 함수
+  // WebView rendering function
   const renderWebView = () => {
     return (
       <WebView
@@ -233,7 +233,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         thirdPartyCookiesEnabled
         cacheEnabled={false}
         domStorageEnabled
-        /* 키보드 관련 설정 - 플랫폼별 차이 적용 */
+        /* Keyboard-related settings - apply platform-specific differences */
         scrollEnabled={true}
         keyboardDisplayRequiresUserAction={Platform.OS === 'ios'}
         contentInsetAdjustmentBehavior={
@@ -269,7 +269,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     );
   };
 
-  // 앱 상태 변경 시 웹뷰에 전달
+  // Send to webview when app state changes
   useAppStateEffect((state) => {
     console.log('[AppScreen] App state changed:', state);
     postMessage('SET_APP_STATE', { value: state });

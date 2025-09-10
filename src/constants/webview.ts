@@ -29,7 +29,7 @@ console.info = (...args) => consoleLog('info', ...args);
 console.warn = (...args) => consoleLog('warn', ...args);
 console.error = (...args) => consoleLog('error', ...args);
 
-// 네비게이션 상태 변경 감지
+// Detect navigation state changes
 (function() {
     function wrap(fn) {
       return function wrapper() {

@@ -32,7 +32,7 @@ const useFirebaseMessage = () => {
 
   const requestPermissionIfNot = async (): Promise<boolean> => {
     try {
-      // Android 13 이상에서는 POST_NOTIFICATIONS 권한 필요
+      // POST_NOTIFICATIONS permission required for Android 13 and above
       if (APP_CONSTS.IS_ANDROID && Number(Platform.Version) >= 33) {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
@@ -101,7 +101,7 @@ const useFirebaseMessage = () => {
         const destinationUrl = detail.notification?.data?.url;
         const notificationId = Number(detail.notification?.data?.tag);
         if (destinationUrl && typeof destinationUrl === 'string') {
-          // 알림 읽음 처리
+          // Handle notification read
           await notificationApis.readNotification([notificationId]);
 
           NavigationService.navigate('AppScreen', {

@@ -51,7 +51,7 @@ const useWebView = () => {
     fetchTokens();
   }, []);
 
-  // 📸 카메라 촬영
+  // 📸 Camera capture
   const openCamera = useCallback(() => {
     ImagePicker.openCamera({
       width: 300,
@@ -68,7 +68,7 @@ const useWebView = () => {
       });
   }, []);
 
-  // 📂 갤러리에서 파일 선택
+  // 📂 Select file from gallery
   const openGallery = useCallback(() => {
     console.log('openGallery');
     ImagePicker.openPicker({
@@ -102,7 +102,7 @@ const useWebView = () => {
   );
 
   /**
-   * 웹뷰에서 오는 요청 처리
+   * Handle requests from webview
    */
   const onMessage = useCallback(
     async (event: WebViewMessageEvent) => {
@@ -156,10 +156,10 @@ const useWebView = () => {
         case 'LOGOUT': {
           console.log('LOGOUT');
 
-          // 세션 종료
+          // End session
           await handleLogout();
 
-          // firebase 푸시 토큰 해제
+          // Unregister firebase push token
           await registerOrUpdatePushToken(tokens, false);
 
           await CookieStorage.removeCookie();

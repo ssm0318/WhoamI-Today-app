@@ -29,7 +29,7 @@ const API = (() => {
 
       // console.log('👉 csrftoken:', csrftoken, 'length:', csrftoken?.length);
 
-      // 토큰 유효성 검사: 토큰이 비어있는 경우 요청을 중단하고 오류 반환
+      // Token validation: abort request and return error if token is empty
       if (!access_token || !csrftoken) {
         console.error(
           '[API] Missing authentication tokens for request to:',

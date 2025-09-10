@@ -14,7 +14,7 @@ export type RouteKeys = keyof RoutesParamsList;
 export type RouteObject<T> = { [key in keyof T]: RouteInfo };
 
 /**
- * CARD: 일반적인 카드 스크린 -> 좌, 우 애니메이션
+ * CARD: General card screen -> left, right animation
  */
 export type ScreenType = 'CARD';
 

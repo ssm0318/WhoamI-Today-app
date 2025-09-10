@@ -24,7 +24,7 @@ const RootNavigator = () => {
   // initialize with async handlers
   useAsyncEffect(async () => {
     try {
-      // 비동기 동작 필요한 것들은 Bootsplash 상태인 동안 처리
+      // Handle asynchronous operations needed during Bootsplash state
       // ex. async storage, ...
     } catch (error) {
       console.log(error);

@@ -4,34 +4,34 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { userApis } from '@apis';
 import { VersionType } from '../types/user.type';
 
-// 상수
+// Constants
 const USER_VERSION_KEY = '@user_version';
 
 /**
- * 버전 체크 및 업데이트를 자동으로 처리하는 훅
- * 초기 마운트와 앱 활성화될 때마다 체크 수행
+ * Hook that automatically handles version check and update
+ * Performs check on initial mount and whenever app becomes active
  *
- * @param tokens 토큰 객체 (access_token, csrftoken)
- * @returns 버전 변경 여부 (true: 변경됨, false: 변경 없음)
+ * @param tokens Token object (access_token, csrftoken)
+ * @returns Version change status (true: changed, false: no change)
  */
 const useVersionCheckUpdate = (tokens: {
   access_token?: string;
   csrftoken?: string;
 }) => {
-  // 버전 변경 감지를 위한 상태
+  // State for detecting version changes
   const [versionChanged, setVersionChanged] = useState(false);
 
   // Ref for tracking check state
   const isChecking = useRef<boolean>(false);
 
-  // 버전 체크 및 업데이트 로직
+  // Version check and update logic
   const checkAndUpdateVersion = useCallback(async (): Promise<{
     hasChanged: boolean;
     currentVersion?: string;
     storedVersion?: string | null;
     error?: any;
   } | null> => {
-    // 토큰이 유효한지 확인
+    // Check if tokens are valid
     if (!tokens || !tokens.access_token || !tokens.csrftoken) {
       console.log(
         '[useVersionCheckUpdate] Skip version check - tokens not available or invalid',
@@ -44,7 +44,7 @@ const useVersionCheckUpdate = (tokens: {
       return null;
     }
 
-    // 이미 체크 중인 경우 방지
+    // Prevent if already checking
     if (isChecking.current) {
       console.log(
         '[useVersionCheckUpdate] Skip version check - already checking',
@@ -56,17 +56,17 @@ const useVersionCheckUpdate = (tokens: {
       isChecking.current = true;
       console.log('[useVersionCheckUpdate] Checking version...');
 
-      // API에서 최신 버전 정보 가져오기
+      // Get latest version information from API
       const meResponse = await userApis.getMe();
       console.log('[useVersionCheckUpdate] getMe API response:', meResponse);
 
-      // 현재 버전과 저장된 버전 비교
+      // Compare current version with stored version
       const currentVersion = meResponse.current_ver ?? VersionType.DEFAULT;
       const storedVersion = await AsyncStorage.getItem(USER_VERSION_KEY);
       const hasChanged = storedVersion !== currentVersion;
 
       if (hasChanged) {
-        // 버전이 변경되었으면 저장
+        // Save if version has changed
         await AsyncStorage.setItem(
           USER_VERSION_KEY,
           currentVersion || VersionType.DEFAULT,
@@ -80,7 +80,7 @@ const useVersionCheckUpdate = (tokens: {
           currentVersion,
         );
 
-        // 버전 변경 상태 업데이트
+        // Update version change state
         setVersionChanged(true);
       }
 
@@ -140,7 +140,7 @@ const useVersionCheckUpdate = (tokens: {
     }
   });
 
-  // 버전 변경 여부 반환
+  // Return version change status
   return versionChanged;
 };
 

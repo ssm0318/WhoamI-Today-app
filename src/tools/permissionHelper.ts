@@ -1,6 +1,6 @@
 import { Linking } from 'react-native';
 
-// 휴대폰의 설정 화면으로 이동하는 함수
+// Function to navigate to device settings screen
 export const redirectSetting = () => {
   Linking.openSettings();
 };

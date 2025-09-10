@@ -35,7 +35,7 @@ export const displayNotification = async (
 ): Promise<void> => {
   const { notification, data } = message;
 
-  // 삭제된 알림을 알림 센터에서 삭제
+  // Remove deleted notifications from notification center
   if (data?.type === 'cancel') {
     const displayedNotifications = await notifee.getDisplayedNotifications();
     const noti = displayedNotifications.find(

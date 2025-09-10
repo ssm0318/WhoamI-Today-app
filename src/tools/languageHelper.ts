@@ -1,9 +1,9 @@
 import { APP_CONSTS } from '@constants';
 import { NativeModules } from 'react-native';
 
-// en을 default로
+// Use 'en' as default
 export const getDeviceLanguage = (): 'en' | 'ko' => {
-  // 'en-US', 'ko-KR', 'ja-JP' 와 같은 값을 가져옴
+  // Get values like 'en-US', 'ko-KR', 'ja-JP'
   const language = APP_CONSTS.IS_IOS
     ? NativeModules.SettingsManager.settings.AppleLocale ||
       NativeModules.SettingsManager.settings.AppleLanguages[0] // iOS 13

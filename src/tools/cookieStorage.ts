@@ -6,7 +6,7 @@ export const COOKIE_STORAGE_KEYS = {
 };
 
 export const CookieStorage = (() => {
-  // 웹뷰에서 받아온 쿠키 저장
+  // Store cookies received from webview
   const setCookie = async ({
     csrftoken,
     access_token,
@@ -17,7 +17,7 @@ export const CookieStorage = (() => {
     );
   };
 
-  // 쿠키 가져오기
+  // Get cookies
   const getCookie = async (): Promise<CookieType.CookieObject> => {
     try {
       const data =
@@ -30,7 +30,7 @@ export const CookieStorage = (() => {
     }
   };
 
-  // 쿠키 삭제
+  // Delete cookies
   const removeCookie = async () => {
     try {
       await AsyncStorage.removeItem(COOKIE_STORAGE_KEYS.COOKIE);
