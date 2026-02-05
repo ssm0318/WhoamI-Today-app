@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">WhoAmI Today</string>
+    <string name="widget_description">Stay connected with friends and discover daily questions.</string>
 </resources>

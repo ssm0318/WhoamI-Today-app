@@ -23,7 +23,12 @@ import {
   useAnalytics,
   useAppStateEffect,
 } from '@hooks';
-import * as Sentry from '@sentry/react-native';
+import {
+  syncSpotifyCredentialsToWidget,
+  syncMyCheckInToWidget,
+  triggerWidgetRefresh,
+} from '../../native/WidgetDataModule';
+import ApiService from '../../apis/API';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/' } = route.params;
@@ -74,6 +79,14 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   useAsyncEffect(async () => {
     const enabled = await requestPermissionIfNot();
     postMessage('SET_NOTI_PERMISSION', { value: enabled });
+  }, []);
+
+  // Sync Spotify credentials to widget on app start
+  useEffect(() => {
+    syncSpotifyCredentialsToWidget(
+      APP_CONSTS.SPOTIFY_CLIENT_ID,
+      APP_CONSTS.SPOTIFY_CLIENT_SECRET,
+    );
   }, []);
 
   useEffect(() => {
@@ -253,15 +266,12 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         onError={(syntheticEvent) => {
           const { nativeEvent } = syntheticEvent;
           console.warn('WebView error: ', nativeEvent);
-          Sentry.captureException(nativeEvent);
         }}
         onRenderProcessGone={(syntheticEvent) => {
-          Sentry.captureException(syntheticEvent);
           console.warn('WebView crashed, reloading...');
           ref.current?.reload();
         }}
         onContentProcessDidTerminate={(syntheticEvent) => {
-          Sentry.captureException(syntheticEvent);
           console.warn('WebView crashed, reloading...');
           ref.current?.reload();
         }}
@@ -274,6 +284,51 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     console.log('[AppScreen] App state changed:', state);
     postMessage('SET_APP_STATE', { value: state });
   }, []);
+
+  // Sync check-in data to widget when app goes to background
+  useAppStateEffect(
+    (state) => {
+      if (state === 'background' && tokens.access_token && tokens.csrftoken) {
+        console.log(
+          '[AppScreen] App going to background, syncing check-in to widget',
+        );
+
+        // Fetch user profile and sync check-in data to widget
+        ApiService.API.get('user/me/profile')
+          .then((response: any) => {
+            console.log(
+              '[AppScreen] Profile response:',
+              JSON.stringify(response, null, 2),
+            );
+            const checkIn = response?.check_in;
+            if (checkIn) {
+              console.log(
+                '[AppScreen] CheckIn data:',
+                JSON.stringify(checkIn, null, 2),
+              );
+              syncMyCheckInToWidget({
+                id: checkIn.id,
+                isActive: checkIn.is_active,
+                createdAt: checkIn.created_at,
+                mood: checkIn.mood || '',
+                socialBattery: checkIn.social_battery || null,
+                description: checkIn.description || '',
+                trackId: checkIn.track_id || '',
+                albumImageUrl: checkIn.album_image_url || null,
+              });
+              triggerWidgetRefresh();
+            }
+          })
+          .catch((error: any) => {
+            console.error(
+              '[AppScreen] Failed to sync check-in to widget:',
+              error,
+            );
+          });
+      }
+    },
+    [tokens.access_token, tokens.csrftoken],
+  );
 
   return (
     <SafeAreaView style={styles.container}>

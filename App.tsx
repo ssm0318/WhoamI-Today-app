@@ -1,18 +1,40 @@
 import React from 'react';
+import { Linking } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   NavigationContainer,
   useNavigationContainerRef,
+  LinkingOptions,
 } from '@react-navigation/native';
 import { RootNavigator } from '@navigation';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { RouteType } from '@types';
 import NavigationService from '@libs/NavigationService';
-import * as Sentry from '@sentry/react-native';
 
-Sentry.init({
-  dsn: 'https://3c8ac3927da72e0a4daeefec838adfcf@o4508942221705216.ingest.us.sentry.io/4508942227603456',
-});
+// Deep linking configuration for widget
+const linking: LinkingOptions<RouteType.RoutesParamsList> = {
+  prefixes: ['whoami://'],
+  config: {
+    screens: {
+      AppScreen: {
+        path: 'app/:path*',
+        parse: {
+          path: (path: string) => `/${path || ''}`,
+        },
+      },
+    },
+  },
+  async getInitialURL() {
+    const url = await Linking.getInitialURL();
+    return url;
+  },
+  subscribe(listener) {
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      listener(url);
+    });
+    return () => subscription.remove();
+  },
+};
 
 const App: React.FC = () => {
   const navigationRef = useNavigationContainerRef<RouteType.RoutesParamsList>();
@@ -22,6 +44,7 @@ const App: React.FC = () => {
       <SafeAreaProvider>
         <NavigationContainer<RouteType.RoutesParamsList>
           ref={navigationRef}
+          linking={linking}
           onReady={() => {
             if (!navigationRef.current) return;
             NavigationService.setNavigation(navigationRef.current);
@@ -34,4 +57,4 @@ const App: React.FC = () => {
   );
 };
 
-export default Sentry.wrap(React.memo(App));
+export default React.memo(App);

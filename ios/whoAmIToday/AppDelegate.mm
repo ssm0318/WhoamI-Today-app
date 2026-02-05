@@ -1,8 +1,9 @@
 #import <Firebase.h>
 #import "AppDelegate.h"
-#import "RNBootSplash.h" 
+#import "RNBootSplash.h"
 
 #import <React/RCTBundleURLProvider.h>
+#import <React/RCTLinkingManager.h>
 
 @implementation AppDelegate
 
@@ -49,6 +50,24 @@
   [RNBootSplash initWithStoryboard:@"BootSplash" rootView:rootView]; 
 
   return rootView;
+}
+
+// Handle deep links from widget
+- (BOOL)application:(UIApplication *)application
+            openURL:(NSURL *)url
+            options:(NSDictionary<UIApplicationOpenURLOptionsKey,id> *)options
+{
+  return [RCTLinkingManager application:application openURL:url options:options];
+}
+
+// Handle universal links
+- (BOOL)application:(UIApplication *)application
+    continueUserActivity:(NSUserActivity *)userActivity
+    restorationHandler:(void (^)(NSArray<id<UIUserActivityRestoring>> *))restorationHandler
+{
+  return [RCTLinkingManager application:application
+                   continueUserActivity:userActivity
+                     restorationHandler:restorationHandler];
 }
 
 @end

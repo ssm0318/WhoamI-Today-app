@@ -2,6 +2,7 @@ import CookieManager, { Cookie } from '@react-native-cookies/cookies';
 import { CookieStorage } from './cookieStorage';
 import { APP_CONSTS } from '@constants';
 import { CookieType } from '@types';
+import { triggerWidgetRefresh } from '../native/WidgetDataModule';
 
 export const parseCookie = (cookie: string): CookieType.CookieObject => {
   const cookieArr = cookie.split(';');
@@ -26,10 +27,13 @@ export const saveCookie = async (cookieObj?: CookieType.CookieObject) => {
     name: 'access_token',
     value: access_token,
   });
-  setCookie({
+  await setCookie({
     csrftoken: csrftoken,
     access_token: access_token,
   });
+
+  // Refresh widget after login to show updated data
+  await triggerWidgetRefresh();
 };
 
 export const getCookie = async (): Promise<Cookie> => {

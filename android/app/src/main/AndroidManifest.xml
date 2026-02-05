@@ -45,6 +45,27 @@
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="whoami" android:host="app" />
+      </intent-filter>
     </activity>
+
+    <!-- Widget Provider -->
+    <receiver
+        android:name=".widget.WhoAmIWidgetProvider"
+        android:exported="true"
+        android:label="WhoAmI Today">
+        <intent-filter>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            <action android:name="com.whoami.today.app.WIDGET_UPDATE" />
+            <action android:name="com.whoami.today.app.WIDGET_REFRESH" />
+        </intent-filter>
+        <meta-data
+            android:name="android.appwidget.provider"
+            android:resource="@xml/widget_info_large" />
+    </receiver>
   </application>
 </manifest>

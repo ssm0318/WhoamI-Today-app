@@ -78,3 +78,8 @@ yarn-error.log
 
 # OS generated files
 Thumbs.db
+
+# Environment variables
+.env
+.env.*
+!.env.example

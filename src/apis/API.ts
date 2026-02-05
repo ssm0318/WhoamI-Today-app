@@ -4,7 +4,6 @@ import axios, { AxiosRequestConfig } from 'axios';
 import RNFetchBlob from 'rn-fetch-blob';
 import { APIInstance, BlobAPIInstance, Methods } from './API.types';
 import i18n from 'i18next';
-import * as Sentry from '@sentry/react-native';
 
 /** API Instance */
 const JSON_DEFAULT_OPTIONS: AxiosRequestConfig = {
@@ -35,7 +34,6 @@ const API = (() => {
           '[API] Missing authentication tokens for request to:',
           config.url,
         );
-        Sentry.captureException(new Error('Missing authentication tokens'));
         return Promise.reject(new Error('Missing authentication tokens'));
       }
 
@@ -48,7 +46,6 @@ const API = (() => {
     },
     (err) => {
       // console.log('[API request error]', err);
-      Sentry.captureException(err);
       return Promise.reject(err);
     },
   );
@@ -60,7 +57,6 @@ const API = (() => {
     },
     (err) => {
       // console.log('‼️ [API response error]', err.config?.url, err);
-      Sentry.captureException(err);
       return Promise.reject(err);
     },
   );

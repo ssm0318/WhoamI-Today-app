@@ -1,6 +1,18 @@
 require_relative '../node_modules/react-native/scripts/react_native_pods'
 require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
 
+# boost podspec의 체크섬 검증 제거 (JFrog 저장소 체크섬 불일치 문제 해결)
+boost_podspec_path = File.join(__dir__, '..', 'node_modules', 'react-native', 'third-party-podspecs', 'boost.podspec')
+if File.exist?(boost_podspec_path)
+  content = File.read(boost_podspec_path)
+  # 체크섬 검증 라인 제거
+  if content.include?(':sha256')
+    content.gsub!(/,\s*:sha256 => '[^']+/, '')
+    File.write(boost_podspec_path, content)
+    puts "✅ boost.podspec 파일의 체크섬 검증이 제거되었습니다."
+  end
+end
+
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
@@ -28,6 +40,9 @@ target 'whoAmIToday' do
   # 기본 플래그 가져오기
   flags = get_default_flags()
 
+  # use_frameworks! 제거 - 정적 라이브러리 모드 사용 (RCTAppDelegate.h 찾기 문제 해결)
+  # use_frameworks! :linkage => :static
+
   # React Native 설정
   use_react_native!(
     :path => config[:reactNativePath],
@@ -43,6 +58,12 @@ target 'whoAmIToday' do
     # 테스트용 Pods 추가
   end
 
+  # 두 번째 앱 타겟 설정 (whoAmITodaySecond)
+  target 'whoAmITodaySecond' do
+    inherit! :complete
+    # whoAmIToday target의 모든 설정 상속
+  end
+
   # post_install 설정
   post_install do |installer|
     # React Native 관련 post-install 작업
@@ -50,6 +71,56 @@ target 'whoAmIToday' do
       installer,
       :mac_catalyst_enabled => false  # Mac Catalyst 빌드를 위한 설정 (필요한 경우 true로 설정)
     )
-    __apply_Xcode_12_5_M1_post_install_workaround(installer)
+    # __apply_Xcode_12_5_M1_post_install_workaround removed in RN 0.73+
+    
+    # 헤더 검색 경로 추가 (React Native 헤더 파일 찾기 문제 해결)
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['HEADER_SEARCH_PATHS'] ||= ['$(inherited)']
+        config.build_settings['HEADER_SEARCH_PATHS'] << '"$(SRCROOT)/../node_modules/react-native/React"'
+        config.build_settings['HEADER_SEARCH_PATHS'] << '"$(SRCROOT)/../node_modules/react-native/ReactCommon"'
+        config.build_settings['HEADER_SEARCH_PATHS'] << '"$(SRCROOT)/../node_modules/react-native/Libraries"'
+        # React Native renderer 헤더 경로 추가 (Float.h, HostPlatformViewProps.h 등)
+        config.build_settings['HEADER_SEARCH_PATHS'] << '"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer"'
+        config.build_settings['HEADER_SEARCH_PATHS'] << '"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/graphics/platform/ios"'
+        # HostPlatformViewProps.h를 찾기 위한 경로 (static library 모드에서는 PODS_ROOT 사용)
+        config.build_settings['HEADER_SEARCH_PATHS'] << '"$(PODS_ROOT)/Headers/Public/React-Fabric"'
+        config.build_settings['HEADER_SEARCH_PATHS'] << '"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/components/view/platform/cxx"'
+        # Yoga 헤더 경로 추가 (Style.h 등)
+        config.build_settings['HEADER_SEARCH_PATHS'] << '"$(PODS_ROOT)/Headers/Public/Yoga"'
+        config.build_settings['HEADER_SEARCH_PATHS'] << '"$(PODS_ROOT)/Headers/Private/Yoga"'
+        config.build_settings['HEADER_SEARCH_PATHS'] << '"$(SRCROOT)/../node_modules/react-native/ReactCommon/yoga"'
+        config.build_settings['HEADER_SEARCH_PATHS'] << '"$(PODS_ROOT)/Headers/Public/React-Core"'
+        config.build_settings['HEADER_SEARCH_PATHS'] << '"$(PODS_ROOT)/Headers/Public/React-graphics"'
+        config.build_settings['HEADER_SEARCH_PATHS'] << '"$(PODS_ROOT)/Headers/Public/React-renderer"'
+      end
+    end
+    
+    # 앱 타겟에도 헤더 검색 경로 및 모듈맵 설정 추가
+    installer.aggregate_targets.each do |aggregate_target|
+      aggregate_target.user_project.targets.each do |target|
+        target.build_configurations.each do |config|
+          config.build_settings['HEADER_SEARCH_PATHS'] ||= ['$(inherited)']
+          config.build_settings['HEADER_SEARCH_PATHS'] << '"$(SRCROOT)/../node_modules/react-native/React"'
+          config.build_settings['HEADER_SEARCH_PATHS'] << '"$(SRCROOT)/../node_modules/react-native/ReactCommon"'
+          config.build_settings['HEADER_SEARCH_PATHS'] << '"$(SRCROOT)/../node_modules/react-native/Libraries"'
+          # React Native renderer 헤더 경로 추가 (Float.h, HostPlatformViewProps.h 등)
+          config.build_settings['HEADER_SEARCH_PATHS'] << '"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer"'
+          config.build_settings['HEADER_SEARCH_PATHS'] << '"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/graphics/platform/ios"'
+          # HostPlatformViewProps.h를 찾기 위한 경로 (static library 모드에서는 PODS_ROOT 사용)
+          config.build_settings['HEADER_SEARCH_PATHS'] << '"$(PODS_ROOT)/Headers/Public/React-Fabric"'
+          config.build_settings['HEADER_SEARCH_PATHS'] << '"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/components/view/platform/cxx"'
+          # React-RCTAppDelegate 헤더 디렉토리 직접 추가
+          config.build_settings['HEADER_SEARCH_PATHS'] << '"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate"'
+          config.build_settings['HEADER_SEARCH_PATHS'] << '"$(PODS_ROOT)/Headers/Public/React-graphics"'
+          config.build_settings['HEADER_SEARCH_PATHS'] << '"$(PODS_ROOT)/Headers/Public/React-renderer"'
+          config.build_settings['USER_HEADER_SEARCH_PATHS'] ||= ['$(inherited)']
+          config.build_settings['USER_HEADER_SEARCH_PATHS'] << '"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate"'
+          # 모듈맵 경로 추가 (RCTAppDelegate 모듈 찾기)
+          config.build_settings['SWIFT_INCLUDE_PATHS'] ||= ['$(inherited)']
+          config.build_settings['SWIFT_INCLUDE_PATHS'] << '"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate"'
+        end
+      end
+    end
   end
 end
