@@ -4,12 +4,11 @@
 
 RCT_EXPORT_MODULE();
 
-// Helper method to reload widget timelines using runtime check
 - (void)reloadWidgetTimelines {
     if (@available(iOS 14.0, *)) {
         Class WidgetCenterClass = NSClassFromString(@"WidgetCenter");
         if (WidgetCenterClass) {
-            id sharedCenter = [WidgetCenterClass performSelector:@selector(sharedWidgetCenter)];
+            id sharedCenter = [WidgetCenterClass performSelector:@selector(shared)];
             if (sharedCenter) {
                 [sharedCenter performSelector:@selector(reloadAllTimelines)];
             }

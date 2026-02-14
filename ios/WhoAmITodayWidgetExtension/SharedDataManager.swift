@@ -17,10 +17,11 @@ class SharedDataManager {
     }
 
     var isAuthenticated: Bool {
-        guard let csrf = csrfToken, let access = accessToken else {
-            return false
-        }
-        return !csrf.isEmpty && !access.isEmpty
+        let hasCsrf = csrfToken.map { !$0.isEmpty } ?? false
+        let hasAccess = accessToken.map { !$0.isEmpty } ?? false
+        let authenticated = hasCsrf && hasAccess
+        NSLog("[Widget] SharedDataManager.isAuthenticated: %@ (csrf: %@, accessToken: %@)", String(authenticated), String(hasCsrf), String(hasAccess))
+        return authenticated
     }
 
     // Spotify credentials

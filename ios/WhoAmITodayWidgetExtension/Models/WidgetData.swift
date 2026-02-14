@@ -34,7 +34,8 @@ struct WidgetData: Codable {
             questionOfDay: QuestionOfDay(
                 id: "1",
                 question: "What was a funny thing that happened today?",
-                deepLink: "whoami://app/question"
+                content: "What was a funny thing that happened today?",
+                createdAt: nil
             ),
             lastUpdated: Date()
         )
@@ -157,7 +158,19 @@ struct MyProfileResponse: Codable {
 struct QuestionOfDay: Codable {
     let id: String
     let question: String
-    let deepLink: String
+    let content: String
+    let createdAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case question
+        case content
+        case createdAt = "created_at"
+    }
+
+    var deepLink: String {
+        "whoami://app/questions/\(id)/new"
+    }
 }
 
 // MARK: - Paginated Response wrapper
@@ -166,4 +179,40 @@ struct PaginatedResponse<T: Codable>: Codable {
     let next: String?
     let previous: String?
     let results: [T]
+}
+
+// MARK: - General Questions Response
+struct QuestionGroup: Codable {
+    let date: String
+    let questions: [GeneralQuestion]
+}
+
+struct GeneralQuestion: Codable {
+    let type: String
+    let id: Int
+    let content: String
+    let createdAt: String
+    let isAdminQuestion: Bool
+    let selectedDates: [String]
+    let selected: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case id
+        case content
+        case createdAt = "created_at"
+        case isAdminQuestion = "is_admin_question"
+        case selectedDates = "selected_dates"
+        case selected
+    }
+
+    // Convert GeneralQuestion to QuestionOfDay
+    func toQuestionOfDay() -> QuestionOfDay {
+        return QuestionOfDay(
+            id: String(id),
+            question: content,
+            content: content,
+            createdAt: createdAt
+        )
+    }
 }

@@ -8,5 +8,9 @@
 	<array>
 		<string>group.com.whoami.today.app</string>
 	</array>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:whoami-admin-group.gina-park.site</string>
+	</array>
 </dict>
 </plist>

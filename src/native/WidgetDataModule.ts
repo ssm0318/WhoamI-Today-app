@@ -113,7 +113,11 @@ export const syncMyCheckInToWidget = async (checkIn: {
     await (WidgetDataModule as WidgetDataModuleInterface).syncMyCheckIn(
       checkInData,
     );
-    console.log('MyCheckIn synced to widget successfully');
+    console.log(
+      '[WidgetBridge] MyCheckIn synced to widget successfully, mood:',
+      checkIn.mood,
+      '| Native NSLog [WidgetBridge] appears in Xcode Debug console when run from Xcode (Cmd+Shift+Y)',
+    );
   } catch (error) {
     console.error('Failed to sync MyCheckIn to widget:', error);
   }

@@ -2,41 +2,57 @@ import SwiftUI
 import WidgetKit
 import UIKit
 
+// Fixed heights so total widget height is constant regardless of content
+private let kWhoamiSectionHeight: CGFloat = 100
+private let kPlaylistSectionHeight: CGFloat = 82
+private let kQuestionSectionHeight: CGFloat = 52
+
 // TODO(Gina): This is the main widget view - customize the layout and styling here
 struct MainWidgetView: View {
     let data: WidgetData
     let albumImageData: Data?
+    let playlistAlbumImages: [String: Data]
+    let profileImages: [Int: Data]
+    var showSignInPrompt: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // DEBUG: Show trackId and albumImageUrl to verify data
-            Text("DEBUG: \(data.myCheckIn?.trackId ?? "no track") | img: \(albumImageData != nil ? "LOADED" : "NO")")
-                .font(.system(size: 8))
-                .foregroundColor(.red)
-
             // MARK: - Whoami Updates Section
             WhoamiUpdatesSection(
                 myCheckIn: data.myCheckIn,
                 friends: data.friendsWithUpdates,
-                albumImageData: albumImageData
+                albumImageData: albumImageData,
+                profileImages: profileImages
             )
+            .frame(height: kWhoamiSectionHeight)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Divider()
                 .padding(.horizontal, 4)
 
             // MARK: - Shared Playlist Section
-            SharedPlaylistSection(playlists: data.sharedPlaylists)
+            SharedPlaylistSection(playlists: data.sharedPlaylists, playlistAlbumImages: playlistAlbumImages, profileImages: profileImages)
+            .frame(height: kPlaylistSectionHeight)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Divider()
                 .padding(.horizontal, 4)
 
-            // MARK: - Question of the Day
-            if let question = data.questionOfDay {
-                QuestionCard(question: question)
+            // MARK: - Question of the Day / Please Sign in
+            let _ = NSLog("[Widget] MainWidgetView: showSignInPrompt=%@, questionOfDay=%@", String(showSignInPrompt), String(data.questionOfDay != nil))
+            Group {
+                if showSignInPrompt {
+                    SignInPromptButton()
+                } else if let question = data.questionOfDay {
+                    QuestionCard(question: question)
+                } else {
+                    Color.clear
+                }
             }
+            .frame(height: kQuestionSectionHeight)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(16)
-        .background(Color.white)
+        .padding(0)
     }
 }
 
@@ -45,61 +61,62 @@ struct WhoamiUpdatesSection: View {
     let myCheckIn: MyCheckIn?
     let friends: [FriendUpdate]
     let albumImageData: Data?
+    let profileImages: [Int: Data]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Section Header
             HStack(spacing: 6) {
-                // TODO(Gina): Replace with your app icon
-                Image(systemName: "person.2.fill")
-                    .font(.system(size: 12))
-                    .foregroundColor(.blue)
+                Image("IconWhoamiUpdates")
+                    .resizable()
+                    .frame(width: 16, height: 16)
 
                 Text("Whoami updates")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.primary)
             }
-            .frame(height: 16)
 
-            // Action Buttons + Friends Row
-            HStack(spacing: 8) {
-                // My Check-In Buttons (I feel, My Battery, My Music)
+            // Action Buttons + Friends Row (when no check-in data, show empty instead of placeholder icons)
+            HStack(spacing: 12) {
                 CheckInButton(
-                    emoji: myCheckIn?.feelingDisplay ?? "🤔",
+                    emoji: myCheckIn?.feelingDisplay,
                     title: "I feel",
-                    deepLink: "whoami://app/i-feel"
+                    deepLink: "whoami://app/check-in/edit"
                 )
 
                 CheckInButton(
-                    emoji: myCheckIn?.batteryDisplay ?? "🪫",
+                    emoji: myCheckIn?.batteryDisplay,
                     title: "My Battery",
-                    deepLink: "whoami://app/my-battery"
+                    deepLink: "whoami://app/check-in/edit"
                 )
 
                 MusicCheckInButton(
                     albumImageData: albumImageData,
+                    hasCheckInData: myCheckIn != nil,
                     title: "My Music",
-                    deepLink: "whoami://app/my-music"
+                    deepLink: "whoami://app/check-in/edit"
                 )
 
                 // Friend avatars with update indicators
                 if friends.isEmpty {
-                    // Empty placeholder for friends
                     Spacer()
                 } else {
                     ForEach(friends.prefix(2)) { friend in
-                        FriendAvatarView(friend: friend)
+                        FriendAvatarView(friend: friend, profileImageData: profileImages[friend.id])
                     }
                 }
             }
-            .frame(minHeight: 70) // Maintain consistent height
+            .frame(minHeight: 70)
+
+            Spacer(minLength: 0)
         }
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 }
 
-// MARK: - Check-In Button View (I feel, My Battery, My Music)
+// MARK: - Check-In Button View (I feel, My Battery, My Music). When emoji is nil (no data), show empty.
 struct CheckInButton: View {
-    let emoji: String
+    let emoji: String?
     let title: String
     let deepLink: String
 
@@ -108,12 +125,17 @@ struct CheckInButton: View {
             VStack(spacing: 4) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12)
-                        // TODO(Gina): Change button background color
                         .fill(Color.purple.opacity(0.15))
                         .frame(width: 50, height: 50)
 
-                    Text(emoji)
-                        .font(.system(size: 24))
+                    if let emoji = emoji, !emoji.isEmpty {
+                        Text(emoji)
+                            .font(.system(size: 24))
+                    } else {
+                        Text("—")
+                            .font(.system(size: 20, weight: .light))
+                            .foregroundColor(.secondary)
+                    }
                 }
 
                 Text(title)
@@ -125,9 +147,10 @@ struct CheckInButton: View {
     }
 }
 
-// MARK: - Music Check-In Button (shows album cover if available)
+// MARK: - Music Check-In Button (shows album cover if available). When no check-in data, show empty.
 struct MusicCheckInButton: View {
     let albumImageData: Data?
+    let hasCheckInData: Bool
     let title: String
     let deepLink: String
 
@@ -141,16 +164,18 @@ struct MusicCheckInButton: View {
 
                     if let imageData = albumImageData,
                        let uiImage = UIImage(data: imageData) {
-                        // Show album cover image from pre-fetched data
                         Image(uiImage: uiImage)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                             .frame(width: 50, height: 50)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
-                    } else {
-                        // No album image - show emoji
+                    } else if hasCheckInData {
                         Text("🎵")
                             .font(.system(size: 24))
+                    } else {
+                        Text("—")
+                            .font(.system(size: 20, weight: .light))
+                            .foregroundColor(.secondary)
                     }
                 }
 
@@ -166,33 +191,28 @@ struct MusicCheckInButton: View {
 // MARK: - Friend Avatar View
 struct FriendAvatarView: View {
     let friend: FriendUpdate
+    let profileImageData: Data?
 
     var body: some View {
-        Link(destination: URL(string: "whoami://app/friends/\(friend.id)")!) {
+        Link(destination: URL(string: "whoami://app/users/\(friend.username)")!) {
             VStack(spacing: 4) {
                 ZStack(alignment: .topTrailing) {
-                    // Avatar Circle
-                    if let imageUrl = friend.profileImage, !imageUrl.isEmpty {
-                        // TODO(Gina): Load actual image using AsyncImage (iOS 15+)
-                        // For now, show placeholder with hex color background
-                        Circle()
-                            .fill(Color(hex: friend.profilePic) ?? Color.gray.opacity(0.3))
+                    // Avatar Circle with actual profile image
+                    if let imageData = profileImageData,
+                       let uiImage = UIImage(data: imageData) {
+                        // Show actual profile image
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
                             .frame(width: 50, height: 50)
-                            .overlay(
-                                Text(String(friend.username.prefix(1)).uppercased())
-                                    .font(.system(size: 18, weight: .medium))
-                                    .foregroundColor(.white)
-                            )
+                            .clipShape(Circle())
                     } else {
-                        // No profile image - use hex color background
-                        Circle()
-                            .fill(Color(hex: friend.profilePic) ?? Color.gray.opacity(0.3))
+                        // Fallback to default profile image
+                        Image("DefaultProfile")
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
                             .frame(width: 50, height: 50)
-                            .overlay(
-                                Text(String(friend.username.prefix(1)).uppercased())
-                                    .font(.system(size: 18, weight: .medium))
-                                    .foregroundColor(.white)
-                            )
+                            .clipShape(Circle())
                     }
 
                     // Update indicator (blue dot) - always show for friends with updates
@@ -214,55 +234,138 @@ struct FriendAvatarView: View {
 // MARK: - Shared Playlist Section
 struct SharedPlaylistSection: View {
     let playlists: [PlaylistSong]
+    let playlistAlbumImages: [String: Data]
+    let profileImages: [Int: Data]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        // DEBUG: Print profile images available
+        let _ = print("[SharedPlaylistSection] Profile images keys: \(Array(profileImages.keys)), Playlist user IDs: \(playlists.prefix(5).map { $0.user.id })")
+
+        return VStack(alignment: .leading, spacing: 8) {
             // Section Header
             HStack(spacing: 6) {
-                // TODO(Gina): Replace with Spotify icon
-                Text("🎧")
-                    .font(.system(size: 14))
+                Image("IconPlaylist")
+                    .resizable()
+                    .frame(width: 16, height: 16)
 
                 Text("Shared Playlist")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.primary)
             }
 
-            // Playlist covers row - shows user avatars who shared songs
+            // Playlist covers row - shows album covers with user profile overlay
             HStack(spacing: 8) {
                 if playlists.isEmpty {
-                    // Empty placeholder to maintain height
                     Text("No playlists yet")
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                         .frame(height: 50)
                 } else {
                     ForEach(playlists.prefix(5)) { song in
-                        PlaylistUserView(song: song)
+                        PlaylistUserView(song: song, albumImageData: playlistAlbumImages[song.trackId], profileImageData: profileImages[song.user.id])
                     }
                 }
             }
             .frame(minHeight: 50)
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxHeight: .infinity, alignment: .top)
+    }
+}
+
+// MARK: - Playlist User View (shows album cover with user profile overlay)
+struct PlaylistUserView: View {
+    let song: PlaylistSong
+    let albumImageData: Data?
+    let profileImageData: Data?
+
+    var body: some View {
+        // DEBUG: Print profile image status
+        let _ = print("[PlaylistUserView] User: \(song.user.username), ID: \(song.user.id), Has profile data: \(profileImageData != nil), profileImage URL: \(song.user.profileImage ?? "nil")")
+
+        return Link(destination: URL(string: "spotify:track:\(song.trackId)")!) {
+            ZStack(alignment: .topTrailing) {
+                // Album cover image
+                if let imageData = albumImageData,
+                   let uiImage = UIImage(data: imageData) {
+                    // Show pre-fetched album cover image
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 50, height: 50)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else {
+                    // Fallback to music note when no image
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.purple.opacity(0.2))
+                        .frame(width: 50, height: 50)
+                        .overlay(
+                            Text("🎵")
+                                .font(.system(size: 20))
+                        )
+                }
+
+                // User profile image overlay (top-right corner)
+                ZStack {
+                    if let imageData = profileImageData,
+                       let uiImage = UIImage(data: imageData) {
+                        // Show actual profile image
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 20, height: 20)
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(Color.white, lineWidth: 2)
+                            )
+                    } else {
+                        // Fallback to default profile image
+                        Image("DefaultProfile")
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 20, height: 20)
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(Color.white, lineWidth: 2)
+                            )
+                    }
+                }
+                .offset(x: 4, y: -4)
+            }
+            .frame(width: 50, height: 50)
         }
     }
 }
 
-// MARK: - Playlist User View (shows who shared the song)
-struct PlaylistUserView: View {
-    let song: PlaylistSong
-
+// MARK: - Please Sign in (shown in question area when not authenticated)
+struct SignInPromptButton: View {
     var body: some View {
-        Link(destination: URL(string: "whoami://app/playlists/\(song.id)")!) {
-            // Show user avatar with their profile color
-            Circle()
-                .fill(Color(hex: song.user.profilePic) ?? Color.purple.opacity(0.6))
-                .frame(width: 50, height: 50)
-                .overlay(
-                    // Show user initial or music note
-                    Text(String(song.user.username.prefix(1)).uppercased())
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(.white)
-                )
+        Link(destination: URL(string: "whoami://app/login")!) {
+            HStack(spacing: 12) {
+                Image("IconQuestion")
+                    .resizable()
+                    .frame(width: 24, height: 24)
+
+                Text("Please Sign in")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.8))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(hex: "#8700FF") ?? Color.purple)
+            )
         }
     }
 }
@@ -275,14 +378,15 @@ struct QuestionCard: View {
         Link(destination: URL(string: question.deepLink)!) {
             HStack(spacing: 12) {
                 // Question icon
-                Text("❓")
-                    .font(.system(size: 24))
+                Image("IconQuestion")
+                    .resizable()
+                    .frame(width: 24, height: 24)
 
-                // Question text
-                Text(question.question)
+                // Question content text
+                Text(question.content)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white)
-                    .lineLimit(2)
+                    .lineLimit(3)
                     .multilineTextAlignment(.leading)
 
                 Spacer()
@@ -296,7 +400,7 @@ struct QuestionCard: View {
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.purple)
+                    .fill(Color(hex: "#8700FF") ?? Color.purple)
             )
         }
     }

@@ -8,27 +8,12 @@
     android:padding="16dp"
     android:gravity="center">
 
-    <ImageView
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:src="@android:drawable/ic_dialog_alert"
-        android:contentDescription="Login required" />
-
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Login Required"
+        android:text="Please Sign in"
         android:textSize="16sp"
-        android:textColor="#333333"
-        android:textStyle="bold"
-        android:layout_marginTop="12dp" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Tap to open WhoAmI Today"
-        android:textSize="12sp"
-        android:textColor="#888888"
-        android:layout_marginTop="4dp" />
+        android:textColor="?attr/colorPrimary"
+        android:textStyle="bold" />
 
 </LinearLayout>

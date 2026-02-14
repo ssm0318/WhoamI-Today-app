@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@drawable/widget_background"
-    android:padding="12dp">
+    android:padding="0dp">
 
     <!-- SECTION: Whoami Updates -->
     <LinearLayout
@@ -21,11 +21,11 @@
             android:gravity="center_vertical"
             android:layout_marginBottom="8dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="👥"
-                android:textSize="14sp" />
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/icon_whoami_updates"
+                android:scaleType="fitCenter" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -52,7 +52,7 @@
                 android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center"
-                android:padding="4dp">
+                android:padding="6dp">
 
                 <FrameLayout
                     android:layout_width="50dp"
@@ -84,7 +84,7 @@
                 android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center"
-                android:padding="4dp">
+                android:padding="6dp">
 
                 <FrameLayout
                     android:layout_width="50dp"
@@ -116,7 +116,7 @@
                 android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center"
-                android:padding="4dp">
+                android:padding="6dp">
 
                 <FrameLayout
                     android:layout_width="50dp"
@@ -148,7 +148,7 @@
                 android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center"
-                android:padding="4dp">
+                android:padding="6dp">
 
                 <FrameLayout
                     android:layout_width="50dp"
@@ -190,7 +190,7 @@
                 android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center"
-                android:padding="4dp">
+                android:padding="6dp">
 
                 <FrameLayout
                     android:layout_width="50dp"
@@ -249,11 +249,11 @@
             android:gravity="center_vertical"
             android:layout_marginBottom="8dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="🎧"
-                android:textSize="14sp" />
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/icon_playlist"
+                android:scaleType="fitCenter" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -272,50 +272,135 @@
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
-            <ImageView
-                android:id="@+id/playlist_1"
+            <!-- Playlist 1 with profile overlay -->
+            <FrameLayout
+                android:id="@+id/playlist_1_container"
                 android:layout_width="0dp"
                 android:layout_height="50dp"
                 android:layout_weight="1"
-                android:layout_margin="4dp"
-                android:background="@drawable/widget_playlist_bg"
-                android:scaleType="centerCrop" />
+                android:layout_margin="4dp">
 
-            <ImageView
-                android:id="@+id/playlist_2"
-                android:layout_width="0dp"
-                android:layout_height="50dp"
-                android:layout_weight="1"
-                android:layout_margin="4dp"
-                android:background="@drawable/widget_playlist_bg"
-                android:scaleType="centerCrop" />
+                <ImageView
+                    android:id="@+id/playlist_1_album"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/widget_playlist_bg"
+                    android:scaleType="centerCrop" />
 
-            <ImageView
-                android:id="@+id/playlist_3"
-                android:layout_width="0dp"
-                android:layout_height="50dp"
-                android:layout_weight="1"
-                android:layout_margin="4dp"
-                android:background="@drawable/widget_playlist_bg"
-                android:scaleType="centerCrop" />
+                <ImageView
+                    android:id="@+id/playlist_1_profile"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="top|end"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginEnd="2dp"
+                    android:background="@drawable/widget_avatar_bg"
+                    android:scaleType="centerCrop" />
+            </FrameLayout>
 
-            <ImageView
-                android:id="@+id/playlist_4"
+            <!-- Playlist 2 with profile overlay -->
+            <FrameLayout
+                android:id="@+id/playlist_2_container"
                 android:layout_width="0dp"
                 android:layout_height="50dp"
                 android:layout_weight="1"
-                android:layout_margin="4dp"
-                android:background="@drawable/widget_playlist_bg"
-                android:scaleType="centerCrop" />
+                android:layout_margin="4dp">
 
-            <ImageView
-                android:id="@+id/playlist_5"
+                <ImageView
+                    android:id="@+id/playlist_2_album"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/widget_playlist_bg"
+                    android:scaleType="centerCrop" />
+
+                <ImageView
+                    android:id="@+id/playlist_2_profile"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="top|end"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginEnd="2dp"
+                    android:background="@drawable/widget_avatar_bg"
+                    android:scaleType="centerCrop" />
+            </FrameLayout>
+
+            <!-- Playlist 3 with profile overlay -->
+            <FrameLayout
+                android:id="@+id/playlist_3_container"
                 android:layout_width="0dp"
                 android:layout_height="50dp"
                 android:layout_weight="1"
-                android:layout_margin="4dp"
-                android:background="@drawable/widget_playlist_bg"
-                android:scaleType="centerCrop" />
+                android:layout_margin="4dp">
+
+                <ImageView
+                    android:id="@+id/playlist_3_album"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/widget_playlist_bg"
+                    android:scaleType="centerCrop" />
+
+                <ImageView
+                    android:id="@+id/playlist_3_profile"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="top|end"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginEnd="2dp"
+                    android:background="@drawable/widget_avatar_bg"
+                    android:scaleType="centerCrop" />
+            </FrameLayout>
+
+            <!-- Playlist 4 with profile overlay -->
+            <FrameLayout
+                android:id="@+id/playlist_4_container"
+                android:layout_width="0dp"
+                android:layout_height="50dp"
+                android:layout_weight="1"
+                android:layout_margin="4dp">
+
+                <ImageView
+                    android:id="@+id/playlist_4_album"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/widget_playlist_bg"
+                    android:scaleType="centerCrop" />
+
+                <ImageView
+                    android:id="@+id/playlist_4_profile"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="top|end"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginEnd="2dp"
+                    android:background="@drawable/widget_avatar_bg"
+                    android:scaleType="centerCrop" />
+            </FrameLayout>
+
+            <!-- Playlist 5 with profile overlay -->
+            <FrameLayout
+                android:id="@+id/playlist_5_container"
+                android:layout_width="0dp"
+                android:layout_height="50dp"
+                android:layout_weight="1"
+                android:layout_margin="4dp">
+
+                <ImageView
+                    android:id="@+id/playlist_5_album"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/widget_playlist_bg"
+                    android:scaleType="centerCrop" />
+
+                <ImageView
+                    android:id="@+id/playlist_5_profile"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="top|end"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginEnd="2dp"
+                    android:background="@drawable/widget_avatar_bg"
+                    android:scaleType="centerCrop" />
+            </FrameLayout>
 
         </LinearLayout>
     </LinearLayout>
@@ -338,11 +423,11 @@
         android:background="@drawable/widget_question_card_bg"
         android:padding="14dp">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="❓"
-            android:textSize="24sp" />
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/icon_question"
+            android:scaleType="fitCenter" />
 
         <TextView
             android:id="@+id/question_text"
@@ -353,7 +438,7 @@
             android:textSize="14sp"
             android:textColor="#FFFFFF"
             android:textStyle="bold"
-            android:maxLines="2"
+            android:maxLines="3"
             android:ellipsize="end"
             android:layout_marginStart="12dp"
             android:layout_marginEnd="12dp" />

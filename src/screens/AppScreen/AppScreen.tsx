@@ -32,7 +32,9 @@ import ApiService from '../../apis/API';
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const { url = '/' } = route.params;
+  console.log('[AppScreen] Received URL param:', url);
   const WEBVIEW_URL = APP_CONSTS.WEB_VIEW_URL + url;
+  console.log('[AppScreen] Full WebView URL:', WEBVIEW_URL);
   const {
     ref,
     onMessage,
@@ -325,6 +327,11 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
               error,
             );
           });
+      }
+      // Reload widget when app returns to foreground so home screen shows latest data
+      if (state === 'active' && tokens.access_token && tokens.csrftoken) {
+        console.log('[AppScreen] App became active, requesting widget refresh');
+        triggerWidgetRefresh();
       }
     },
     [tokens.access_token, tokens.csrftoken],

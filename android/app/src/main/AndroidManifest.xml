@@ -51,6 +51,15 @@
         <category android:name="android.intent.category.BROWSABLE" />
         <data android:scheme="whoami" android:host="app" />
       </intent-filter>
+      <!-- App Links for HTTPS URLs -->
+      <intent-filter android:autoVerify="true">
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data
+          android:scheme="https"
+          android:host="whoami-admin-group.gina-park.site" />
+      </intent-filter>
     </activity>
 
     <!-- Widget Provider -->
@@ -67,5 +76,10 @@
             android:name="android.appwidget.provider"
             android:resource="@xml/widget_info_large" />
     </receiver>
+
+    <!-- Widget Update Service -->
+    <service
+        android:name=".widget.WidgetUpdateService"
+        android:exported="false" />
   </application>
 </manifest>
