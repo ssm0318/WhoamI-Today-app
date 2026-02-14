@@ -1,0 +1,32 @@
+diff --git a/node_modules/@react-native/gradle-plugin/.gradle/buildOutputCleanup/buildOutputCleanup.lock b/node_modules/@react-native/gradle-plugin/.gradle/buildOutputCleanup/buildOutputCleanup.lock
+new file mode 100644
+index 0000000..72cc411
+Binary files /dev/null and b/node_modules/@react-native/gradle-plugin/.gradle/buildOutputCleanup/buildOutputCleanup.lock differ
+diff --git a/node_modules/@react-native/gradle-plugin/.gradle/buildOutputCleanup/cache.properties b/node_modules/@react-native/gradle-plugin/.gradle/buildOutputCleanup/cache.properties
+new file mode 100644
+index 0000000..94b27af
+--- /dev/null
++++ b/node_modules/@react-native/gradle-plugin/.gradle/buildOutputCleanup/cache.properties
+@@ -0,0 +1,2 @@
++#Sat Feb 14 09:45:23 KST 2026
++gradle.version=7.6.3
+diff --git a/node_modules/@react-native/gradle-plugin/.gradle/buildOutputCleanup/outputFiles.bin b/node_modules/@react-native/gradle-plugin/.gradle/buildOutputCleanup/outputFiles.bin
+new file mode 100644
+index 0000000..b8cc4bc
+Binary files /dev/null and b/node_modules/@react-native/gradle-plugin/.gradle/buildOutputCleanup/outputFiles.bin differ
+diff --git a/node_modules/@react-native/gradle-plugin/build.gradle.kts b/node_modules/@react-native/gradle-plugin/build.gradle.kts
+index dfb97e0..c02775d 100644
+--- a/node_modules/@react-native/gradle-plugin/build.gradle.kts
++++ b/node_modules/@react-native/gradle-plugin/build.gradle.kts
+@@ -52,9 +52,9 @@ dependencies {
+ // We intentionally don't build for Java 17 as users will see a cryptic bytecode version
+ // error first. Instead we produce a Java 11-compatible Gradle Plugin, so that AGP can print their
+ // nice message showing that JDK 11 (or 17) is required first
+-java { targetCompatibility = JavaVersion.VERSION_11 }
++java { toolchain { languageVersion.set(org.gradle.jvm.toolchain.JavaLanguageVersion.of(11)) } }
+ 
+-kotlin { jvmToolchain(17) }
++kotlin { jvmToolchain(11) }
+ 
+ tasks.withType<KotlinCompile>().configureEach {
+   kotlinOptions {

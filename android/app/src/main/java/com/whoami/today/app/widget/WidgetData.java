@@ -73,14 +73,16 @@ public class WidgetData {
             }
         }
 
+        /** Matches SocialBatteryChipAssets in TS: completely_drained, low, needs_recharge, moderately_social, fully_charged, super_social */
         public String getBatteryEmoji() {
             if (socialBattery == null) return "🪫";
             switch (socialBattery) {
-                case "fully_charged": return "🔋";
-                case "half":
-                case "medium": return "🔋";
-                case "low":
-                case "empty": return "🪫";
+                case "completely_drained": return "💤";
+                case "low": return "🪫";
+                case "needs_recharge": return "🔌";
+                case "moderately_social": return "🔋";
+                case "fully_charged": return "🚀";
+                case "super_social": return "🤩";
                 default: return "🔋";
             }
         }

@@ -49,26 +49,37 @@ public class ReactNativeFlipper {
       client.addPlugin(networkFlipperPlugin);
       client.start();
 
-      // Fresco Plugin needs to ensure that ImagePipelineFactory is initialized
-      // Hence we run if after all native modules have been initialized
-      ReactContext reactContext = reactInstanceManager.getCurrentReactContext();
-      if (reactContext == null) {
-        reactInstanceManager.addReactInstanceEventListener(
-            new ReactInstanceEventListener() {
-              @Override
-              public void onReactContextInitialized(ReactContext reactContext) {
-                reactInstanceManager.removeReactInstanceEventListener(this);
-                reactContext.runOnNativeModulesQueueThread(
-                    new Runnable() {
-                      @Override
-                      public void run() {
-                        client.addPlugin(new FrescoFlipperPlugin());
-                      }
-                    });
-              }
-            });
-      } else {
-        client.addPlugin(new FrescoFlipperPlugin());
+      // Fresco Plugin only when Fresco/Drawee is on classpath (avoids ClassNotFoundException when app doesn't use Fresco)
+      try {
+        ReactContext reactContext = reactInstanceManager.getCurrentReactContext();
+        if (reactContext == null) {
+          reactInstanceManager.addReactInstanceEventListener(
+              new ReactInstanceEventListener() {
+                @Override
+                public void onReactContextInitialized(ReactContext reactContext) {
+                  reactInstanceManager.removeReactInstanceEventListener(this);
+                  reactContext.runOnNativeModulesQueueThread(
+                      new Runnable() {
+                        @Override
+                        public void run() {
+                          try {
+                            client.addPlugin(new FrescoFlipperPlugin());
+                          } catch (NoClassDefFoundError e) {
+                            // Fresco not on classpath; skip
+                          }
+                        }
+                      });
+                }
+              });
+        } else {
+          try {
+            client.addPlugin(new FrescoFlipperPlugin());
+          } catch (NoClassDefFoundError e) {
+            // Fresco not on classpath; skip
+          }
+        }
+      } catch (NoClassDefFoundError e) {
+        // Fresco not on classpath; skip Fresco Flipper plugin
       }
     }
   }

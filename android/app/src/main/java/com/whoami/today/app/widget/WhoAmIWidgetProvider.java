@@ -44,6 +44,31 @@ public class WhoAmIWidgetProvider extends AppWidgetProvider {
     }
 
     static void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId) {
+        RemoteViews views;
+        try {
+            views = buildRemoteViews(context);
+        } catch (Exception e) {
+            Log.e(TAG, "updateAppWidget failed", e);
+            views = new RemoteViews(context.getPackageName(), R.layout.widget_large);
+            views.setTextViewText(R.id.question_text, "Tap to open app");
+            try {
+                Intent appIntent = new Intent(context, MainActivity.class);
+                appIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                PendingIntent appPending = PendingIntent.getActivity(
+                    context, 0, appIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                );
+                views.setOnClickPendingIntent(R.id.widget_container, appPending);
+            } catch (Exception e2) {
+                Log.e(TAG, "Fallback click handler failed", e2);
+            }
+            appWidgetManager.updateAppWidget(appWidgetId, views);
+            return;
+        }
+        appWidgetManager.updateAppWidget(appWidgetId, views);
+    }
+
+    private static RemoteViews buildRemoteViews(Context context) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String accessToken = prefs.getString("access_token", null);
         boolean isLoggedIn = accessToken != null && !accessToken.isEmpty();
@@ -91,7 +116,7 @@ public class WhoAmIWidgetProvider extends AppWidgetProvider {
         );
         views.setOnClickPendingIntent(R.id.widget_container, appPending);
 
-        appWidgetManager.updateAppWidget(appWidgetId, views);
+        return views;
     }
 
     public static void setupActionButton(Context context, RemoteViews views, int buttonId, String deepLink, int requestCode) {

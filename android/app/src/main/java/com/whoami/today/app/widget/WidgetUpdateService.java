@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.util.Log;
+import android.view.View;
 import android.widget.RemoteViews;
 
 import com.whoami.today.app.R;
@@ -34,11 +35,14 @@ public class WidgetUpdateService extends IntentService {
             return;
         }
 
+        // Fetch full widget data from API (profile, friends, playlists, question) and save to prefs — same as iOS timeline
+        NetworkManager.fetchWidgetData(context);
+
         AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
         ComponentName componentName = new ComponentName(context, WhoAmIWidgetProvider.class);
         int[] appWidgetIds = appWidgetManager.getAppWidgetIds(componentName);
 
-        // Load widget data
+        // Load widget data (now populated by fetchWidgetData, or previously synced from app)
         String widgetDataJson = SharedPrefsHelper.getWidgetData(context);
         if (widgetDataJson == null) {
             Log.d(TAG, "No widget data available");
@@ -50,11 +54,20 @@ public class WidgetUpdateService extends IntentService {
             Log.e(TAG, "Failed to parse widget data");
             return;
         }
+        if (widgetData.myCheckIn != null) {
+            Log.d(TAG, "[widget_data] my_check_in: trackId=" + widgetData.myCheckIn.trackId
+                + " albumImageUrl=" + (widgetData.myCheckIn.albumImageUrl != null ? "set" : "null"));
+        } else {
+            Log.d(TAG, "[widget_data] my_check_in is null");
+        }
 
         SpotifyManager spotifyManager = new SpotifyManager(context);
 
-        // Fetch daily question
-        WidgetData.QuestionOfDay dailyQuestion = NetworkManager.fetchFirstDailyQuestion(context);
+        // Use question from widget data (already set by fetchWidgetData); fallback to live fetch if missing
+        WidgetData.QuestionOfDay dailyQuestion = widgetData.questionOfDay;
+        if (dailyQuestion == null) {
+            dailyQuestion = NetworkManager.fetchFirstDailyQuestion(context);
+        }
 
         for (int appWidgetId : appWidgetIds) {
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_large);
@@ -123,6 +136,9 @@ public class WidgetUpdateService extends IntentService {
                 }
             }
 
+            // Update check-in (I feel, My Battery, My Music)
+            updateCheckInViews(context, views, widgetData, spotifyManager);
+
             // Update views with images
             updateFriendViews(context, views, widgetData, profileImages);
             updatePlaylistViews(context, views, widgetData, albumImages, profileImages);
@@ -133,19 +149,72 @@ public class WidgetUpdateService extends IntentService {
         Log.d(TAG, "Widget update complete");
     }
 
+    private void updateCheckInViews(Context context, RemoteViews views, WidgetData data, SpotifyManager spotifyManager) {
+        WidgetData.MyCheckIn checkIn = data != null ? data.myCheckIn : null;
+
+        // I feel - mood emoji
+        String mood = (checkIn != null && checkIn.mood != null && !checkIn.mood.isEmpty())
+            ? checkIn.mood : "🤔";
+        views.setTextViewText(R.id.i_feel_emoji, mood);
+
+        // My Battery - social battery emoji
+        String batteryEmoji = checkIn != null ? checkIn.getBatteryEmoji() : "🪫";
+        views.setTextViewText(R.id.my_battery_emoji, batteryEmoji);
+
+        // My Music - album art via Spotify (like iOS): use track_id with SpotifyManager, or album_image_url if already set
+        Bitmap albumBitmap = null;
+        if (checkIn == null) {
+            Log.d(TAG, "[My Music] no checkIn");
+        } else {
+            Log.d(TAG, "[My Music] checkIn: trackId=" + (checkIn.trackId != null ? checkIn.trackId : "null")
+                + " albumImageUrl=" + (checkIn.albumImageUrl != null ? "set(" + checkIn.albumImageUrl.length() + ")" : "null")
+                + " spotifyConfigured=" + spotifyManager.isConfigured());
+        }
+        if (checkIn != null && checkIn.trackId != null && !checkIn.trackId.isEmpty()) {
+            // Use album_image_url only if it's a valid URL (not literal "null" from JSON)
+            String albumUrl = null;
+            if (checkIn.albumImageUrl != null && !checkIn.albumImageUrl.isEmpty()
+                    && !"null".equalsIgnoreCase(checkIn.albumImageUrl)
+                    && checkIn.albumImageUrl.startsWith("http")) {
+                albumUrl = checkIn.albumImageUrl;
+            }
+            if (albumUrl == null) {
+                albumUrl = spotifyManager.getAlbumImageUrl(checkIn.trackId);
+            }
+            Log.d(TAG, "[My Music] albumUrl=" + (albumUrl != null ? albumUrl : "null"));
+            if (albumUrl != null) {
+                albumBitmap = ImageLoader.loadImageFromUrl(albumUrl);
+                Log.d(TAG, "[My Music] loadImageFromUrl result: " + (albumBitmap != null ? "OK" : "null"));
+                if (albumBitmap == null) {
+                    Log.d(TAG, "My Music: album image load failed for track " + checkIn.trackId);
+                }
+            } else if (!spotifyManager.isConfigured()) {
+                Log.d(TAG, "My Music: Spotify not configured (sync credentials from app)");
+            }
+        }
+        if (albumBitmap != null) {
+            Bitmap rounded = ImageLoader.getCircularBitmap(albumBitmap);
+            views.setImageViewBitmap(R.id.my_music_album, rounded);
+            views.setViewVisibility(R.id.my_music_album, View.VISIBLE);
+            views.setViewVisibility(R.id.my_music_icon, View.GONE);
+        } else {
+            views.setViewVisibility(R.id.my_music_album, View.GONE);
+            views.setViewVisibility(R.id.my_music_icon, View.VISIBLE);
+            views.setTextViewText(R.id.my_music_icon, "🎵");
+        }
+    }
+
     private void updateFriendViews(Context context, RemoteViews views, WidgetData data, Map<Integer, Bitmap> profileImages) {
         int[] friendAvatarIds = {R.id.friend_1_avatar, R.id.friend_2_avatar};
         int[] friendNameIds = {R.id.friend_1_name, R.id.friend_2_name};
         int[] friendContainerIds = {R.id.friend_1, R.id.friend_2};
 
-        if (data.friendsWithUpdates != null) {
-            for (int i = 0; i < Math.min(2, data.friendsWithUpdates.size()); i++) {
+        boolean hasFriends = data.friendsWithUpdates != null && !data.friendsWithUpdates.isEmpty();
+        for (int i = 0; i < 2; i++) {
+            if (hasFriends && i < data.friendsWithUpdates.size()) {
                 WidgetData.FriendUpdate friend = data.friendsWithUpdates.get(i);
-
-                // Set friend name
+                views.setViewVisibility(friendContainerIds[i], View.VISIBLE);
                 views.setTextViewText(friendNameIds[i], friend.username);
-
-                // Set profile image if available, otherwise use default
                 if (profileImages.containsKey(friend.id)) {
                     Bitmap profileBitmap = profileImages.get(friend.id);
                     Bitmap circularProfile = ImageLoader.getCircularBitmap(profileBitmap);
@@ -153,10 +222,10 @@ public class WidgetUpdateService extends IntentService {
                 } else {
                     views.setImageViewResource(friendAvatarIds[i], R.drawable.default_profile);
                 }
-
-                // Set click handler for friend profile
                 WhoAmIWidgetProvider.setupActionButton(context, views, friendContainerIds[i],
                     "whoami://app/users/" + friend.username, 200 + i);
+            } else {
+                views.setViewVisibility(friendContainerIds[i], View.GONE);
             }
         }
     }
@@ -168,6 +237,10 @@ public class WidgetUpdateService extends IntentService {
                                 R.id.playlist_4_profile, R.id.playlist_5_profile};
         int[] containerIds = {R.id.playlist_1_container, R.id.playlist_2_container, R.id.playlist_3_container,
                               R.id.playlist_4_container, R.id.playlist_5_container};
+
+        boolean hasPlaylists = data.sharedPlaylists != null && !data.sharedPlaylists.isEmpty();
+        views.setViewVisibility(R.id.playlist_empty_text, hasPlaylists ? View.GONE : View.VISIBLE);
+        views.setViewVisibility(R.id.playlist_row, hasPlaylists ? View.VISIBLE : View.GONE);
 
         if (data.sharedPlaylists != null) {
             for (int i = 0; i < Math.min(5, data.sharedPlaylists.size()); i++) {

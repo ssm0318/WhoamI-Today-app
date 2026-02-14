@@ -1,5 +1,6 @@
 apply plugin: "com.android.application"
 apply plugin: "com.facebook.react"
+apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
 
 import com.android.build.OutputFile
 
@@ -35,19 +36,19 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 10403
         versionName "1.4.3"
-
-        // ✅ 16KB page size 지원 (필수)
-        externalNativeBuild {
-            cmake {
-                arguments "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+        // .env from repo root (react-native-config) so Config.SPOTIFY_* is available on Android
+        def envFile = rootProject.file("../.env")
+        println("WhoAmI .env: path=" + envFile.getAbsolutePath() + " exists=" + envFile.exists())
+        if (envFile.exists()) {
+            envFile.eachLine { line ->
+                def matcher = (line =~ /^\s*(?:export\s+|)([\w\d\.\-_]+)\s*=\s*['"]?(.*?)?['"]?\s*$/)
+                if (matcher.getCount() == 1 && matcher[0].size() == 3) {
+                    def key = matcher[0][1]
+                    def value = matcher[0][2].replace('"', '\\"').replaceAll("%", "\\\\u0025")
+                    buildConfigField "String", key, "\"$value\""
+                    resValue "string", key, "\"$value\""
+                }
             }
-        }
-    }
-
-    // ✅ CMake 빌드 설정 (프로젝트에 CMakeLists가 있어야 함)
-    externalNativeBuild {
-        cmake {
-            path file("src/main/jni/CMakeLists.txt")
         }
     }
 
@@ -114,7 +115,7 @@ dependencies {
     }
 
     implementation 'com.google.firebase:firebase-messaging:21.1.0'
-    implementation 'com.google.firebase:firebase-analytics'
+    implementation 'com.google.firebase:firebase-analytics:21.1.0'
     implementation 'org.jetbrains:annotations:16.0.2'
 
     // ❗ '+'는 재현성 깨짐. 가능하면 고정 권장

@@ -12,6 +12,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 
 public class SpotifyManager {
     private static final String TAG = "SpotifyManager";
@@ -29,16 +30,20 @@ public class SpotifyManager {
 
     private String getClientId() {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        return prefs.getString("spotify_client_id", null);
+        String s = prefs.getString("spotify_client_id", null);
+        return s != null ? s.trim() : null;
     }
 
     private String getClientSecret() {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        return prefs.getString("spotify_client_secret", null);
+        String s = prefs.getString("spotify_client_secret", null);
+        return s != null ? s.trim() : null;
     }
 
     public boolean isConfigured() {
-        return getClientId() != null && getClientSecret() != null;
+        String id = getClientId();
+        String secret = getClientSecret();
+        return id != null && !id.isEmpty() && secret != null && !secret.isEmpty();
     }
 
     private String getAccessToken() throws Exception {
@@ -60,14 +65,14 @@ public class SpotifyManager {
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
 
-        // Basic auth header
+        // Basic auth header (UTF-8 like iOS: Data(credentials.utf8).base64EncodedString())
         String credentials = clientId + ":" + clientSecret;
-        String encodedCredentials = Base64.encodeToString(credentials.getBytes(), Base64.NO_WRAP);
+        String encodedCredentials = Base64.encodeToString(credentials.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP);
         conn.setRequestProperty("Authorization", "Basic " + encodedCredentials);
 
         conn.setDoOutput(true);
         OutputStream os = conn.getOutputStream();
-        os.write("grant_type=client_credentials".getBytes());
+        os.write("grant_type=client_credentials".getBytes(StandardCharsets.UTF_8));
         os.flush();
         os.close();
 
@@ -88,13 +93,34 @@ public class SpotifyManager {
 
             return accessToken;
         } else {
-            throw new Exception("Failed to get Spotify access token: " + responseCode);
+            // Log error body so we can see Spotify's message (e.g. invalid_client, bad credentials)
+            java.io.InputStream errStream = conn.getErrorStream();
+            String errBody = "";
+            if (errStream != null) {
+                BufferedReader errReader = new BufferedReader(new InputStreamReader(errStream));
+                StringBuilder errSb = new StringBuilder();
+                String line;
+                while ((line = errReader.readLine()) != null) errSb.append(line);
+                errReader.close();
+                errBody = errSb.toString();
+            }
+            Log.e(TAG, "Spotify token error " + responseCode + ": " + errBody);
+            throw new Exception("Failed to get Spotify access token: " + responseCode + " " + errBody);
         }
     }
 
     public String getAlbumImageUrl(String trackId) {
+        if (trackId == null || trackId.isEmpty()) {
+            Log.d(TAG, "getAlbumImageUrl: trackId null/empty");
+            return null;
+        }
         try {
+            if (!isConfigured()) {
+                Log.d(TAG, "getAlbumImageUrl: Spotify not configured (no client_id/secret in prefs)");
+                return null;
+            }
             String token = getAccessToken();
+            Log.d(TAG, "getAlbumImageUrl: got token, requesting track " + trackId);
 
             URL url = new URL(TRACK_URL + trackId);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -102,6 +128,7 @@ public class SpotifyManager {
             conn.setRequestProperty("Authorization", "Bearer " + token);
 
             int responseCode = conn.getResponseCode();
+            Log.d(TAG, "getAlbumImageUrl: Spotify API response " + responseCode);
             if (responseCode == 200) {
                 BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
                 String inputLine;
@@ -114,13 +141,16 @@ public class SpotifyManager {
                 JSONObject json = new JSONObject(response.toString());
                 JSONObject album = json.getJSONObject("album");
                 if (album.has("images") && album.getJSONArray("images").length() > 0) {
-                    return album.getJSONArray("images").getJSONObject(0).getString("url");
+                    String urlStr = album.getJSONArray("images").getJSONObject(0).getString("url");
+                    Log.d(TAG, "getAlbumImageUrl: success url=" + (urlStr != null ? urlStr.substring(0, Math.min(50, urlStr.length())) + "..." : "null"));
+                    return urlStr;
                 }
+                Log.d(TAG, "getAlbumImageUrl: album has no images");
             } else {
-                Log.e(TAG, "Failed to get track info: " + responseCode);
+                Log.e(TAG, "getAlbumImageUrl: Failed to get track info: " + responseCode);
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error fetching album image: " + e.getMessage());
+            Log.e(TAG, "getAlbumImageUrl: " + e.getMessage(), e);
         }
         return null;
     }

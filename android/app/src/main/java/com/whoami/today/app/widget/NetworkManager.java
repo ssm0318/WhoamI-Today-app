@@ -17,6 +17,148 @@ public class NetworkManager {
     private static final String TAG = "NetworkManager";
     private static final String BASE_URL = "https://whoami-admin-group.gina-park.site";
 
+    /**
+     * Fetch full widget data from API (same as iOS getTimeline -> fetchWidgetData).
+     * Saves to SharedPreferences so WidgetUpdateService can use it.
+     */
+    public static boolean fetchWidgetData(Context context) {
+        String csrfToken = SharedPrefsHelper.getCsrfToken(context);
+        String accessToken = SharedPrefsHelper.getAccessToken(context);
+        if (csrfToken == null || accessToken == null || csrfToken.isEmpty() || accessToken.isEmpty()) {
+            Log.d(TAG, "fetchWidgetData: No auth tokens");
+            return false;
+        }
+        try {
+            String cookie = "csrftoken=" + csrfToken + "; access_token=" + accessToken;
+            JSONObject existing = new JSONObject();
+            String existingJson = SharedPrefsHelper.getWidgetData(context);
+            if (existingJson != null && !existingJson.isEmpty()) {
+                try {
+                    existing = new JSONObject(existingJson);
+                } catch (Exception ignored) {}
+            }
+            JSONObject root = new JSONObject();
+            if (existing.has("my_check_in") && !existing.isNull("my_check_in")) {
+                root.put("my_check_in", existing.get("my_check_in"));
+            } else {
+                JSONObject profile = getJson(context, BASE_URL + "/api/user/me/profile", cookie);
+                if (profile != null && profile.has("check_in") && !profile.isNull("check_in")) {
+                    root.put("my_check_in", profile.getJSONObject("check_in"));
+                }
+            }
+            JSONArray friends = fetchFriendsWithUpdates(context, cookie);
+            root.put("friends_with_updates", friends != null ? friends : new JSONArray());
+            JSONArray playlists = fetchPlaylistFeed(context, cookie);
+            root.put("shared_playlists", playlists != null ? playlists : new JSONArray());
+            WidgetData.QuestionOfDay question = fetchFirstDailyQuestion(context);
+            if (question != null) {
+                JSONObject qJson = new JSONObject();
+                qJson.put("id", question.id);
+                qJson.put("question", question.content);
+                qJson.put("content", question.content);
+                qJson.put("created_at", question.createdAt != null ? question.createdAt : "");
+                root.put("question_of_day", qJson);
+            }
+            SharedPrefsHelper.saveWidgetData(context, root.toString());
+            Log.d(TAG, "fetchWidgetData: saved friends=" + (friends != null ? friends.length() : 0) + " playlists=" + (playlists != null ? playlists.length() : 0));
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "fetchWidgetData error", e);
+            return false;
+        }
+    }
+
+    private static JSONObject getJson(Context context, String urlString, String cookie) {
+        try {
+            URL url = new URL(urlString);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("X-CSRFToken", SharedPrefsHelper.getCsrfToken(context));
+            conn.setRequestProperty("Cookie", cookie);
+            conn.setConnectTimeout(10000);
+            conn.setReadTimeout(10000);
+            if (conn.getResponseCode() == 200) {
+                BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) sb.append(line);
+                reader.close();
+                conn.disconnect();
+                return new JSONObject(sb.toString());
+            }
+            conn.disconnect();
+        } catch (Exception e) {
+            Log.e(TAG, "getJson " + urlString + ": " + e.getMessage());
+        }
+        return null;
+    }
+
+    private static JSONArray fetchFriendsWithUpdates(Context context, String cookie) {
+        try {
+            URL url = new URL(BASE_URL + "/api/user/friends/updates/");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("X-CSRFToken", SharedPrefsHelper.getCsrfToken(context));
+            conn.setRequestProperty("Cookie", cookie);
+            conn.setConnectTimeout(10000);
+            conn.setReadTimeout(10000);
+            int code = conn.getResponseCode();
+            Log.d(TAG, "fetchFriendsWithUpdates: HTTP " + code);
+            if (code == 200) {
+                BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) sb.append(line);
+                reader.close();
+                String body = sb.toString();
+                conn.disconnect();
+                JSONArray arr;
+                if (body.startsWith("[")) {
+                    arr = new JSONArray(body);
+                } else {
+                    JSONObject paginated = new JSONObject(body);
+                    arr = paginated.has("results") ? paginated.getJSONArray("results") : new JSONArray();
+                }
+                Log.d(TAG, "fetchFriendsWithUpdates: parsed count=" + arr.length());
+                return arr;
+            }
+            conn.disconnect();
+        } catch (Exception e) {
+            Log.e(TAG, "fetchFriendsWithUpdates: " + e.getMessage());
+        }
+        return null;
+    }
+
+    private static JSONArray fetchPlaylistFeed(Context context, String cookie) {
+        try {
+            URL url = new URL(BASE_URL + "/api/playlist/feed");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("X-CSRFToken", SharedPrefsHelper.getCsrfToken(context));
+            conn.setRequestProperty("Cookie", cookie);
+            conn.setConnectTimeout(10000);
+            conn.setReadTimeout(10000);
+            int code = conn.getResponseCode();
+            Log.d(TAG, "fetchPlaylistFeed: HTTP " + code);
+            if (code == 200) {
+                BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) sb.append(line);
+                reader.close();
+                JSONObject paginated = new JSONObject(sb.toString());
+                conn.disconnect();
+                JSONArray arr = paginated.has("results") ? paginated.getJSONArray("results") : new JSONArray();
+                Log.d(TAG, "fetchPlaylistFeed: parsed count=" + arr.length());
+                return arr;
+            }
+            conn.disconnect();
+        } catch (Exception e) {
+            Log.e(TAG, "fetchPlaylistFeed: " + e.getMessage());
+        }
+        return null;
+    }
+
     public static WidgetData.QuestionOfDay fetchFirstDailyQuestion(Context context) {
         // Try daily questions first
         WidgetData.QuestionOfDay question = fetchFromDailyQuestions(context);

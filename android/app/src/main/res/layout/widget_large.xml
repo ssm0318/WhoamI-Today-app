@@ -5,12 +5,13 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@drawable/widget_background"
-    android:padding="0dp">
+    android:padding="16dp">
 
-    <!-- SECTION: Whoami Updates -->
+    <!-- SECTION: Whoami Updates (fixed min height like iOS) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:minHeight="100dp"
         android:orientation="vertical">
 
         <!-- Section Header -->
@@ -37,19 +38,18 @@
                 android:layout_marginStart="6dp" />
         </LinearLayout>
 
-        <!-- Action Buttons + Friends Row -->
+        <!-- Action Buttons + Friends Row (flex-start: items aligned to start) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:gravity="center_vertical|start">
 
             <!-- I feel Button -->
             <LinearLayout
                 android:id="@+id/btn_i_feel"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center"
                 android:padding="6dp">
@@ -60,6 +60,7 @@
                     android:background="@drawable/widget_emoji_button_bg">
 
                     <TextView
+                        android:id="@+id/i_feel_emoji"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_gravity="center"
@@ -79,9 +80,8 @@
             <!-- My Battery Button -->
             <LinearLayout
                 android:id="@+id/btn_my_battery"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center"
                 android:padding="6dp">
@@ -92,6 +92,7 @@
                     android:background="@drawable/widget_emoji_button_bg">
 
                     <TextView
+                        android:id="@+id/my_battery_emoji"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_gravity="center"
@@ -111,9 +112,8 @@
             <!-- My Music Button -->
             <LinearLayout
                 android:id="@+id/btn_my_music"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center"
                 android:padding="6dp">
@@ -123,7 +123,15 @@
                     android:layout_height="50dp"
                     android:background="@drawable/widget_emoji_button_bg">
 
+                    <ImageView
+                        android:id="@+id/my_music_album"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:visibility="gone"
+                        android:scaleType="centerCrop" />
+
                     <TextView
+                        android:id="@+id/my_music_icon"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_gravity="center"
@@ -143,9 +151,8 @@
             <!-- Friend 1 -->
             <LinearLayout
                 android:id="@+id/friend_1"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center"
                 android:padding="6dp">
@@ -161,13 +168,14 @@
                         android:background="@drawable/widget_avatar_bg"
                         android:scaleType="centerCrop" />
 
-                    <!-- Blue update dot -->
-                    <View
+                    <!-- Blue update dot (ImageView: View not allowed in app widget) -->
+                    <ImageView
                         android:id="@+id/friend_1_dot"
                         android:layout_width="12dp"
                         android:layout_height="12dp"
                         android:layout_gravity="top|end"
-                        android:background="@drawable/widget_update_dot" />
+                        android:src="@drawable/widget_update_dot"
+                        android:scaleType="fitCenter" />
                 </FrameLayout>
 
                 <TextView
@@ -185,9 +193,8 @@
             <!-- Friend 2 -->
             <LinearLayout
                 android:id="@+id/friend_2"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center"
                 android:padding="6dp">
@@ -203,13 +210,14 @@
                         android:background="@drawable/widget_avatar_bg"
                         android:scaleType="centerCrop" />
 
-                    <!-- Blue update dot -->
-                    <View
+                    <!-- Blue update dot (ImageView: View not allowed in app widget) -->
+                    <ImageView
                         android:id="@+id/friend_2_dot"
                         android:layout_width="12dp"
                         android:layout_height="12dp"
                         android:layout_gravity="top|end"
-                        android:background="@drawable/widget_update_dot" />
+                        android:src="@drawable/widget_update_dot"
+                        android:scaleType="fitCenter" />
                 </FrameLayout>
 
                 <TextView
@@ -227,18 +235,19 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Divider -->
-    <View
+    <!-- Divider (LinearLayout: View not allowed in app widget) -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:background="#E0E0E0"
         android:layout_marginTop="12dp"
         android:layout_marginBottom="12dp" />
 
-    <!-- SECTION: Shared Playlist -->
+    <!-- SECTION: Shared Playlist (fixed min height like iOS) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:minHeight="90dp"
         android:orientation="vertical">
 
         <!-- Section Header -->
@@ -265,8 +274,19 @@
                 android:layout_marginStart="6dp" />
         </LinearLayout>
 
-        <!-- Playlist Covers Row -->
+        <!-- Empty state: show when no playlists -->
+        <TextView
+            android:id="@+id/playlist_empty_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="No playlists yet"
+            android:textSize="13sp"
+            android:textColor="#888888"
+            android:visibility="gone" />
+
+        <!-- Playlist Covers Row (hidden when empty) -->
         <LinearLayout
+            android:id="@+id/playlist_row"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
@@ -405,19 +425,20 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Divider -->
-    <View
+    <!-- Divider (LinearLayout: View not allowed in app widget) -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:background="#E0E0E0"
         android:layout_marginTop="12dp"
         android:layout_marginBottom="12dp" />
 
-    <!-- SECTION: Question of the Day -->
+    <!-- SECTION: Question of the Day (fixed min height like iOS) -->
     <LinearLayout
         android:id="@+id/question_card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:minHeight="56dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:background="@drawable/widget_question_card_bg"
