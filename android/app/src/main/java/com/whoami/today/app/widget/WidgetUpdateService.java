@@ -157,8 +157,13 @@ public class WidgetUpdateService extends IntentService {
             ? checkIn.mood : "🤔";
         views.setTextViewText(R.id.i_feel_emoji, mood);
 
-        // My Battery - social battery emoji
-        String batteryEmoji = checkIn != null ? checkIn.getBatteryEmoji() : "🪫";
+        // My Battery - social battery emoji when set, otherwise "+" (same as iOS empty slot)
+        String batteryEmoji;
+        if (checkIn != null && checkIn.socialBattery != null && !checkIn.socialBattery.isEmpty()) {
+            batteryEmoji = checkIn.getBatteryEmoji();
+        } else {
+            batteryEmoji = "+";
+        }
         views.setTextViewText(R.id.my_battery_emoji, batteryEmoji);
 
         // My Music - album art via Spotify (like iOS): use track_id with SpotifyManager, or album_image_url if already set
