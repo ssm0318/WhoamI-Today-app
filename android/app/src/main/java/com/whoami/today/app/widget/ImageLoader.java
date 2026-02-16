@@ -53,23 +53,37 @@ public class ImageLoader {
         return output;
     }
 
+    /**
+     * Crops and scales the bitmap to fill a circle (centerCrop), then masks to a circle
+     * so the image fills the circular area with no pink/background gaps.
+     */
     public static Bitmap getCircularBitmap(Bitmap bitmap) {
         if (bitmap == null) return null;
 
         int size = Math.min(bitmap.getWidth(), bitmap.getHeight());
+        float scale = Math.max(size / (float) bitmap.getWidth(), size / (float) bitmap.getHeight());
+        int scaledW = Math.round(bitmap.getWidth() * scale);
+        int scaledH = Math.round(bitmap.getHeight() * scale);
+        int srcX = (scaledW - size) / 2;
+        int srcY = (scaledH - size) / 2;
+
+        Bitmap scaled = Bitmap.createScaledBitmap(bitmap, scaledW, scaledH, true);
         Bitmap output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(output);
 
         final Paint paint = new Paint();
-        final Rect rect = new Rect(0, 0, size, size);
-
         paint.setAntiAlias(true);
         canvas.drawARGB(0, 0, 0, 0);
         canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint);
 
         paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
-        canvas.drawBitmap(bitmap, null, rect, paint);
+        Rect srcRect = new Rect(srcX, srcY, srcX + size, srcY + size);
+        Rect dstRect = new Rect(0, 0, size, size);
+        canvas.drawBitmap(scaled, srcRect, dstRect, paint);
 
+        if (scaled != bitmap) {
+            scaled.recycle();
+        }
         return output;
     }
 }
