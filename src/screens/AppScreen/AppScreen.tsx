@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BackHandler,
+  NativeModules,
   SafeAreaView,
   StatusBar,
   StyleSheet,
@@ -12,6 +13,11 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { APP_CONSTS, WEBVIEW_CONSTS } from '@constants';
+import {
+  useFocusEffect,
+  useNavigation,
+  CommonActions,
+} from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenRouteParamList } from '@screens';
 import {
@@ -23,21 +29,32 @@ import {
   useAnalytics,
   useAppStateEffect,
 } from '@hooks';
+import ApiService from '../../apis/API';
 import {
+  getWidgetDiagnostics,
   syncSpotifyCredentialsToWidget,
   syncMyCheckInToWidget,
   triggerWidgetRefresh,
 } from '../../native/WidgetDataModule';
-import ApiService from '../../apis/API';
+import {
+  getCachedCheckInForWidget,
+  setCachedCheckInForWidget,
+} from '../../utils/widgetCheckInCache';
+import { setWidgetDataStale } from '../../utils/widgetDataStale';
+
+const BASE_URL = APP_CONSTS.WEB_VIEW_URL;
 
 const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
-  const { url = '/' } = route.params;
-  console.log('[AppScreen] Received URL param:', url);
-  const WEBVIEW_URL = APP_CONSTS.WEB_VIEW_URL + url;
-  console.log('[AppScreen] Full WebView URL:', WEBVIEW_URL);
+  const navigation = useNavigation();
+  const { url = '/' } = route.params ?? {};
+  const isDeepLinkPath = url !== '/' && url !== '';
+  const initialUri = isDeepLinkPath ? BASE_URL : BASE_URL + url;
+  const deepLinkBackToBaseDoneRef = useRef(false);
+
   const {
     ref,
     onMessage,
+    onNavigationStateChange,
     postMessage,
     injectCookieScript,
     tokens,
@@ -92,19 +109,6 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   }, []);
 
   useEffect(() => {
-    BackHandler.addEventListener(
-      'hardwareBackPress',
-      onPressHardwareBackButton,
-    );
-    return () => {
-      BackHandler.removeEventListener(
-        'hardwareBackPress',
-        onPressHardwareBackButton,
-      );
-    };
-  }, [isCanGoBack]);
-
-  useEffect(() => {
     const shouldReload = tokens.access_token && tokens.csrftoken && ref.current;
     if (shouldReload) {
       console.log('[AppScreen] Reloading WebView due to changes:', {
@@ -123,14 +127,65 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     }
   }, []);
 
-  const onPressHardwareBackButton = () => {
+  const onPressHardwareBackButtonRef = useRef<() => boolean>(() => false);
+  onPressHardwareBackButtonRef.current = () => {
+    // Deep link → main: use navigation reset so it works even when WebView ref is not ready
+    if (isDeepLinkPath && !deepLinkBackToBaseDoneRef.current) {
+      deepLinkBackToBaseDoneRef.current = true;
+      NativeModules.InitialURLModule?.clearStoredInitialURL?.();
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'AppScreen', params: { url: '/' } }],
+        }),
+      );
+      return true;
+    }
     if (ref.current && isCanGoBack) {
       ref.current.goBack();
       return true;
-    } else {
-      return false;
     }
+    return false;
   };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const handler = () => onPressHardwareBackButtonRef.current();
+      BackHandler.addEventListener('hardwareBackPress', handler);
+      return () =>
+        BackHandler.removeEventListener('hardwareBackPress', handler);
+    }, []),
+  );
+
+  // When web is opened via deep link, router.back() has no history. Web sends NAVIGATE_TO_BASE; we inject flag + replace so web can skip "restore route" on load.
+  const handleWebViewMessage = useCallback(
+    (event: { nativeEvent: { data: string } }) => {
+      const raw = event.nativeEvent.data;
+      try {
+        const data = JSON.parse(raw);
+        if (data?.actionType === 'NAVIGATE_TO_BASE') {
+          NativeModules.InitialURLModule?.clearStoredInitialURL?.();
+          navigation.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: 'AppScreen', params: { url: '/' } }],
+            }),
+          );
+          const base = BASE_URL.replace(/\/+$/, '') + '/';
+          ref.current?.injectJavaScript(
+            `(function(){sessionStorage.setItem('from_navigate_to_base','1');location.replace(${JSON.stringify(
+              base,
+            )});})();true;`,
+          );
+          return;
+        }
+      } catch {
+        // not JSON or other message
+      }
+      onMessage(event as Parameters<typeof onMessage>[0]);
+    },
+    [onMessage],
+  );
 
   // Function to send keyboard height to WebView (Android only)
   const sendKeyboardHeightToWebView = (height: number) => {
@@ -218,21 +273,29 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     }
   };
 
-  // WebView rendering function
+  // WebView rendering function: deep link → load base first, then redirect in onLoadEnd
   const renderWebView = () => {
     return (
       <WebView
+        key={isDeepLinkPath ? `${BASE_URL}-redirect-${url}` : initialUri}
         ref={ref}
-        onMessage={onMessage}
+        onMessage={handleWebViewMessage}
+        onNavigationStateChange={onNavigationStateChange}
         source={{
-          uri: WEBVIEW_URL,
+          uri: initialUri,
         }}
         style={{ backgroundColor: 'transparent' }}
         containerStyle={{ backgroundColor: '#FFFFFF' }}
-        injectedJavaScriptBeforeContentLoaded={injectCookieScript(
-          tokens.csrftoken,
-          tokens.access_token,
-        )}
+        injectedJavaScriptBeforeContentLoaded={
+          injectCookieScript(tokens.csrftoken, tokens.access_token) +
+          (isDeepLinkPath
+            ? `(function(){var b=${JSON.stringify(
+                BASE_URL.replace(/\/+$/, ''),
+              )},p=${JSON.stringify(
+                url,
+              )};if(p&&p!=="/"&&p!==""){var pathPart=p.replace(/^\\/+/, "");if(location.pathname==="/"||location.pathname===""){location.replace(b+(pathPart?"/"+pathPart:""));}}})();`
+            : '')
+        }
         allowsBackForwardNavigationGestures
         allowFileAccess={true}
         allowFileAccessFromFileURLs={true}
@@ -287,54 +350,112 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     postMessage('SET_APP_STATE', { value: state });
   }, []);
 
-  // Sync check-in data to widget when app goes to background
+  // Sync latest check-in to widget when leaving app. Run on 'inactive' so reload is more likely
+  // to be honored. First push cached check-in and reload immediately (no network); then fetch and sync.
+  const runWidgetSync = useCallback(() => {
+    if (!tokens.access_token || !tokens.csrftoken) return;
+    setWidgetDataStale(false);
+
+    const cachedCheckIn = getCachedCheckInForWidget();
+    if (cachedCheckIn) {
+      syncMyCheckInToWidget(cachedCheckIn).then(() => triggerWidgetRefresh());
+    }
+
+    (async () => {
+      try {
+        const response = (await ApiService.API.get(
+          'user/me/profile',
+        )) as unknown;
+        const res = response as {
+          check_in?: {
+            id: number;
+            is_active: boolean;
+            created_at: string;
+            mood?: string;
+            social_battery?: string | null;
+            description?: string;
+            track_id?: string;
+            album_image_url?: string | null;
+          };
+        };
+        const checkIn = res?.check_in;
+        if (checkIn) {
+          const payload = {
+            id: checkIn.id,
+            isActive: checkIn.is_active,
+            createdAt: checkIn.created_at,
+            mood: checkIn.mood ?? '',
+            socialBattery: checkIn.social_battery ?? null,
+            description: checkIn.description ?? '',
+            trackId: checkIn.track_id ?? '',
+            albumImageUrl: checkIn.album_image_url ?? null,
+          };
+          await syncMyCheckInToWidget(payload);
+          setCachedCheckInForWidget(payload);
+        }
+        await triggerWidgetRefresh();
+      } catch (err) {
+        console.warn('[AppScreen] Widget sync failed:', err);
+        await triggerWidgetRefresh();
+      }
+    })();
+  }, [tokens.access_token, tokens.csrftoken]);
+
   useAppStateEffect(
     (state) => {
-      if (state === 'background' && tokens.access_token && tokens.csrftoken) {
-        console.log(
-          '[AppScreen] App going to background, syncing check-in to widget',
-        );
-
-        // Fetch user profile and sync check-in data to widget
-        ApiService.API.get('user/me/profile')
-          .then((response: any) => {
-            console.log(
-              '[AppScreen] Profile response:',
-              JSON.stringify(response, null, 2),
-            );
-            const checkIn = response?.check_in;
-            if (checkIn) {
+      if (state === 'inactive' && tokens.access_token && tokens.csrftoken) {
+        runWidgetSync();
+      }
+      if (state === 'active' && tokens.access_token && tokens.csrftoken) {
+        triggerWidgetRefresh();
+        const logWidgetDiagnostics = () => {
+          getWidgetDiagnostics()
+            .then((d) => {
               console.log(
-                '[AppScreen] CheckIn data:',
-                JSON.stringify(checkIn, null, 2),
+                '[AppScreen] Widget diagnostics:',
+                d
+                  ? `lastSeenMood=${d.lastSeenMood} lastGetTimelineAt=${d.lastGetTimelineAt}`
+                  : 'unavailable',
               );
-              syncMyCheckInToWidget({
+            })
+            .catch(() => {
+              console.log('[AppScreen] Widget diagnostics: failed to read');
+            });
+        };
+        logWidgetDiagnostics();
+        setTimeout(logWidgetDiagnostics, 1200);
+        ApiService.API.get('user/me/profile')
+          .then((response: unknown) => {
+            const res = response as {
+              check_in?: {
+                id: number;
+                is_active: boolean;
+                created_at: string;
+                mood?: string;
+                social_battery?: string | null;
+                description?: string;
+                track_id?: string;
+                album_image_url?: string | null;
+              };
+            };
+            const checkIn = res?.check_in;
+            if (checkIn) {
+              setCachedCheckInForWidget({
                 id: checkIn.id,
                 isActive: checkIn.is_active,
                 createdAt: checkIn.created_at,
-                mood: checkIn.mood || '',
-                socialBattery: checkIn.social_battery || null,
-                description: checkIn.description || '',
-                trackId: checkIn.track_id || '',
-                albumImageUrl: checkIn.album_image_url || null,
+                mood: checkIn.mood ?? '',
+                socialBattery: checkIn.social_battery ?? null,
+                description: checkIn.description ?? '',
+                trackId: checkIn.track_id ?? '',
+                albumImageUrl: checkIn.album_image_url ?? null,
               });
-              triggerWidgetRefresh();
             }
           })
-          .catch((error: any) => {
-            console.error(
-              '[AppScreen] Failed to sync check-in to widget:',
-              error,
-            );
-          });
-      }
-      // Reload widget when app returns to foreground so home screen shows latest data
-      if (state === 'active' && tokens.access_token && tokens.csrftoken) {
-        console.log('[AppScreen] App became active, requesting widget refresh');
-        triggerWidgetRefresh();
+          .catch(() => undefined);
       }
     },
-    [tokens.access_token, tokens.csrftoken],
+    [tokens.access_token, tokens.csrftoken, runWidgetSync],
   );
 
   return (
