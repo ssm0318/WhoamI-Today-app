@@ -1377,7 +1377,7 @@
 				CODE_SIGN_ENTITLEMENTS = whoAmIToday/app.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 6XD5FH576F;
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = "\"i386 arm64\"";
@@ -1545,7 +1545,7 @@
 				CODE_SIGN_ENTITLEMENTS = whoAmIToday/app.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 6XD5FH576F;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = "\"i386 arm64\"";
 				HEADER_SEARCH_PATHS = (
