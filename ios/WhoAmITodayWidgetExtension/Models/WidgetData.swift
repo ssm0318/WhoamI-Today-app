@@ -15,7 +15,7 @@ struct WidgetData: Codable {
                 isActive: true,
                 createdAt: "",
                 mood: "🤔",
-                socialBattery: "half",
+                socialBattery: nil,  // No battery check-in → widget shows + for My Battery
                 description: "",
                 trackId: "",
                 albumImageUrl: nil

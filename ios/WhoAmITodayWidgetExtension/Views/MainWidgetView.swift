@@ -1,6 +1,7 @@
 import SwiftUI
 import WidgetKit
 import UIKit
+import AppIntents
 
 // Fixed heights so total widget height is constant regardless of content
 private let kWhoamiSectionHeight: CGFloat = 100
@@ -16,43 +17,65 @@ struct MainWidgetView: View {
     var showSignInPrompt: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // MARK: - Whoami Updates Section
-            WhoamiUpdatesSection(
-                myCheckIn: data.myCheckIn,
-                friends: data.friendsWithUpdates,
-                albumImageData: albumImageData,
-                profileImages: profileImages
-            )
-            .frame(height: kWhoamiSectionHeight)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        ZStack(alignment: .topTrailing) {
+            VStack(alignment: .leading, spacing: 0) {
+                // MARK: - Whoami Updates Section
+                WhoamiUpdatesSection(
+                    myCheckIn: data.myCheckIn,
+                    friends: data.friendsWithUpdates,
+                    albumImageData: albumImageData,
+                    profileImages: profileImages
+                )
+                .frame(height: kWhoamiSectionHeight)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            Divider()
-                .padding(.horizontal, 4)
+                Spacer(minLength: 12)
+                Divider()
+                    .padding(.horizontal, 4)
+                Spacer(minLength: 12)
 
-            // MARK: - Shared Playlist Section
-            SharedPlaylistSection(playlists: data.sharedPlaylists, playlistAlbumImages: playlistAlbumImages, profileImages: profileImages)
-            .frame(height: kPlaylistSectionHeight)
-            .frame(maxWidth: .infinity, alignment: .leading)
+                // MARK: - Shared Playlist Section
+                SharedPlaylistSection(playlists: data.sharedPlaylists, playlistAlbumImages: playlistAlbumImages, profileImages: profileImages)
+                .frame(height: kPlaylistSectionHeight)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            Divider()
-                .padding(.horizontal, 4)
+                Spacer(minLength: 12)
+                Divider()
+                    .padding(.horizontal, 4)
+                Spacer(minLength: 12)
 
-            // MARK: - Question of the Day / Please Sign in
-            let _ = NSLog("[Widget] MainWidgetView: showSignInPrompt=%@, questionOfDay=%@", String(showSignInPrompt), String(data.questionOfDay != nil))
-            Group {
-                if showSignInPrompt {
-                    SignInPromptButton()
-                } else if let question = data.questionOfDay {
-                    QuestionCard(question: question)
-                } else {
-                    Color.clear
+                // MARK: - Question of the Day / Please Sign in (extra spacing above)
+                let _ = NSLog("[Widget] MainWidgetView: showSignInPrompt=%@, questionOfDay=%@", String(showSignInPrompt), String(data.questionOfDay != nil))
+                Group {
+                    if showSignInPrompt {
+                        SignInPromptButton()
+                    } else if let question = data.questionOfDay {
+                        QuestionCard(question: question)
+                    } else {
+                        Color.clear
+                    }
                 }
+                .frame(height: kQuestionSectionHeight)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 10)
+
+                Spacer(minLength: 0)
             }
-            .frame(height: kQuestionSectionHeight)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .padding(0)
+
+            // MARK: - Refresh button (top-right, iOS 17+)
+            if #available(iOS 17.0, *) {
+                Button(intent: RefreshWidgetIntent()) {
+                    Image("arrow-circular-anti-clockwise")
+                        .resizable()
+                        .frame(width: 20, height: 20)
+                        .foregroundColor(.primary.opacity(0.7))
+                }
+                .buttonStyle(.plain)
+                .padding(4)
+            }
         }
-        .padding(0)
     }
 }
 
@@ -76,16 +99,22 @@ struct WhoamiUpdatesSection: View {
                     .foregroundColor(.primary)
             }
 
-            // Action Buttons + Friends Row (when no check-in data, show empty instead of placeholder icons)
+            // Action Buttons + Friends Row (when no check-in data for that slot, show +)
+            // #region agent log
+            let feelEmoji = (myCheckIn != nil && !(myCheckIn!.mood.isEmpty)) ? myCheckIn?.feelingDisplay : nil
+            let hasBatteryData = myCheckIn?.socialBattery != nil && !(myCheckIn!.socialBattery!.isEmpty)
+            let batteryEmoji = hasBatteryData ? myCheckIn?.batteryDisplay : nil
+            let _ = NSLog("[WhoAmI-Debug] CheckIn emoji: feel=%@ battery=%@", feelEmoji ?? "nil", batteryEmoji ?? "nil")
+            // #endregion
             HStack(spacing: 12) {
                 CheckInButton(
-                    emoji: myCheckIn?.feelingDisplay,
+                    emoji: feelEmoji,
                     title: "I feel",
                     deepLink: "whoami://app/check-in/edit"
                 )
 
                 CheckInButton(
-                    emoji: myCheckIn?.batteryDisplay,
+                    emoji: batteryEmoji,
                     title: "My Battery",
                     deepLink: "whoami://app/check-in/edit"
                 )
@@ -132,8 +161,10 @@ struct CheckInButton: View {
                         Text(emoji)
                             .font(.system(size: 24))
                     } else {
-                        Text("—")
-                            .font(.system(size: 20, weight: .light))
+                        Image("plus")
+                            .resizable()
+                            .renderingMode(.template)
+                            .frame(width: 20, height: 20)
                             .foregroundColor(.secondary)
                     }
                 }
@@ -173,8 +204,10 @@ struct MusicCheckInButton: View {
                         Text("🎵")
                             .font(.system(size: 24))
                     } else {
-                        Text("—")
-                            .font(.system(size: 20, weight: .light))
+                        Image("plus")
+                            .resizable()
+                            .renderingMode(.template)
+                            .frame(width: 20, height: 20)
                             .foregroundColor(.secondary)
                     }
                 }
@@ -375,21 +408,28 @@ struct QuestionCard: View {
     let question: QuestionOfDay
 
     var body: some View {
+        // #region agent log
+        let _ = NSLog("[WhoAmI-Debug] QuestionCard lineLimit=2 contentLen=%d", question.content.count)
+        // #endregion
         Link(destination: URL(string: question.deepLink)!) {
-            HStack(spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
                 // Question icon
                 Image("IconQuestion")
                     .resizable()
                     .frame(width: 24, height: 24)
 
-                // Question content text
+                // Question content text (max 2 lines) — give priority so it gets width and wraps
                 Text(question.content)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white)
-                    .lineLimit(3)
+                    .lineLimit(2)
+                    .truncationMode(.tail)
                     .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .layoutPriority(1)
 
-                Spacer()
+                Spacer(minLength: 8)
 
                 // Arrow
                 Image(systemName: "chevron.right")

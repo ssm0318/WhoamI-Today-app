@@ -64,4 +64,14 @@ class SharedDataManager {
             }
         }
     }
+
+    /// Write diagnostics so the main app can see when getTimeline last ran and what mood it saw.
+    func setWidgetDiagnostics(lastSeenMood: String?, lastGetTimelineDate: Date) {
+        let defs = UserDefaults(suiteName: suiteName)
+        defs?.set(lastSeenMood ?? "nil", forKey: "widget_last_seen_mood")
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        defs?.set(formatter.string(from: lastGetTimelineDate), forKey: "widget_last_getTimeline_at")
+        defs?.synchronize()
+    }
 }

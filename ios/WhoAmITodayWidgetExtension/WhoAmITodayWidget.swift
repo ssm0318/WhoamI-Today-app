@@ -1,17 +1,36 @@
 import WidgetKit
 import SwiftUI
 
+extension WidgetConfiguration {
+    func contentMarginsDisabledIfAvailable() -> some WidgetConfiguration {
+        if #available(iOSApplicationExtension 17.0, *) {
+            return self.contentMarginsDisabled()
+        } else {
+            return self
+        }
+    }
+}
+
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> WidgetEntry {
         WidgetEntry(date: Date(), data: .placeholder, isAuthenticated: true, albumImageData: nil, playlistAlbumImages: [:], profileImages: [:])
     }
 
     func getSnapshot(in context: Context, completion: @escaping (WidgetEntry) -> Void) {
-        // Prefer freshly synced myCheckIn from App Group so the widget shows updated mood immediately
-        let baseData = SharedDataManager.shared.cachedWidgetData ?? .placeholder
+        // Use cache only if less than 5 minutes old so first add or long idle shows fresh data after getTimeline
+        let cache = SharedDataManager.shared.cachedWidgetData
+        let cacheAge = cache?.lastUpdated.timeIntervalSinceNow ?? -999
+        let useCache = cache != nil && cacheAge > -300
+        let baseData: WidgetData
+        if useCache {
+            baseData = cache!
+            print("[Widget] getSnapshot: using cache (age \(Int(-cacheAge))s), mood: \(baseData.myCheckIn?.mood ?? "nil")")
+        } else {
+            baseData = .placeholder
+            print("[Widget] getSnapshot: no recent cache (age \(Int(-cacheAge))s), using placeholder until getTimeline")
+        }
         let snapshotData: WidgetData
-        if let freshCheckIn = SharedDataManager.shared.myCheckIn {
-            print("[Widget] getSnapshot: using fresh myCheckIn from App Group, mood: \(freshCheckIn.mood), id: \(freshCheckIn.id)")
+        if let freshCheckIn = SharedDataManager.shared.myCheckIn, useCache {
             snapshotData = WidgetData(
                 myCheckIn: freshCheckIn,
                 friendsWithUpdates: baseData.friendsWithUpdates,
@@ -20,7 +39,6 @@ struct Provider: TimelineProvider {
                 lastUpdated: Date()
             )
         } else {
-            print("[Widget] getSnapshot: no fresh myCheckIn, using baseData/cache, mood: \(baseData.myCheckIn?.mood ?? "nil")")
             snapshotData = baseData
         }
         let isAuth = SharedDataManager.shared.isAuthenticated
@@ -143,9 +161,10 @@ struct Provider: TimelineProvider {
                 entry = WidgetEntry(date: Date(), data: nil, isAuthenticated: false, albumImageData: nil, playlistAlbumImages: [:], profileImages: [:])
             }
 
-            // Refresh every 30s so widget picks up check-in updates sooner when system asks for new timeline
-            let nextUpdate = Calendar.current.date(byAdding: .second, value: 30, to: Date())!
-            NSLog("[Widget] getTimeline: completed, nextRefresh in 30s, entry isAuth=%@", String(entry.isAuthenticated))
+            SharedDataManager.shared.setWidgetDiagnostics(lastSeenMood: entry.data?.myCheckIn?.mood, lastGetTimelineDate: Date())
+
+            let nextUpdate = Calendar.current.date(byAdding: .second, value: 1, to: Date())!
+            NSLog("[Widget] getTimeline: completed, nextRefresh in 1s, entry isAuth=%@", String(entry.isAuthenticated))
             let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
             completion(timeline)
         }
@@ -166,22 +185,24 @@ struct WhoAmITodayWidgetEntryView: View {
 
     var body: some View {
         let _ = NSLog("[Widget] EntryView: isAuthenticated=%@, hasData=%@", String(entry.isAuthenticated), String(entry.data != nil))
-        if !entry.isAuthenticated {
-            let _ = NSLog("[Widget] EntryView: showing MainWidgetView with showSignInPrompt=true")
-            // Same layout as logged-in widget, with "Please Sign in" in the question area
-            MainWidgetView(
-                data: .empty,
-                albumImageData: nil,
-                playlistAlbumImages: [:],
-                profileImages: [:],
-                showSignInPrompt: true
-            )
-        } else if let data = entry.data {
-            // TODO(Gina): MainWidgetView is the main widget view - customize in MainWidgetView.swift
-            MainWidgetView(data: data, albumImageData: entry.albumImageData, playlistAlbumImages: entry.playlistAlbumImages, profileImages: entry.profileImages)
-        } else {
-            PlaceholderView()
+        Group {
+            if !entry.isAuthenticated {
+                let _ = NSLog("[Widget] EntryView: showing MainWidgetView with showSignInPrompt=true")
+                MainWidgetView(
+                    data: .empty,
+                    albumImageData: nil,
+                    playlistAlbumImages: [:],
+                    profileImages: [:],
+                    showSignInPrompt: true
+                )
+            } else if let data = entry.data {
+                MainWidgetView(data: data, albumImageData: entry.albumImageData, playlistAlbumImages: entry.playlistAlbumImages, profileImages: entry.profileImages)
+            } else {
+                PlaceholderView()
+            }
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 20)
     }
 }
 
@@ -199,6 +220,7 @@ struct WhoAmITodayWidget: Widget {
                     .background(Color.white)
             }
         }
+        .contentMarginsDisabledIfAvailable()
         .configurationDisplayName("WhoAmI Today")
         .description("Stay connected with friends and discover daily questions.")
         .supportedFamilies([.systemLarge])

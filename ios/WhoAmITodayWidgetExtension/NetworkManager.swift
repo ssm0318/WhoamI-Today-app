@@ -70,11 +70,10 @@ class NetworkManager {
             NetworkManager.questionsDebugInfo += " | NO QUESTION FOUND"
         }
 
-        // Use myCheckIn from SharedDataManager (synced from RN with album image) if available,
-        // otherwise fall back to API data
+        // Prefer App Group when main app wrote (WIDGET_DATA_UPDATED flow); else API. Velog: "write UserDefaults when values change" so widget reads it.
         var myCheckInData = SharedDataManager.shared.myCheckIn ?? profileResult?.checkIn
-        let source = SharedDataManager.shared.myCheckIn != nil ? "SharedDataManager" : "API"
-        print("[Widget] fetchWidgetData: myCheckIn from \(source), mood: \(myCheckInData?.mood ?? "nil")")
+        let source = SharedDataManager.shared.myCheckIn != nil ? "AppGroup" : "API"
+        print("[Widget] fetchWidgetData: myCheckIn from \(source), mood: \(myCheckInData?.mood ?? "nil"), social_battery: \(myCheckInData?.socialBattery ?? "nil")")
 
         // Fetch album image from Spotify if we have a trackId but no albumImageUrl
         if var checkIn = myCheckInData,
@@ -165,7 +164,15 @@ class NetworkManager {
         }
 
         do {
-            return try JSONDecoder().decode(MyProfileResponse.self, from: data)
+            let profile = try JSONDecoder().decode(MyProfileResponse.self, from: data)
+            // Log social battery from API response
+            if let checkIn = profile.checkIn {
+                let trackPreview = checkIn.trackId.isEmpty ? "empty" : String(checkIn.trackId.prefix(20)) + (checkIn.trackId.count > 20 ? "…" : "")
+                print("[Widget] API /api/user/me/profile check_in: id=\(checkIn.id), mood=\(checkIn.mood), social_battery=\(checkIn.socialBattery ?? "nil"), trackId=\(trackPreview)")
+            } else {
+                print("[Widget] API /api/user/me/profile check_in: nil")
+            }
+            return profile
         } catch {
             NetworkManager.lastError = "Profile decode: \(error.localizedDescription)"
             throw error
