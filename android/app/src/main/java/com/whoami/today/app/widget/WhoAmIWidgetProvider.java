@@ -79,6 +79,15 @@ public class WhoAmIWidgetProvider extends AppWidgetProvider {
         // Use same large layout for both authenticated and unauthenticated; question area shows "Please Sign in" when not logged in
         views = new RemoteViews(context.getPackageName(), R.layout.widget_large);
 
+        // Refresh button - triggers ACTION_REFRESH so onReceive runs onUpdate and WidgetUpdateService fetches fresh data
+        Intent refreshIntent = new Intent(context, WhoAmIWidgetProvider.class);
+        refreshIntent.setAction(ACTION_REFRESH);
+        PendingIntent refreshPending = PendingIntent.getBroadcast(
+            context, 0, refreshIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+        views.setOnClickPendingIntent(R.id.widget_refresh_button, refreshPending);
+
         // Check-in buttons - all go to same deep link (aligned with iOS)
         String checkInUrl = "whoami://app/check-in/edit";
         setupActionButton(context, views, R.id.btn_i_feel, checkInUrl, 1);
@@ -132,6 +141,15 @@ public class WhoAmIWidgetProvider extends AppWidgetProvider {
     }
 
     public static void setupClickHandlers(Context context, RemoteViews views) {
+        // Refresh button - reload widget with latest check-in and data (same as iOS)
+        Intent refreshIntent = new Intent(context, WhoAmIWidgetProvider.class);
+        refreshIntent.setAction(ACTION_REFRESH);
+        PendingIntent refreshPending = PendingIntent.getBroadcast(
+            context, 0, refreshIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+        views.setOnClickPendingIntent(R.id.widget_refresh_button, refreshPending);
+
         // I feel button
         String checkInUrl = "whoami://app/check-in/edit";
         setupActionButton(context, views, R.id.btn_i_feel, checkInUrl, 1);
