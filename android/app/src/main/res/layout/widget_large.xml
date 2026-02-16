@@ -14,9 +14,9 @@
         android:minHeight="100dp"
         android:orientation="vertical">
 
-        <!-- Section Header -->
+        <!-- Section Header (title + refresh button, same as iOS) -->
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
@@ -36,6 +36,20 @@
                 android:textStyle="bold"
                 android:textColor="#333333"
                 android:layout_marginStart="6dp" />
+
+            <!-- Spacer: RemoteViews only supports specific views (TextView, ImageView, etc.), not generic View -->
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+
+            <ImageView
+                android:id="@+id/widget_refresh_button"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:src="@drawable/ic_widget_refresh"
+                android:scaleType="fitCenter"
+                android:contentDescription="Refresh widget" />
         </LinearLayout>
 
         <!-- Action Buttons + Friends Row (flex-start: items aligned to start) -->
@@ -243,11 +257,11 @@
         android:layout_marginTop="12dp"
         android:layout_marginBottom="12dp" />
 
-    <!-- SECTION: Shared Playlist (fixed min height like iOS) -->
+    <!-- SECTION: Shared Playlist -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:minHeight="90dp"
+        android:minHeight="80dp"
         android:orientation="vertical">
 
         <!-- Section Header -->
@@ -433,20 +447,19 @@
         android:layout_marginTop="12dp"
         android:layout_marginBottom="12dp" />
 
-    <!-- SECTION: Question of the Day (fixed min height like iOS) -->
+    <!-- SECTION: Question of the Day (60dp; 2 lines) -->
     <LinearLayout
         android:id="@+id/question_card"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:minHeight="56dp"
+        android:layout_height="60dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:background="@drawable/widget_question_card_bg"
-        android:padding="14dp">
+        android:padding="10dp">
 
         <ImageView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
             android:src="@drawable/icon_question"
             android:scaleType="fitCenter" />
 
@@ -455,22 +468,24 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:minWidth="0dp"
             android:text="What was a funny thing that happened today?"
-            android:textSize="14sp"
+            android:textSize="12sp"
             android:textColor="#FFFFFF"
             android:textStyle="bold"
-            android:maxLines="3"
+            android:maxLines="2"
             android:ellipsize="end"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp" />
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="4dp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="›"
-            android:textSize="20sp"
+            android:textSize="16sp"
             android:textColor="#FFFFFF"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:layout_marginStart="2dp" />
 
     </LinearLayout>
 
