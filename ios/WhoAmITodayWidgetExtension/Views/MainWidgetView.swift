@@ -8,6 +8,11 @@ private let kWhoamiSectionHeight: CGFloat = 100
 private let kPlaylistSectionHeight: CGFloat = 82
 private let kQuestionSectionHeight: CGFloat = 52
 
+// Fixed colors so widget looks the same for everyone (white background).
+// .primary/.secondary depend on system appearance (Light/Dark), which can make text gray on some devices.
+private let kWidgetTextPrimary = Color.black
+private let kWidgetTextSecondary = Color(white: 0.45)
+
 // TODO(Gina): This is the main widget view - customize the layout and styling here
 struct MainWidgetView: View {
     let data: WidgetData
@@ -70,7 +75,7 @@ struct MainWidgetView: View {
                     Image("arrow-circular-anti-clockwise")
                         .resizable()
                         .frame(width: 20, height: 20)
-                        .foregroundColor(.primary.opacity(0.7))
+                        .foregroundColor(kWidgetTextPrimary.opacity(0.7))
                 }
                 .buttonStyle(.plain)
                 .padding(4)
@@ -96,7 +101,7 @@ struct WhoamiUpdatesSection: View {
 
                 Text("Whoami updates")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.primary)
+                    .foregroundColor(kWidgetTextPrimary)
             }
 
             // Action Buttons + Friends Row (when no check-in data for that slot, show +)
@@ -165,13 +170,13 @@ struct CheckInButton: View {
                             .resizable()
                             .renderingMode(.template)
                             .frame(width: 20, height: 20)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(kWidgetTextSecondary)
                     }
                 }
 
                 Text(title)
                     .font(.system(size: 10))
-                    .foregroundColor(.primary)
+                    .foregroundColor(kWidgetTextPrimary)
                     .lineLimit(1)
             }
         }
@@ -208,13 +213,13 @@ struct MusicCheckInButton: View {
                             .resizable()
                             .renderingMode(.template)
                             .frame(width: 20, height: 20)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(kWidgetTextSecondary)
                     }
                 }
 
                 Text(title)
                     .font(.system(size: 10))
-                    .foregroundColor(.primary)
+                    .foregroundColor(kWidgetTextPrimary)
                     .lineLimit(1)
             }
         }
@@ -257,7 +262,7 @@ struct FriendAvatarView: View {
 
                 Text(friend.username)
                     .font(.system(size: 10))
-                    .foregroundColor(.primary)
+                    .foregroundColor(kWidgetTextPrimary)
                     .lineLimit(1)
             }
         }
@@ -283,7 +288,7 @@ struct SharedPlaylistSection: View {
 
                 Text("Shared Playlist")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.primary)
+                    .foregroundColor(kWidgetTextPrimary)
             }
 
             // Playlist covers row - shows album covers with user profile overlay
@@ -291,7 +296,7 @@ struct SharedPlaylistSection: View {
                 if playlists.isEmpty {
                     Text("No playlists yet")
                         .font(.system(size: 12))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(kWidgetTextSecondary)
                         .frame(height: 50)
                 } else {
                     ForEach(playlists.prefix(5)) { song in
