@@ -27,7 +27,10 @@
 		33728F782A9BA5F2009191CA /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 33728F762A9BA5F2009191CA /* Images.xcassets */; };
 		337D1D0F2F2AD18D00884C31 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 337D1D0E2F2AD18D00884C31 /* WidgetKit.framework */; };
 		337D1D112F2AD18D00884C31 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 337D1D102F2AD18D00884C31 /* SwiftUI.framework */; };
+		337225CC2D9EBEAD004127FB /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 337D1D102F2AD18D00884C31 /* SwiftUI.framework */; };
+		337225CD2D9EBEAD004127FB /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 337D1D0E2F2AD18D00884C31 /* WidgetKit.framework */; };
 		337D1D1C2F2AD18E00884C31 /* WhoAmITodayWidgetExtensionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 337D1D0D2F2AD18D00884C31 /* WhoAmITodayWidgetExtensionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		337225B12D9EBEAD004127FB /* WhoAmITodayWidgetExtensionSecond.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 337225C12D9EBEAD004127FB /* WhoAmITodayWidgetExtensionSecond.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		337D1D3C2F2BBD0B00884C31 /* WidgetDataModule.m in Sources */ = {isa = PBXBuildFile; fileRef = 337D1D3A2F2BBD0B00884C31 /* WidgetDataModule.m */; };
 		337D1D3D2F2BBD0B00884C31 /* WidgetDataModule.m in Sources */ = {isa = PBXBuildFile; fileRef = 337D1D3A2F2BBD0B00884C31 /* WidgetDataModule.m */; };
 		337D1D3E2F2BBD0B00884C31 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 337D1D0E2F2AD18D00884C31 /* WidgetKit.framework */; };
@@ -54,6 +57,13 @@
 			remoteGlobalIDString = 337D1D0C2F2AD18D00884C31;
 			remoteInfo = WhoAmITodayWidgetExtensionExtension;
 		};
+		337225B32D9EBEAD004127FB /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 337225C22D9EBEAD004127FB;
+			remoteInfo = WhoAmITodayWidgetExtensionSecond;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -64,6 +74,17 @@
 			dstSubfolderSpec = 13;
 			files = (
 				337D1D1C2F2AD18E00884C31 /* WhoAmITodayWidgetExtensionExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		337225B22D9EBEAD004127FB /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				337225B12D9EBEAD004127FB /* WhoAmITodayWidgetExtensionSecond.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -89,6 +110,7 @@
 		33728F752A9BA5F2009191CA /* BootSplash.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = BootSplash.storyboard; path = whoAmIToday/BootSplash.storyboard; sourceTree = "<group>"; };
 		33728F762A9BA5F2009191CA /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = whoAmIToday/Images.xcassets; sourceTree = "<group>"; };
 		337D1D0D2F2AD18D00884C31 /* WhoAmITodayWidgetExtensionExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WhoAmITodayWidgetExtensionExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		337225C12D9EBEAD004127FB /* WhoAmITodayWidgetExtensionSecond.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WhoAmITodayWidgetExtensionSecond.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		337D1D0E2F2AD18D00884C31 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		337D1D102F2AD18D00884C31 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		337D1D362F2BADFD00884C31 /* WhoAmITodayWidgetExtensionExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WhoAmITodayWidgetExtensionExtension.entitlements; sourceTree = "<group>"; };
@@ -118,10 +140,17 @@
 			);
 			target = 337D1D0C2F2AD18D00884C31 /* WhoAmITodayWidgetExtensionExtension */;
 		};
+		337225CE2D9EBEAD004127FB /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 337225C22D9EBEAD004127FB /* WhoAmITodayWidgetExtensionSecond */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		337D1D122F2AD18D00884C31 /* WhoAmITodayWidgetExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (337D1D202F2AD18E00884C31 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = WhoAmITodayWidgetExtension; sourceTree = "<group>"; };
+		337D1D122F2AD18D00884C31 /* WhoAmITodayWidgetExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (337D1D202F2AD18E00884C31 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, 337225CE2D9EBEAD004127FB /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = WhoAmITodayWidgetExtension; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -156,6 +185,15 @@
 			files = (
 				337D1D112F2AD18D00884C31 /* SwiftUI.framework in Frameworks */,
 				337D1D0F2F2AD18D00884C31 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		337225C52D9EBEAD004127FB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				337225CC2D9EBEAD004127FB /* SwiftUI.framework in Frameworks */,
+				337225CD2D9EBEAD004127FB /* WidgetKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -256,6 +294,7 @@
 				00E356EE1AD99517003FC87E /* whoAmITodayTests.xctest */,
 				337225A52D9EBEAD004127FB /* whoAmITodaySecond.app */,
 				337D1D0D2F2AD18D00884C31 /* WhoAmITodayWidgetExtensionExtension.appex */,
+				337225C12D9EBEAD004127FB /* WhoAmITodayWidgetExtensionSecond.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -331,10 +370,12 @@
 				337225992D9EBEAD004127FB /* Resources */,
 				3372259F2D9EBEAD004127FB /* Bundle React Native code and images */,
 				CA389ABD5EED389D3C6472E9 /* [CP] Copy Pods Resources */,
+				337225B22D9EBEAD004127FB /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				337225B42D9EBEAD004127FB /* PBXTargetDependency */,
 			);
 			name = whoAmITodaySecond;
 			productName = app;
@@ -361,6 +402,26 @@
 			productReference = 337D1D0D2F2AD18D00884C31 /* WhoAmITodayWidgetExtensionExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		337225C22D9EBEAD004127FB /* WhoAmITodayWidgetExtensionSecond */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 337225C32D9EBEAD004127FB /* Build configuration list for PBXNativeTarget "WhoAmITodayWidgetExtensionSecond" */;
+			buildPhases = (
+				337225C42D9EBEAD004127FB /* Sources */,
+				337225C52D9EBEAD004127FB /* Frameworks */,
+				337225C62D9EBEAD004127FB /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				337D1D122F2AD18D00884C31 /* WhoAmITodayWidgetExtension */,
+			);
+			name = WhoAmITodayWidgetExtensionSecond;
+			productName = WhoAmITodayWidgetExtensionSecond;
+			productReference = 337225C12D9EBEAD004127FB /* WhoAmITodayWidgetExtensionSecond.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -378,6 +439,9 @@
 						LastSwiftMigration = 1120;
 					};
 					337D1D0C2F2AD18D00884C31 = {
+						CreatedOnToolsVersion = 26.0.1;
+					};
+					337225C22D9EBEAD004127FB = {
 						CreatedOnToolsVersion = 26.0.1;
 					};
 				};
@@ -399,6 +463,7 @@
 				00E356ED1AD99517003FC87E /* whoAmITodayTests */,
 				337225912D9EBEAD004127FB /* whoAmITodaySecond */,
 				337D1D0C2F2AD18D00884C31 /* WhoAmITodayWidgetExtensionExtension */,
+				337225C22D9EBEAD004127FB /* WhoAmITodayWidgetExtensionSecond */,
 			);
 		};
 /* End PBXProject section */
@@ -440,6 +505,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		337D1D0B2F2AD18D00884C31 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		337225C62D9EBEAD004127FB /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -703,6 +775,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		337225C42D9EBEAD004127FB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -715,6 +794,11 @@
 			isa = PBXTargetDependency;
 			target = 337D1D0C2F2AD18D00884C31 /* WhoAmITodayWidgetExtensionExtension */;
 			targetProxy = 337D1D1A2F2AD18E00884C31 /* PBXContainerItemProxy */;
+		};
+		337225B42D9EBEAD004127FB /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 337225C22D9EBEAD004127FB /* WhoAmITodayWidgetExtensionSecond */;
+			targetProxy = 337225B32D9EBEAD004127FB /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1377,7 +1461,7 @@
 				CODE_SIGN_ENTITLEMENTS = whoAmIToday/app.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 6XD5FH576F;
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = "\"i386 arm64\"";
@@ -1545,7 +1629,7 @@
 				CODE_SIGN_ENTITLEMENTS = whoAmIToday/app.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 6XD5FH576F;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = "\"i386 arm64\"";
 				HEADER_SEARCH_PATHS = (
@@ -2152,7 +2236,315 @@
 			};
 			name = Release;
 		};
-/* End XCBuildConfiguration section */
+
+				337225C72D9EBEAD004127FB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_ENTITLEMENTS = WhoAmITodayWidgetExtensionExtension.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 6XD5FH576F;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/../node_modules/react-native/React\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon\"",
+					"\"$(SRCROOT)/../node_modules/react-native/Libraries\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/graphics/platform/ios\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-Fabric\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/components/view/platform/cxx\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-graphics\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/React\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon\"",
+					"\"$(SRCROOT)/../node_modules/react-native/Libraries\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/graphics/platform/ios\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-Fabric\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/components/view/platform/cxx\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-graphics\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/React\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon\"",
+					"\"$(SRCROOT)/../node_modules/react-native/Libraries\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/graphics/platform/ios\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-Fabric\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/components/view/platform/cxx\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-graphics\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/React\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon\"",
+					"\"$(SRCROOT)/../node_modules/react-native/Libraries\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/graphics/platform/ios\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-Fabric\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/components/view/platform/cxx\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-graphics\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/React\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon\"",
+					"\"$(SRCROOT)/../node_modules/react-native/Libraries\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/graphics/platform/ios\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-Fabric\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/components/view/platform/cxx\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-graphics\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/React\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon\"",
+					"\"$(SRCROOT)/../node_modules/react-native/Libraries\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/graphics/platform/ios\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-Fabric\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/components/view/platform/cxx\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-graphics\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/React\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon\"",
+					"\"$(SRCROOT)/../node_modules/react-native/Libraries\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/graphics/platform/ios\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-Fabric\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/components/view/platform/cxx\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-graphics\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/React\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon\"",
+					"\"$(SRCROOT)/../node_modules/react-native/Libraries\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/graphics/platform/ios\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-Fabric\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/components/view/platform/cxx\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-graphics\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/React\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon\"",
+					"\"$(SRCROOT)/../node_modules/react-native/Libraries\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/graphics/platform/ios\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-Fabric\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/components/view/platform/cxx\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-graphics\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-renderer\"",
+				);
+				INFOPLIST_FILE = WhoAmITodayWidgetExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = WhoAmITodayWidgetExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.whoami.today.second.app.WhoAmITodayWidgetExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_INCLUDE_PATHS = "$(inherited) \"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\" \"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\" \"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				USER_HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+				);
+			};
+			name = Debug;
+		};
+				337225C82D9EBEAD004127FB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_ENTITLEMENTS = WhoAmITodayWidgetExtensionExtension.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 6XD5FH576F;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/../node_modules/react-native/React\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon\"",
+					"\"$(SRCROOT)/../node_modules/react-native/Libraries\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/graphics/platform/ios\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-Fabric\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/components/view/platform/cxx\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-graphics\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/React\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon\"",
+					"\"$(SRCROOT)/../node_modules/react-native/Libraries\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/graphics/platform/ios\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-Fabric\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/components/view/platform/cxx\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-graphics\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/React\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon\"",
+					"\"$(SRCROOT)/../node_modules/react-native/Libraries\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/graphics/platform/ios\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-Fabric\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/components/view/platform/cxx\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-graphics\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/React\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon\"",
+					"\"$(SRCROOT)/../node_modules/react-native/Libraries\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/graphics/platform/ios\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-Fabric\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/components/view/platform/cxx\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-graphics\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/React\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon\"",
+					"\"$(SRCROOT)/../node_modules/react-native/Libraries\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/graphics/platform/ios\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-Fabric\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/components/view/platform/cxx\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-graphics\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/React\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon\"",
+					"\"$(SRCROOT)/../node_modules/react-native/Libraries\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/graphics/platform/ios\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-Fabric\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/components/view/platform/cxx\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-graphics\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/React\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon\"",
+					"\"$(SRCROOT)/../node_modules/react-native/Libraries\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/graphics/platform/ios\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-Fabric\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/components/view/platform/cxx\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-graphics\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/React\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon\"",
+					"\"$(SRCROOT)/../node_modules/react-native/Libraries\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/graphics/platform/ios\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-Fabric\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/components/view/platform/cxx\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-graphics\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/React\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon\"",
+					"\"$(SRCROOT)/../node_modules/react-native/Libraries\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/graphics/platform/ios\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-Fabric\"",
+					"\"$(SRCROOT)/../node_modules/react-native/ReactCommon/react/renderer/components/view/platform/cxx\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-graphics\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-renderer\"",
+				);
+				INFOPLIST_FILE = WhoAmITodayWidgetExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = WhoAmITodayWidgetExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.whoami.today.second.app.WhoAmITodayWidgetExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_INCLUDE_PATHS = "$(inherited) \"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\" \"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\" \"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				USER_HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+					"\"$(PODS_ROOT)/Headers/Public/React-RCTAppDelegate\"",
+				);
+			};
+			name = Release;
+		};
+		/* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
 		00E357021AD99517003FC87E /* Build configuration list for PBXNativeTarget "whoAmITodayTests" */ = {
@@ -2187,6 +2579,15 @@
 			buildConfigurations = (
 				337D1D1E2F2AD18E00884C31 /* Debug */,
 				337D1D1F2F2AD18E00884C31 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		337225C32D9EBEAD004127FB /* Build configuration list for PBXNativeTarget "WhoAmITodayWidgetExtensionSecond" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				337225C72D9EBEAD004127FB /* Debug */,
+				337225C82D9EBEAD004127FB /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
