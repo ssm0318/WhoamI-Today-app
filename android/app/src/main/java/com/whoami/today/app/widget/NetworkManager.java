@@ -38,13 +38,12 @@ public class NetworkManager {
                 } catch (Exception ignored) {}
             }
             JSONObject root = new JSONObject();
-            if (existing.has("my_check_in") && !existing.isNull("my_check_in")) {
+            // Always fetch profile so check-in is latest (same as iOS fetchWidgetData)
+            JSONObject profile = getJson(context, BASE_URL + "/api/user/me/profile", cookie);
+            if (profile != null && profile.has("check_in") && !profile.isNull("check_in")) {
+                root.put("my_check_in", profile.getJSONObject("check_in"));
+            } else if (existing.has("my_check_in") && !existing.isNull("my_check_in")) {
                 root.put("my_check_in", existing.get("my_check_in"));
-            } else {
-                JSONObject profile = getJson(context, BASE_URL + "/api/user/me/profile", cookie);
-                if (profile != null && profile.has("check_in") && !profile.isNull("check_in")) {
-                    root.put("my_check_in", profile.getJSONObject("check_in"));
-                }
             }
             JSONArray friends = fetchFriendsWithUpdates(context, cookie);
             root.put("friends_with_updates", friends != null ? friends : new JSONArray());
