@@ -79,15 +79,15 @@ public class WhoAmIWidgetProvider extends AppWidgetProvider {
         // Use same large layout for both authenticated and unauthenticated; question area shows "Please Sign in" when not logged in
         views = new RemoteViews(context.getPackageName(), R.layout.widget_large);
 
-        // Check-in buttons - all go to same URL
-        String checkInUrl = "https://whoami-admin-group.gina-park.site/check-in/edit";
+        // Check-in buttons - all go to same deep link (aligned with iOS)
+        String checkInUrl = "whoami://app/check-in/edit";
         setupActionButton(context, views, R.id.btn_i_feel, checkInUrl, 1);
         setupActionButton(context, views, R.id.btn_my_battery, checkInUrl, 2);
         setupActionButton(context, views, R.id.btn_my_music, checkInUrl, 3);
 
-        // TODO(Gina): Friend buttons - update deep links as needed
-        setupActionButton(context, views, R.id.friend_1, "whoami://app/friends/1", 4);
-        setupActionButton(context, views, R.id.friend_2, "whoami://app/friends/2", 5);
+        // Friend buttons - placeholder until WidgetUpdateService sets whoami://app/users/{username} (same as iOS)
+        setupActionButton(context, views, R.id.friend_1, "whoami://app/users", 4);
+        setupActionButton(context, views, R.id.friend_2, "whoami://app/users", 5);
 
         // TODO(Gina): Playlist buttons - update deep links as needed
         setupActionButton(context, views, R.id.playlist_1_container, "whoami://app/playlists/1", 6);
@@ -102,9 +102,9 @@ public class WhoAmIWidgetProvider extends AppWidgetProvider {
             views.setTextViewText(R.id.question_text, "Please Sign in");
             setupActionButton(context, views, R.id.question_card, "whoami://app/login", 11);
         } else {
-            // Question card - will be updated by WidgetUpdateService with actual question ID
+            // Question card - will be updated by WidgetUpdateService with actual question ID (same format as iOS)
             Log.d(TAG, "updateAppWidget: setting question card to default (will be updated by WidgetUpdateService)");
-            setupActionButton(context, views, R.id.question_card, "https://whoami-admin-group.gina-park.site/questions/1/new", 11);
+            setupActionButton(context, views, R.id.question_card, "whoami://app/questions/1/new", 11);
         }
 
         // Set up widget container click to open app
@@ -121,6 +121,7 @@ public class WhoAmIWidgetProvider extends AppWidgetProvider {
 
     public static void setupActionButton(Context context, RemoteViews views, int buttonId, String deepLink, int requestCode) {
         Intent intent = new Intent(context, MainActivity.class);
+        intent.setAction(Intent.ACTION_VIEW);
         intent.setData(Uri.parse(deepLink));
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent pending = PendingIntent.getActivity(
@@ -137,9 +138,9 @@ public class WhoAmIWidgetProvider extends AppWidgetProvider {
         setupActionButton(context, views, R.id.btn_my_battery, checkInUrl, 2);
         setupActionButton(context, views, R.id.btn_my_music, checkInUrl, 3);
 
-        // Friend buttons - will be updated by WidgetUpdateService with actual usernames
-        setupActionButton(context, views, R.id.friend_1, "whoami://app/users/friend1", 4);
-        setupActionButton(context, views, R.id.friend_2, "whoami://app/users/friend2", 5);
+        // Friend buttons - will be updated by WidgetUpdateService with whoami://app/users/{username} (same as iOS)
+        setupActionButton(context, views, R.id.friend_1, "whoami://app/users", 4);
+        setupActionButton(context, views, R.id.friend_2, "whoami://app/users", 5);
 
         // Question card - will be updated by WidgetUpdateService with actual question ID
         setupActionButton(context, views, R.id.question_card, "whoami://app/questions/1/new", 11);
