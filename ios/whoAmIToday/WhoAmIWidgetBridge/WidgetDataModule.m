@@ -78,6 +78,12 @@ RCT_EXPORT_METHOD(refreshWidgets:(RCTPromiseResolveBlock)resolve
 {
     if (@available(iOS 14.0, *)) {
         [self reloadWidgetTimelines];
+        // Reload again after a short delay so the widget extension gets a chance to run when app is in background
+        __weak typeof(self) weakSelf = self;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [weakSelf reloadWidgetTimelines];
+            NSLog(@"[WidgetBridge] refreshWidgets: delayed reload (0.6s) requested");
+        });
         resolve(@YES);
     } else {
         reject(@"UNSUPPORTED", @"Widgets require iOS 14+", nil);
@@ -127,16 +133,18 @@ RCT_EXPORT_METHOD(syncMyCheckIn:(NSDictionary *)checkInData
         [sharedDefaults synchronize];
         NSString *mood = checkInData[@"mood"] ?: @"(nil)";
         NSNumber *checkInId = checkInData[@"id"];
-        // This log appears in Xcode: run main app scheme (whoAmIToday), open Debug area (Cmd+Shift+Y), then background the app to trigger sync
         NSLog(@"[WidgetBridge] syncMyCheckIn: wrote my_check_in to App Group, id=%@ mood=%@", checkInId, mood);
 
-        // Reload widget timelines immediately
         [self reloadWidgetTimelines];
-        // Reload again after a short delay so widget extension can see the written UserDefaults (helps when app is in background)
+
         __weak typeof(self) weakSelf = self;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             [weakSelf reloadWidgetTimelines];
-            NSLog(@"[WidgetBridge] syncMyCheckIn: delayed reload (0.6s) requested");
+            NSLog(@"[WidgetBridge] syncMyCheckIn: reload after 0.4s");
+        });
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [weakSelf reloadWidgetTimelines];
+            NSLog(@"[WidgetBridge] syncMyCheckIn: second reload after 1.0s");
         });
 
         resolve(@YES);
@@ -162,6 +170,21 @@ RCT_EXPORT_METHOD(clearMyCheckIn:(RCTPromiseResolveBlock)resolve
     } else {
         reject(@"ERROR", @"Failed to access shared UserDefaults", nil);
     }
+}
+
+// Read widget diagnostics (when widget last ran getTimeline and what mood it saw) for debugging
+RCT_EXPORT_METHOD(getWidgetDiagnostics:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+    NSUserDefaults *sharedDefaults = [[NSUserDefaults alloc]
+        initWithSuiteName:@"group.com.whoami.today.app"];
+    if (!sharedDefaults) {
+        resolve(@{@"lastSeenMood": @"(no suite)", @"lastGetTimelineAt": @""});
+        return;
+    }
+    NSString *mood = [sharedDefaults stringForKey:@"widget_last_seen_mood"] ?: @"(never)";
+    NSString *dateStr = [sharedDefaults stringForKey:@"widget_last_getTimeline_at"] ?: @"";
+    resolve(@{@"lastSeenMood": mood, @"lastGetTimelineAt": dateStr});
 }
 
 @end

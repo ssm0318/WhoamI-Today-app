@@ -21,6 +21,10 @@ interface WidgetDataModuleInterface {
   clearAuthTokens(): Promise<boolean>;
   clearMyCheckIn(): Promise<boolean>;
   refreshWidgets(): Promise<boolean>;
+  getWidgetDiagnostics(): Promise<{
+    lastSeenMood: string;
+    lastGetTimelineAt: string;
+  }>;
 }
 
 const { WidgetDataModule } = NativeModules;
@@ -114,9 +118,7 @@ export const syncMyCheckInToWidget = async (checkIn: {
       checkInData,
     );
     console.log(
-      '[WidgetBridge] MyCheckIn synced to widget successfully, mood:',
-      checkIn.mood,
-      '| Native NSLog [WidgetBridge] appears in Xcode Debug console when run from Xcode (Cmd+Shift+Y)',
+      `[WidgetBridge] MyCheckIn synced to widget successfully, mood: ${checkIn.mood}`,
     );
   } catch (error) {
     console.error('Failed to sync MyCheckIn to widget:', error);
@@ -130,5 +132,25 @@ export const clearMyCheckInFromWidget = async (): Promise<void> => {
     await (WidgetDataModule as WidgetDataModuleInterface).clearMyCheckIn();
   } catch (error) {
     console.error('Failed to clear MyCheckIn from widget:', error);
+  }
+};
+
+export const getWidgetDiagnostics = async (): Promise<{
+  lastSeenMood: string;
+  lastGetTimelineAt: string;
+} | null> => {
+  if (!WidgetDataModule) {
+    console.warn(
+      '[WidgetDataModule] getWidgetDiagnostics: WidgetDataModule is null',
+    );
+    return null;
+  }
+  try {
+    return await (
+      WidgetDataModule as WidgetDataModuleInterface
+    ).getWidgetDiagnostics();
+  } catch (e) {
+    console.warn('[WidgetDataModule] getWidgetDiagnostics failed:', e);
+    return null;
   }
 };

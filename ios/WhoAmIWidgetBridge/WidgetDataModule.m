@@ -4,6 +4,8 @@
 
 RCT_EXPORT_MODULE();
 
+static NSString *const kWidgetKind = @"WhoAmITodayWidget";
+
 - (void)reloadWidgetTimelines {
     if (@available(iOS 14.0, *)) {
         Class WidgetCenterClass = NSClassFromString(@"WidgetCenter");
@@ -11,9 +13,26 @@ RCT_EXPORT_MODULE();
             id sharedCenter = [WidgetCenterClass performSelector:@selector(shared)];
             if (sharedCenter) {
                 [sharedCenter performSelector:@selector(reloadAllTimelines)];
+                if (@available(iOS 15.0, *)) {
+                    SEL reloadKind = NSSelectorFromString(@"reloadTimelinesOfKind:");
+                    if ([sharedCenter respondsToSelector:reloadKind]) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+                        [sharedCenter performSelector:reloadKind withObject:kWidgetKind];
+#pragma clang diagnostic pop
+                    }
+                }
             }
         }
     }
+}
+
+// Reload now and again after a short delay so the widget extension picks up App Group data after user has switched to home screen
+- (void)reloadWidgetTimelinesWithFollowUp {
+    [self reloadWidgetTimelines];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [self reloadWidgetTimelines];
+    });
 }
 
 // Sync auth tokens to App Group UserDefaults
@@ -64,7 +83,7 @@ RCT_EXPORT_METHOD(refreshWidgets:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 {
     if (@available(iOS 14.0, *)) {
-        [self reloadWidgetTimelines];
+        [self reloadWidgetTimelinesWithFollowUp];
         resolve(@YES);
     } else {
         reject(@"UNSUPPORTED", @"Widgets require iOS 14+", nil);
@@ -113,9 +132,7 @@ RCT_EXPORT_METHOD(syncMyCheckIn:(NSDictionary *)checkInData
         [sharedDefaults setObject:jsonData forKey:@"my_check_in"];
         [sharedDefaults synchronize];
 
-        // Reload widget timelines
-        [self reloadWidgetTimelines];
-
+        [self reloadWidgetTimelinesWithFollowUp];
         resolve(@YES);
     } else {
         reject(@"ERROR", @"Failed to access shared UserDefaults", nil);
@@ -139,6 +156,21 @@ RCT_EXPORT_METHOD(clearMyCheckIn:(RCTPromiseResolveBlock)resolve
     } else {
         reject(@"ERROR", @"Failed to access shared UserDefaults", nil);
     }
+}
+
+// Read widget diagnostics (when widget last ran getTimeline and what mood it saw)
+RCT_EXPORT_METHOD(getWidgetDiagnostics:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+    NSUserDefaults *sharedDefaults = [[NSUserDefaults alloc]
+        initWithSuiteName:@"group.com.whoami.today.app"];
+    if (!sharedDefaults) {
+        resolve(@{@"lastSeenMood": @"(no suite)", @"lastGetTimelineAt": @""});
+        return;
+    }
+    NSString *mood = [sharedDefaults stringForKey:@"widget_last_seen_mood"] ?: @"(never)";
+    NSString *dateStr = [sharedDefaults stringForKey:@"widget_last_getTimeline_at"] ?: @"";
+    resolve(@{@"lastSeenMood": mood, @"lastGetTimelineAt": dateStr});
 }
 
 @end
