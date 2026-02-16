@@ -7,10 +7,21 @@ import {
 } from '@tools';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking } from 'react-native';
-import { WebViewMessageEvent, WebView } from 'react-native-webview';
+import {
+  WebViewMessageEvent,
+  WebView,
+  type WebViewNavigation,
+} from 'react-native-webview';
 import { WebViewProgressEvent } from 'react-native-webview/lib/WebViewTypes';
 import { ScreenRouteParamList } from '@screens';
 import ImagePicker from 'react-native-image-crop-picker';
+import {
+  syncMyCheckInToWidget,
+  triggerWidgetRefresh,
+} from '../native/WidgetDataModule';
+import { setWidgetDataStale } from '../utils/widgetDataStale';
+import { setCachedCheckInForWidget } from '../utils/widgetCheckInCache';
+import ApiService from '../apis/API';
 
 interface FileData {
   uri: string;
@@ -28,6 +39,11 @@ const useWebView = () => {
   const { registerOrUpdatePushToken } = useFirebaseMessage();
   const [isCanGoBack, setIsCanGoBack] = useState(false);
   const { handleLogout } = useAnalytics(tokens);
+
+  const onNavigationStateChange = useCallback((navState: WebViewNavigation) => {
+    setIsCanGoBack(navState.canGoBack ?? false);
+  }, []);
+
   const postMessage = useCallback((key: string, data: any) => {
     ref.current?.postMessage(JSON.stringify({ key, data }));
   }, []);
@@ -129,6 +145,8 @@ const useWebView = () => {
       // Handle specific action types
       if (!('actionType' in data)) return;
 
+      console.log('[useWebView] Web action received:', data.actionType);
+
       switch (data.actionType) {
         case 'CONSOLE':
           console.log('[WEBVIEW CONSOLE]', data.data);
@@ -202,6 +220,58 @@ const useWebView = () => {
         case 'OPEN_CAMERA':
           openCamera();
           return;
+        case 'WIDGET_DATA_UPDATED': {
+          console.log(
+            '[useWebView] WIDGET_DATA_UPDATED — fetch, write to App Group, then reload',
+          );
+          setWidgetDataStale(true);
+          (async () => {
+            try {
+              const response = (await ApiService.API.get(
+                'user/me/profile',
+              )) as unknown;
+              const res = response as {
+                check_in?: {
+                  id: number;
+                  is_active: boolean;
+                  created_at: string;
+                  mood?: string;
+                  social_battery?: string | null;
+                  description?: string;
+                  track_id?: string;
+                  album_image_url?: string | null;
+                };
+              };
+              const checkIn = res?.check_in;
+              if (checkIn) {
+                const payload = {
+                  id: checkIn.id,
+                  isActive: checkIn.is_active,
+                  createdAt: checkIn.created_at,
+                  mood: checkIn.mood ?? '',
+                  socialBattery: checkIn.social_battery ?? null,
+                  description: checkIn.description ?? '',
+                  trackId: checkIn.track_id ?? '',
+                  albumImageUrl: checkIn.album_image_url ?? null,
+                };
+                await syncMyCheckInToWidget(payload);
+                setCachedCheckInForWidget(payload);
+              } else {
+                console.warn(
+                  '[useWebView] WIDGET_DATA_UPDATED: no check_in in profile response',
+                );
+              }
+              await triggerWidgetRefresh();
+            } catch (err) {
+              console.warn(
+                '[useWebView] WIDGET_DATA_UPDATED profile fetch failed:',
+                err,
+              );
+              await triggerWidgetRefresh();
+            }
+          })();
+          return;
+        }
         default:
           return;
       }
@@ -218,6 +288,7 @@ const useWebView = () => {
     loadProgress,
     onMessage,
     onLoadProgress,
+    onNavigationStateChange,
     postMessage,
     injectCookieScript,
     tokens,
