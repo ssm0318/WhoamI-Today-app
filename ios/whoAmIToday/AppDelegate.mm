@@ -4,6 +4,7 @@
 
 #import <React/RCTBundleURLProvider.h>
 #import <React/RCTLinkingManager.h>
+#import "InitialURLModule.h"
 
 @implementation AppDelegate
 
@@ -57,6 +58,11 @@
             openURL:(NSURL *)url
             options:(NSDictionary<UIApplicationOpenURLOptionsKey,id> *)options
 {
+  // Store URL so getInitialURL can return it when app was cold-started from widget
+  // (launchOptions may not contain the URL in that case)
+  if (url.absoluteString.length > 0) {
+    SetStoredInitialURL(url.absoluteString);
+  }
   return [RCTLinkingManager application:application openURL:url options:options];
 }
 

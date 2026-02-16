@@ -14,6 +14,7 @@ public class WidgetDataPackage implements ReactPackage {
     public List<NativeModule> createNativeModules(ReactApplicationContext reactContext) {
         List<NativeModule> modules = new ArrayList<>();
         modules.add(new WidgetDataModule(reactContext));
+        modules.add(new InitialURLModule(reactContext));
         return modules;
     }
 
