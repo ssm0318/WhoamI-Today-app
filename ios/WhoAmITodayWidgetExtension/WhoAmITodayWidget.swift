@@ -163,9 +163,12 @@ struct Provider: TimelineProvider {
 
             SharedDataManager.shared.setWidgetDiagnostics(lastSeenMood: entry.data?.myCheckIn?.mood, lastGetTimelineDate: Date())
 
-            let nextUpdate = Calendar.current.date(byAdding: .second, value: 1, to: Date())!
-            NSLog("[Widget] getTimeline: completed, nextRefresh in 1s, entry isAuth=%@", String(entry.isAuthenticated))
-            let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
+            let cal = Calendar.current
+            let now = Date()
+            let startOfToday = cal.startOfDay(for: now)
+            let startOfNextDay = cal.date(byAdding: .day, value: 1, to: startOfToday)!
+            NSLog("[Widget] getTimeline: completed, nextRefresh at midnight, entry isAuth=%@", String(entry.isAuthenticated))
+            let timeline = Timeline(entries: [entry], policy: .after(startOfNextDay))
             completion(timeline)
         }
     }

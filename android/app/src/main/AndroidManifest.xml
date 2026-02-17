@@ -81,5 +81,14 @@
     <service
         android:name=".widget.WidgetUpdateService"
         android:exported="false" />
+
+    <!-- Widget midnight refresh: alarm fires at start of next day to refresh widget data -->
+    <receiver
+        android:name=".widget.WidgetMidnightReceiver"
+        android:exported="false">
+        <intent-filter>
+            <action android:name="com.whoami.today.app.WIDGET_MIDNIGHT_REFRESH" />
+        </intent-filter>
+    </receiver>
   </application>
 </manifest>

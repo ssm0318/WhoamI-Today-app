@@ -27,6 +27,9 @@ public class WhoAmIWidgetProvider extends AppWidgetProvider {
         // Start background service to load album images
         Intent serviceIntent = new Intent(context, WidgetUpdateService.class);
         context.startService(serviceIntent);
+
+        // Schedule next midnight refresh so widget updates when the date changes
+        WidgetMidnightScheduler.scheduleNextMidnight(context);
     }
 
     @Override
@@ -176,6 +179,8 @@ public class WhoAmIWidgetProvider extends AppWidgetProvider {
     @Override
     public void onEnabled(Context context) {
         super.onEnabled(context);
+        // Schedule midnight refresh when the first widget instance is added
+        WidgetMidnightScheduler.scheduleNextMidnight(context);
     }
 
     @Override
