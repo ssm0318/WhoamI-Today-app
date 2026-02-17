@@ -1598,6 +1598,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.whoami.today.second.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				CURRENT_PROJECT_VERSION = 7;
 				SWIFT_INCLUDE_PATHS = "$(inherited) \"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\" \"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\" \"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -1629,7 +1630,7 @@
 				CODE_SIGN_ENTITLEMENTS = whoAmIToday/app.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = 6XD5FH576F;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = "\"i386 arm64\"";
 				HEADER_SEARCH_PATHS = (
@@ -1765,6 +1766,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.whoami.today.second.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				CURRENT_PROJECT_VERSION = 7;
 				SWIFT_INCLUDE_PATHS = "$(inherited) \"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\" \"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\" \"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"\"$(PODS_ROOT)/Headers/Public/React_RCTAppDelegate\"";
 				SWIFT_VERSION = 5.0;
 				USER_HEADER_SEARCH_PATHS = (
