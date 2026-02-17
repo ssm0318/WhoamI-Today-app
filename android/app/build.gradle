@@ -34,8 +34,8 @@ android {
         applicationId "com.whoami.today.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 10403
-        versionName "1.4.3"
+        versionCode 10407
+        versionName "1.5"
         // .env from repo root (react-native-config) so Config.SPOTIFY_* is available on Android
         def envFile = rootProject.file("../.env")
         println("WhoAmI .env: path=" + envFile.getAbsolutePath() + " exists=" + envFile.exists())
