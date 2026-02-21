@@ -20,16 +20,27 @@ struct MainWidgetView: View {
     let playlistAlbumImages: [String: Data]
     let profileImages: [Int: Data]
     var showSignInPrompt: Bool = false
+    var isRefreshing: Bool = false
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
+            // Full-size background button so taps on empty area run this intent instead of opening the app (iOS widget tap-through workaround).
+            if #available(iOS 17.0, *) {
+                Button(intent: WidgetBackgroundIntent()) {
+                    Color.clear
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+
             VStack(alignment: .leading, spacing: 0) {
-                // MARK: - Whoami Updates Section
+                // MARK: - Whoami Updates Section (title row + refresh on same row)
                 WhoamiUpdatesSection(
                     myCheckIn: data.myCheckIn,
                     friends: data.friendsWithUpdates,
                     albumImageData: albumImageData,
-                    profileImages: profileImages
+                    profileImages: profileImages,
+                    isRefreshing: isRefreshing
                 )
                 .frame(height: kWhoamiSectionHeight)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -50,7 +61,6 @@ struct MainWidgetView: View {
                 Spacer(minLength: 12)
 
                 // MARK: - Question of the Day / Please Sign in (extra spacing above)
-                let _ = NSLog("[Widget] MainWidgetView: showSignInPrompt=%@, questionOfDay=%@", String(showSignInPrompt), String(data.questionOfDay != nil))
                 Group {
                     if showSignInPrompt {
                         SignInPromptButton()
@@ -69,17 +79,6 @@ struct MainWidgetView: View {
             .frame(maxHeight: .infinity, alignment: .top)
             .padding(0)
 
-            // MARK: - Refresh button (top-right, iOS 17+)
-            if #available(iOS 17.0, *) {
-                Button(intent: RefreshWidgetIntent()) {
-                    Image("arrow-circular-anti-clockwise")
-                        .resizable()
-                        .frame(width: 20, height: 20)
-                        .foregroundColor(kWidgetTextPrimary.opacity(0.7))
-                }
-                .buttonStyle(.plain)
-                .padding(4)
-            }
         }
     }
 }
@@ -90,11 +89,12 @@ struct WhoamiUpdatesSection: View {
     let friends: [FriendUpdate]
     let albumImageData: Data?
     let profileImages: [Int: Data]
+    var isRefreshing: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Section Header
-            HStack(spacing: 6) {
+            // Section Header + Refresh on same row (icon aligned top-right)
+            HStack(alignment: .center, spacing: 6) {
                 Image("IconWhoamiUpdates")
                     .resizable()
                     .frame(width: 16, height: 16)
@@ -102,15 +102,35 @@ struct WhoamiUpdatesSection: View {
                 Text("Whoami updates")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(kWidgetTextPrimary)
+
+                Spacer(minLength: 0)
+
+                if #available(iOS 17.0, *) {
+                    Group {
+                        if isRefreshing {
+                            Image("arrow-circular-anti-clockwise")
+                                .resizable()
+                                .frame(width: 20, height: 20)
+                                .foregroundColor(kWidgetTextPrimary.opacity(0.35))
+                        } else {
+                            Button(intent: RefreshWidgetIntent()) {
+                                Image("arrow-circular-anti-clockwise")
+                                    .resizable()
+                                    .frame(width: 20, height: 20)
+                                    .foregroundColor(kWidgetTextPrimary.opacity(0.7))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+                }
             }
 
             // Action Buttons + Friends Row (when no check-in data for that slot, show +)
-            // #region agent log
             let feelEmoji = (myCheckIn != nil && !(myCheckIn!.mood.isEmpty)) ? myCheckIn?.feelingDisplay : nil
             let hasBatteryData = myCheckIn?.socialBattery != nil && !(myCheckIn!.socialBattery!.isEmpty)
             let batteryEmoji = hasBatteryData ? myCheckIn?.batteryDisplay : nil
-            let _ = NSLog("[WhoAmI-Debug] CheckIn emoji: feel=%@ battery=%@", feelEmoji ?? "nil", batteryEmoji ?? "nil")
-            // #endregion
             HStack(spacing: 12) {
                 CheckInButton(
                     emoji: feelEmoji,
@@ -413,9 +433,6 @@ struct QuestionCard: View {
     let question: QuestionOfDay
 
     var body: some View {
-        // #region agent log
-        let _ = NSLog("[WhoAmI-Debug] QuestionCard lineLimit=2 contentLen=%d", question.content.count)
-        // #endregion
         Link(destination: URL(string: question.deepLink)!) {
             HStack(alignment: .center, spacing: 12) {
                 // Question icon

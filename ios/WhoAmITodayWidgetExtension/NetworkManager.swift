@@ -135,9 +135,10 @@ class NetworkManager {
     private func fetchMyProfile(csrf: String, token: String) async throws -> MyProfileResponse {
         let url = URL(string: "\(baseURL)/api/user/me/profile")!
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue(csrf, forHTTPHeaderField: "X-CSRFToken")
-        // Cookie header should contain both csrftoken and access_token
         request.setValue("csrftoken=\(csrf); access_token=\(token)", forHTTPHeaderField: "Cookie")
+        request.setValue("no-cache, no-store", forHTTPHeaderField: "Cache-Control")
 
         let data: Data
         let response: URLResponse

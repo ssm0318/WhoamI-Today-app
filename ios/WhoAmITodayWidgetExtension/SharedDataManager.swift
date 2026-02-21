@@ -65,6 +65,56 @@ class SharedDataManager {
         }
     }
 
+    // Cached images for refresh follow-up (so we don't refetch in second getTimeline)
+    private let widgetAlbumKey = "widget_album_image"
+    private let widgetPlaylistPrefix = "widget_pl_"
+    private let widgetProfilePrefix = "widget_pf_"
+    private let widgetPlaylistKeysKey = "widget_pl_keys"
+    private let widgetProfileKeysKey = "widget_pf_keys"
+
+    var cachedAlbumImageData: Data? {
+        get { sharedDefaults?.data(forKey: widgetAlbumKey) }
+        set {
+            sharedDefaults?.set(newValue, forKey: widgetAlbumKey)
+            sharedDefaults?.synchronize()
+        }
+    }
+
+    var cachedPlaylistAlbumImages: [String: Data] {
+        get {
+            guard let keys = sharedDefaults?.stringArray(forKey: widgetPlaylistKeysKey) else { return [:] }
+            var out: [String: Data] = [:]
+            for k in keys {
+                if let d = sharedDefaults?.data(forKey: widgetPlaylistPrefix + k) { out[k] = d }
+            }
+            return out
+        }
+        set {
+            sharedDefaults?.set(Array(newValue.keys), forKey: widgetPlaylistKeysKey)
+            for (k, v) in newValue { sharedDefaults?.set(v, forKey: widgetPlaylistPrefix + k) }
+            sharedDefaults?.synchronize()
+        }
+    }
+
+    var cachedProfileImages: [Int: Data] {
+        get {
+            guard let keys = sharedDefaults?.stringArray(forKey: widgetProfileKeysKey) else { return [:] }
+            var out: [Int: Data] = [:]
+            for s in keys { if let id = Int(s), let d = sharedDefaults?.data(forKey: widgetProfilePrefix + s) { out[id] = d } }
+            return out
+        }
+        set {
+            sharedDefaults?.set(newValue.keys.map { String($0) }, forKey: widgetProfileKeysKey)
+            for (k, v) in newValue { sharedDefaults?.set(v, forKey: widgetProfilePrefix + String(k)) }
+            sharedDefaults?.synchronize()
+        }
+    }
+
+    /// Call after writing all widget caches so the follow-up getTimeline sees them.
+    func synchronizeWidgetCaches() {
+        sharedDefaults?.synchronize()
+    }
+
     /// Write diagnostics so the main app can see when getTimeline last ran and what mood it saw.
     func setWidgetDiagnostics(lastSeenMood: String?, lastGetTimelineDate: Date) {
         let defs = UserDefaults(suiteName: suiteName)
