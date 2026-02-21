@@ -58,11 +58,12 @@ const useFirebaseMessage = () => {
   const hasPermission = async (): Promise<boolean> => {
     const permissionStatus = await messaging().hasPermission();
     const permitted = isPermitted(permissionStatus);
-    // console.log('[Firebase] Permission status:', {
-    //   status: permissionStatus,
-    //   permitted,
-    //   currentToken: await messaging().getToken(),
-    // });
+    try {
+      const currentToken = await messaging().getToken();
+      console.log('[FCM Token]', currentToken);
+    } catch (e) {
+      console.log('[FCM Token] not available (e.g. permission denied)', e);
+    }
     return permitted;
   };
 
@@ -82,6 +83,14 @@ const useFirebaseMessage = () => {
 
   const initialize = useCallback(async () => {
     console.log('[Firebase Message] : initialize');
+
+    if (Platform.OS === 'ios') {
+      messaging()
+        .getAPNSToken()
+        .then((token) => {
+          console.log('APNS Token:', token);
+        });
+    }
 
     // Handle foreground messages
     messaging().onMessage(handleOnMessage);
@@ -124,6 +133,7 @@ const useFirebaseMessage = () => {
         }
 
         const pushToken = await messaging().getToken();
+        console.log('[FCM Token]', pushToken);
         await FcmTokenStorage.setToken({ fcmToken: pushToken });
 
         const params = {

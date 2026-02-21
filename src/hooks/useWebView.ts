@@ -221,12 +221,39 @@ const useWebView = () => {
           openCamera();
           return;
         case 'WIDGET_DATA_UPDATED': {
-          console.log(
-            '[useWebView] WIDGET_DATA_UPDATED — fetch, write to App Group, then reload',
-          );
+          // If web sends check_in in the message (when user saves check-in), use it so widget
+          // matches the app screen without waiting for API. Otherwise fetch from API.
           setWidgetDataStale(true);
           (async () => {
             try {
+              const raw = data.check_in as
+                | {
+                    id?: number;
+                    is_active?: boolean;
+                    created_at?: string;
+                    mood?: string;
+                    social_battery?: string | null;
+                    description?: string;
+                    track_id?: string;
+                    album_image_url?: string | null;
+                  }
+                | undefined;
+              if (raw && typeof raw.id === 'number') {
+                const payload = {
+                  id: raw.id,
+                  isActive: raw.is_active ?? true,
+                  createdAt: raw.created_at ?? '',
+                  mood: raw.mood ?? '',
+                  socialBattery: raw.social_battery ?? null,
+                  description: raw.description ?? '',
+                  trackId: raw.track_id ?? '',
+                  albumImageUrl: raw.album_image_url ?? null,
+                };
+                await syncMyCheckInToWidget(payload);
+                setCachedCheckInForWidget(payload);
+                await triggerWidgetRefresh();
+                return;
+              }
               const response = (await ApiService.API.get(
                 'user/me/profile',
               )) as unknown;
@@ -256,17 +283,10 @@ const useWebView = () => {
                 };
                 await syncMyCheckInToWidget(payload);
                 setCachedCheckInForWidget(payload);
-              } else {
-                console.warn(
-                  '[useWebView] WIDGET_DATA_UPDATED: no check_in in profile response',
-                );
               }
               await triggerWidgetRefresh();
             } catch (err) {
-              console.warn(
-                '[useWebView] WIDGET_DATA_UPDATED profile fetch failed:',
-                err,
-              );
+              console.warn('[useWebView] WIDGET_DATA_UPDATED failed:', err);
               await triggerWidgetRefresh();
             }
           })();
