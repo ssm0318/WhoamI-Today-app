@@ -79,6 +79,11 @@ struct MainWidgetView: View {
             .frame(maxHeight: .infinity, alignment: .top)
             .padding(0)
 
+            // Refreshing overlay (no text): dimmed layer so user sees refresh is in progress
+            if isRefreshing {
+                Color.white.opacity(0.5)
+                    .ignoresSafeArea()
+            }
         }
     }
 }
