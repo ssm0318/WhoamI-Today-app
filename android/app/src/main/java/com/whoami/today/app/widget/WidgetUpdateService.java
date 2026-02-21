@@ -1,48 +1,102 @@
 package com.whoami.today.app.widget;
 
 import android.app.IntentService;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.appwidget.AppWidgetManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ServiceInfo;
 import android.graphics.Bitmap;
+import android.os.Build;
 import android.util.Log;
 import android.view.View;
 import android.widget.RemoteViews;
 
 import com.whoami.today.app.R;
 
-import java.util.HashMap;
-import java.util.Map;
-
 public class WidgetUpdateService extends IntentService {
     private static final String TAG = "WidgetUpdateService";
+    private static final String CHANNEL_ID = "widget_update";
+    private static final int NOTIFICATION_ID = 9001;
 
     public WidgetUpdateService() {
         super("WidgetUpdateService");
     }
 
     @Override
-    protected void onHandleIntent(Intent intent) {
-        Log.d(TAG, "Updating widget with album images...");
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "Widget update", NotificationManager.IMPORTANCE_LOW);
+            channel.setShowBadge(false);
+            ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).createNotificationChannel(channel);
+            Notification n = new Notification.Builder(this, CHANNEL_ID)
+                    .setContentTitle(getString(R.string.app_name))
+                    .setContentText("Updating widget…")
+                    .setSmallIcon(android.R.drawable.ic_menu_rotate)
+                    .setPriority(Notification.PRIORITY_MIN)
+                    .build();
+            if (Build.VERSION.SDK_INT >= 34) {
+                startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
+            } else {
+                startForeground(NOTIFICATION_ID, n);
+            }
+        }
+        return super.onStartCommand(intent, flags, startId);
+    }
 
+    @Override
+    protected void onHandleIntent(Intent intent) {
         Context context = getApplicationContext();
+        try {
+            if (intent == null) {
+                Log.w(TAG, "onHandleIntent: null intent (e.g. process restarted), skipping update");
+                return;
+            }
+            runWidgetUpdate(context);
+        } finally {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                try {
+                    stopForeground(true);
+                } catch (Exception e) {
+                    Log.e(TAG, "stopForeground failed", e);
+                }
+            }
+            Log.d(TAG, "Widget update complete");
+        }
+    }
+
+    private void runWidgetUpdate(Context context) {
+        Log.d(TAG, "Updating widget with album images...");
 
         // When not logged in, do not overwrite widget (provider already set "Please Sign in" on question card)
         String accessToken = SharedPrefsHelper.getAccessToken(context);
-        if (accessToken == null || accessToken.isEmpty()) {
+        boolean hasToken = accessToken != null && !accessToken.isEmpty();
+        if (!hasToken) {
             Log.d(TAG, "Not logged in: skipping widget content update (question card stays 'Please Sign in')");
             return;
         }
 
-        // Fetch full widget data from API (profile, friends, playlists, question) and save to prefs — same as iOS timeline
-        NetworkManager.fetchWidgetData(context);
-
         AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
         ComponentName componentName = new ComponentName(context, WhoAmIWidgetProvider.class);
         int[] appWidgetIds = appWidgetManager.getAppWidgetIds(componentName);
+        if (appWidgetIds == null || appWidgetIds.length == 0) return;
 
-        // Load widget data (now populated by fetchWidgetData, or previously synced from app)
+        // Show current data + loading spinner so content doesn’t disappear while fetching
+        String currentJson = SharedPrefsHelper.getWidgetData(context);
+        if (currentJson != null) {
+            WidgetData currentData = WidgetData.fromJson(currentJson);
+            if (currentData != null) {
+                buildAndUpdateWidgets(context, appWidgetManager, appWidgetIds, currentData, true);
+            }
+        }
+
+        // Fetch full widget data from API (profile, friends, playlists, question) and save to prefs
+        NetworkManager.fetchWidgetData(context);
+
+        // Load widget data (now populated by fetchWidgetData)
         String widgetDataJson = SharedPrefsHelper.getWidgetData(context);
         if (widgetDataJson == null) {
             Log.d(TAG, "No widget data available");
@@ -54,99 +108,77 @@ public class WidgetUpdateService extends IntentService {
             Log.e(TAG, "Failed to parse widget data");
             return;
         }
-        if (widgetData.myCheckIn != null) {
-            Log.d(TAG, "[widget_data] my_check_in: trackId=" + widgetData.myCheckIn.trackId
-                + " albumImageUrl=" + (widgetData.myCheckIn.albumImageUrl != null ? "set" : "null"));
-        } else {
-            Log.d(TAG, "[widget_data] my_check_in is null");
-        }
 
+        buildAndUpdateWidgets(context, appWidgetManager, appWidgetIds, widgetData, false);
+    }
+
+    private void buildAndUpdateWidgets(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds,
+                                       WidgetData widgetData, boolean showLoading) {
         SpotifyManager spotifyManager = new SpotifyManager(context);
-
-        // Use question from widget data (already set by fetchWidgetData); fallback to live fetch if missing
         WidgetData.QuestionOfDay dailyQuestion = widgetData.questionOfDay;
         if (dailyQuestion == null) {
             dailyQuestion = NetworkManager.fetchFirstDailyQuestion(context);
         }
 
         for (int appWidgetId : appWidgetIds) {
-            RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_large);
+            try {
+                RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_large);
+                WhoAmIWidgetProvider.setupClickHandlers(context, views);
 
-            // Set up click handlers (same as in WhoAmIWidgetProvider)
-            WhoAmIWidgetProvider.setupClickHandlers(context, views);
+                if (dailyQuestion != null && dailyQuestion.content != null && !dailyQuestion.content.isEmpty()) {
+                    views.setTextViewText(R.id.question_text, dailyQuestion.content);
+                    WhoAmIWidgetProvider.setupActionButton(context, views, R.id.question_card,
+                        dailyQuestion.getDeepLink(), 11);
+                    Log.d(TAG, "Set daily question: " + dailyQuestion.content);
+                }
 
-            // Update question text with daily question content
-            if (dailyQuestion != null && dailyQuestion.content != null && !dailyQuestion.content.isEmpty()) {
-                views.setTextViewText(R.id.question_text, dailyQuestion.content);
-                // Set click handler with actual question ID
-                WhoAmIWidgetProvider.setupActionButton(context, views, R.id.question_card,
-                    dailyQuestion.getDeepLink(), 11);
-                Log.d(TAG, "Set daily question: " + dailyQuestion.content);
-            }
-
-            // Load playlist album images
-            Map<String, Bitmap> albumImages = new HashMap<>();
-            if (widgetData.sharedPlaylists != null && widgetData.sharedPlaylists.size() > 0) {
-                for (int i = 0; i < Math.min(5, widgetData.sharedPlaylists.size()); i++) {
-                    WidgetData.PlaylistSong song = widgetData.sharedPlaylists.get(i);
-                    if (song.trackId != null && !song.trackId.isEmpty()) {
-                        String albumImageUrl = spotifyManager.getAlbumImageUrl(song.trackId);
-                        if (albumImageUrl != null) {
-                            Bitmap albumBitmap = ImageLoader.loadImageFromUrl(albumImageUrl);
-                            if (albumBitmap != null) {
-                                albumImages.put(song.trackId, albumBitmap);
-                                Log.d(TAG, "Loaded album image for track: " + song.trackId);
+                Map<String, Bitmap> albumImages = new HashMap<>();
+                if (widgetData.sharedPlaylists != null && widgetData.sharedPlaylists.size() > 0) {
+                    for (int i = 0; i < Math.min(5, widgetData.sharedPlaylists.size()); i++) {
+                        WidgetData.PlaylistSong song = widgetData.sharedPlaylists.get(i);
+                        if (song.trackId != null && !song.trackId.isEmpty()) {
+                            String albumImageUrl = spotifyManager.getAlbumImageUrl(song.trackId);
+                            if (albumImageUrl != null) {
+                                Bitmap albumBitmap = ImageLoader.loadImageFromUrlForWidget(albumImageUrl, 96);
+                                if (albumBitmap != null) albumImages.put(song.trackId, albumBitmap);
                             }
                         }
                     }
                 }
-            }
 
-            // Load profile images for friends and playlist users
-            Map<Integer, Bitmap> profileImages = new HashMap<>();
-
-            // Load friend profile images
-            if (widgetData.friendsWithUpdates != null) {
-                for (int i = 0; i < Math.min(2, widgetData.friendsWithUpdates.size()); i++) {
-                    WidgetData.FriendUpdate friend = widgetData.friendsWithUpdates.get(i);
-                    if (friend.profileImage != null && !friend.profileImage.isEmpty()) {
-                        Bitmap profileBitmap = ImageLoader.loadImageFromUrl(friend.profileImage);
-                        if (profileBitmap != null) {
-                            profileImages.put(friend.id, profileBitmap);
-                            Log.d(TAG, "Loaded profile image for friend: " + friend.id);
+                Map<Integer, Bitmap> profileImages = new HashMap<>();
+                if (widgetData.friendsWithUpdates != null) {
+                    for (int i = 0; i < Math.min(2, widgetData.friendsWithUpdates.size()); i++) {
+                        WidgetData.FriendUpdate friend = widgetData.friendsWithUpdates.get(i);
+                        if (friend.profileImage != null && !friend.profileImage.isEmpty()) {
+                            Bitmap profileBitmap = ImageLoader.loadImageFromUrlForWidget(friend.profileImage, 96);
+                            if (profileBitmap != null) profileImages.put(friend.id, profileBitmap);
                         }
                     }
                 }
-            }
-
-            // Load playlist user profile images
-            if (widgetData.sharedPlaylists != null) {
-                for (int i = 0; i < Math.min(5, widgetData.sharedPlaylists.size()); i++) {
-                    WidgetData.PlaylistSong song = widgetData.sharedPlaylists.get(i);
-                    if (song.user.profileImage != null && !song.user.profileImage.isEmpty()) {
-                        // Skip if already loaded (same user might have multiple songs)
-                        if (!profileImages.containsKey(song.user.id)) {
-                            Bitmap profileBitmap = ImageLoader.loadImageFromUrl(song.user.profileImage);
-                            if (profileBitmap != null) {
-                                profileImages.put(song.user.id, profileBitmap);
-                                Log.d(TAG, "Loaded profile image for playlist user: " + song.user.id);
-                            }
+                if (widgetData.sharedPlaylists != null) {
+                    for (int i = 0; i < Math.min(5, widgetData.sharedPlaylists.size()); i++) {
+                        WidgetData.PlaylistSong song = widgetData.sharedPlaylists.get(i);
+                        if (song.user.profileImage != null && !song.user.profileImage.isEmpty()
+                                && !profileImages.containsKey(song.user.id)) {
+                            Bitmap profileBitmap = ImageLoader.loadImageFromUrlForWidget(song.user.profileImage, 96);
+                            if (profileBitmap != null) profileImages.put(song.user.id, profileBitmap);
                         }
                     }
                 }
+
+                updateCheckInViews(context, views, widgetData, spotifyManager);
+                updateFriendViews(context, views, widgetData, profileImages);
+                updatePlaylistViews(context, views, widgetData, albumImages, profileImages);
+
+                views.setViewVisibility(R.id.widget_loading_progress, showLoading ? View.VISIBLE : View.GONE);
+                views.setViewVisibility(R.id.widget_refresh_button, showLoading ? View.GONE : View.VISIBLE);
+
+                appWidgetManager.updateAppWidget(appWidgetId, views);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to update widget " + appWidgetId, e);
             }
-
-            // Update check-in (I feel, My Battery, My Music)
-            updateCheckInViews(context, views, widgetData, spotifyManager);
-
-            // Update views with images
-            updateFriendViews(context, views, widgetData, profileImages);
-            updatePlaylistViews(context, views, widgetData, albumImages, profileImages);
-
-            appWidgetManager.updateAppWidget(appWidgetId, views);
         }
-
-        Log.d(TAG, "Widget update complete");
     }
 
     private void updateCheckInViews(Context context, RemoteViews views, WidgetData data, SpotifyManager spotifyManager) {
@@ -188,7 +220,7 @@ public class WidgetUpdateService extends IntentService {
             }
             Log.d(TAG, "[My Music] albumUrl=" + (albumUrl != null ? albumUrl : "null"));
             if (albumUrl != null) {
-                albumBitmap = ImageLoader.loadImageFromUrl(albumUrl);
+                albumBitmap = ImageLoader.loadImageFromUrlForWidget(albumUrl, 96);
                 Log.d(TAG, "[My Music] loadImageFromUrl result: " + (albumBitmap != null ? "OK" : "null"));
                 if (albumBitmap == null) {
                     Log.d(TAG, "My Music: album image load failed for track " + checkIn.trackId);

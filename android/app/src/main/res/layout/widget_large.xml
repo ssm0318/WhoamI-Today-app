@@ -43,6 +43,14 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1" />
 
+            <!-- Loading spinner (same 28dp as refresh icon so layout doesn't shift) -->
+            <ProgressBar
+                android:id="@+id/widget_loading_progress"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:indeterminate="true"
+                android:visibility="gone" />
+
             <ImageView
                 android:id="@+id/widget_refresh_button"
                 android:layout_width="28dp"

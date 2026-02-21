@@ -10,6 +10,8 @@
   <uses-permission android:name="android.permission.CAMERA" />
 
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
 
   <application
@@ -77,10 +79,11 @@
             android:resource="@xml/widget_info_large" />
     </receiver>
 
-    <!-- Widget Update Service -->
+    <!-- Widget Update Service: runs as foreground when started from background (Android 12+) -->
     <service
         android:name=".widget.WidgetUpdateService"
-        android:exported="false" />
+        android:exported="false"
+        android:foregroundServiceType="dataSync" />
 
     <!-- Widget midnight refresh: alarm fires at start of next day to refresh widget data -->
     <receiver

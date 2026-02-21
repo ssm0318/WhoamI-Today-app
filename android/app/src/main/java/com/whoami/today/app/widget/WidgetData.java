@@ -101,6 +101,13 @@ public class WidgetData {
                 friend.username = json.optString("username", "");
                 friend.profilePic = json.optString("profile_pic", "#AABBCC");
                 friend.profileImage = json.optString("profile_image", null);
+                // Support nested "user" object (e.g. API returns { "user": { "username": "x" } })
+                if (json.has("user") && !json.isNull("user")) {
+                    JSONObject user = json.getJSONObject("user");
+                    if (friend.username.isEmpty()) friend.username = user.optString("username", "");
+                    if (friend.profileImage == null || friend.profileImage.isEmpty()) friend.profileImage = user.optString("profile_image", null);
+                    if ("#AABBCC".equals(friend.profilePic)) friend.profilePic = user.optString("profile_pic", friend.profilePic);
+                }
                 return friend;
             } catch (Exception e) {
                 e.printStackTrace();

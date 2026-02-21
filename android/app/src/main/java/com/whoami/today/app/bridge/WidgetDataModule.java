@@ -71,7 +71,12 @@ public class WidgetDataModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void refreshWidgets(Promise promise) {
         try {
-            updateWidgets(getReactApplicationContext());
+            Context context = getReactApplicationContext();
+            if (context == null) {
+                promise.reject("ERROR", "App context not available");
+                return;
+            }
+            updateWidgets(context);
             promise.resolve(true);
         } catch (Exception e) {
             promise.reject("ERROR", e.getMessage());
@@ -125,8 +130,13 @@ public class WidgetDataModule extends ReactContextBaseJavaModule {
     public void syncMyCheckIn(ReadableMap checkInData, Promise promise) {
         try {
             Context context = getReactApplicationContext();
+            if (context == null) {
+                promise.reject("ERROR", "App context not available");
+                return;
+            }
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             String existingJson = prefs.getString("widget_data", "{}");
+            if (existingJson == null) existingJson = "{}";
             JSONObject root = new JSONObject(existingJson);
             JSONObject myCheckIn = new JSONObject();
             if (checkInData.hasKey("id")) myCheckIn.put("id", checkInData.getInt("id"));
@@ -142,6 +152,7 @@ public class WidgetDataModule extends ReactContextBaseJavaModule {
             updateWidgets(context);
             promise.resolve(true);
         } catch (Exception e) {
+            Log.e(TAG, "syncMyCheckIn failed", e);
             promise.reject("ERROR", e.getMessage());
         }
     }
@@ -163,9 +174,12 @@ public class WidgetDataModule extends ReactContextBaseJavaModule {
     }
 
     private void updateWidgets(Context context) {
-        // Widget provider will be added later
-        // For now, send a broadcast that can be caught when widget is implemented
-        Intent intent = new Intent("com.whoami.today.app.WIDGET_UPDATE");
-        context.sendBroadcast(intent);
+        if (context == null) return;
+        try {
+            Intent intent = new Intent("com.whoami.today.app.WIDGET_UPDATE");
+            context.sendBroadcast(intent);
+        } catch (Exception e) {
+            Log.e(TAG, "updateWidgets failed", e);
+        }
     }
 }

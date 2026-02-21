@@ -24,7 +24,8 @@ public class NetworkManager {
     public static boolean fetchWidgetData(Context context) {
         String csrfToken = SharedPrefsHelper.getCsrfToken(context);
         String accessToken = SharedPrefsHelper.getAccessToken(context);
-        if (csrfToken == null || accessToken == null || csrfToken.isEmpty() || accessToken.isEmpty()) {
+        boolean hasTokens = csrfToken != null && accessToken != null && !csrfToken.isEmpty() && !accessToken.isEmpty();
+        if (!hasTokens) {
             Log.d(TAG, "fetchWidgetData: No auth tokens");
             return false;
         }
@@ -40,15 +41,37 @@ public class NetworkManager {
             JSONObject root = new JSONObject();
             // Always fetch profile so check-in is latest (same as iOS fetchWidgetData)
             JSONObject profile = getJson(context, BASE_URL + "/api/user/me/profile", cookie);
-            if (profile != null && profile.has("check_in") && !profile.isNull("check_in")) {
-                root.put("my_check_in", profile.getJSONObject("check_in"));
-            } else if (existing.has("my_check_in") && !existing.isNull("my_check_in")) {
-                root.put("my_check_in", existing.get("my_check_in"));
+            // Prefer app-synced check-in when newer than API (avoids widget showing stale data after app sync)
+            JSONObject apiCheckIn = (profile != null && profile.has("check_in") && !profile.isNull("check_in"))
+                ? profile.getJSONObject("check_in") : null;
+            JSONObject existingCheckIn = (existing.has("my_check_in") && !existing.isNull("my_check_in"))
+                ? existing.getJSONObject("my_check_in") : null;
+            boolean useExisting = existingCheckIn != null && isCheckInNewerThan(existingCheckIn, apiCheckIn);
+            JSONObject chosenCheckIn = useExisting ? existingCheckIn : (apiCheckIn != null ? apiCheckIn : existingCheckIn);
+            if (chosenCheckIn != null) {
+                root.put("my_check_in", chosenCheckIn);
             }
+            // Use existing friends/playlists only when fetch fails (null); if API returns empty array, show empty
             JSONArray friends = fetchFriendsWithUpdates(context, cookie);
-            root.put("friends_with_updates", friends != null ? friends : new JSONArray());
+            JSONArray existingFriends = (existing.has("friends_with_updates") && !existing.isNull("friends_with_updates"))
+                ? existing.optJSONArray("friends_with_updates") : null;
+            if (friends != null) {
+                root.put("friends_with_updates", friends);
+            } else if (existingFriends != null && existingFriends.length() > 0) {
+                root.put("friends_with_updates", existingFriends);
+            } else {
+                root.put("friends_with_updates", new JSONArray());
+            }
             JSONArray playlists = fetchPlaylistFeed(context, cookie);
-            root.put("shared_playlists", playlists != null ? playlists : new JSONArray());
+            JSONArray existingPlaylists = (existing.has("shared_playlists") && !existing.isNull("shared_playlists"))
+                ? existing.optJSONArray("shared_playlists") : null;
+            if (playlists != null) {
+                root.put("shared_playlists", playlists);
+            } else if (existingPlaylists != null && existingPlaylists.length() > 0) {
+                root.put("shared_playlists", existingPlaylists);
+            } else {
+                root.put("shared_playlists", new JSONArray());
+            }
             WidgetData.QuestionOfDay question = fetchFirstDailyQuestion(context);
             if (question != null) {
                 JSONObject qJson = new JSONObject();
@@ -67,13 +90,31 @@ public class NetworkManager {
         }
     }
 
+    /** True if existing check-in is newer than or equal to api, so we keep app-synced data when same id. */
+    private static boolean isCheckInNewerThan(JSONObject existing, JSONObject api) {
+        if (api == null) return true;
+        if (existing == null) return false;
+        try {
+            if (existing.has("id") && api.has("id") && !existing.isNull("id") && !api.isNull("id")) {
+                return existing.getInt("id") >= api.getInt("id");
+            }
+            String exTs = existing.optString("created_at", "");
+            String apiTs = api.optString("created_at", "");
+            if (!exTs.isEmpty() && !apiTs.isEmpty()) return exTs.compareTo(apiTs) >= 0;
+        } catch (Exception ignored) {}
+        return true;
+    }
+
     private static JSONObject getJson(Context context, String urlString, String cookie) {
         try {
             URL url = new URL(urlString);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
+            conn.setUseCaches(false);
             conn.setRequestProperty("X-CSRFToken", SharedPrefsHelper.getCsrfToken(context));
             conn.setRequestProperty("Cookie", cookie);
+            conn.setRequestProperty("Cache-Control", "no-cache, no-store");
+            conn.setRequestProperty("Pragma", "no-cache");
             conn.setConnectTimeout(10000);
             conn.setReadTimeout(10000);
             if (conn.getResponseCode() == 200) {

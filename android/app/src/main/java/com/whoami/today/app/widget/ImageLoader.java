@@ -33,6 +33,21 @@ public class ImageLoader {
         }
     }
 
+    /** Load and scale to maxSize for widget (keeps RemoteViews under ~15MB bitmap limit). */
+    public static Bitmap loadImageFromUrlForWidget(String imageUrl, int maxSizePx) {
+        Bitmap full = loadImageFromUrl(imageUrl);
+        if (full == null) return null;
+        int w = full.getWidth();
+        int h = full.getHeight();
+        if (w <= maxSizePx && h <= maxSizePx) return full;
+        float scale = Math.min(maxSizePx / (float) w, maxSizePx / (float) h);
+        int nw = Math.round(w * scale);
+        int nh = Math.round(h * scale);
+        Bitmap scaled = Bitmap.createScaledBitmap(full, nw, nh, true);
+        if (scaled != full) full.recycle();
+        return scaled;
+    }
+
     public static Bitmap getRoundedCornerBitmap(Bitmap bitmap, int cornerRadius) {
         if (bitmap == null) return null;
 
