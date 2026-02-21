@@ -17,6 +17,9 @@ import android.widget.RemoteViews;
 
 import com.whoami.today.app.R;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class WidgetUpdateService extends IntentService {
     private static final String TAG = "WidgetUpdateService";
     private static final String CHANNEL_ID = "widget_update";
