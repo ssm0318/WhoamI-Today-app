@@ -18,12 +18,17 @@ interface WidgetDataModuleInterface {
     clientSecret: string,
   ): Promise<boolean>;
   syncMyCheckIn(checkInData: MyCheckInData): Promise<boolean>;
+  syncVersionType(versionType: string): Promise<boolean>;
   clearAuthTokens(): Promise<boolean>;
   clearMyCheckIn(): Promise<boolean>;
   refreshWidgets(): Promise<boolean>;
   getWidgetDiagnostics(): Promise<{
     lastSeenMood: string;
+    lastSeenBattery: string;
+    lastFeelingDisplay: string;
+    lastBatteryDisplay: string;
     lastGetTimelineAt: string;
+    myCheckInJson: string;
   }>;
 }
 
@@ -137,7 +142,11 @@ export const clearMyCheckInFromWidget = async (): Promise<void> => {
 
 export const getWidgetDiagnostics = async (): Promise<{
   lastSeenMood: string;
+  lastSeenBattery: string;
+  lastFeelingDisplay: string;
+  lastBatteryDisplay: string;
   lastGetTimelineAt: string;
+  myCheckInJson: string;
 } | null> => {
   if (!WidgetDataModule) {
     console.warn(
@@ -152,5 +161,23 @@ export const getWidgetDiagnostics = async (): Promise<{
   } catch (e) {
     console.warn('[WidgetDataModule] getWidgetDiagnostics failed:', e);
     return null;
+  }
+};
+
+export const syncVersionTypeToWidget = async (
+  versionType: string,
+): Promise<void> => {
+  if (!WidgetDataModule) {
+    console.warn('WidgetDataModule not available');
+    return;
+  }
+
+  try {
+    await (WidgetDataModule as WidgetDataModuleInterface).syncVersionType(
+      versionType,
+    );
+    console.log(`[WidgetBridge] Version type synced to widget: ${versionType}`);
+  } catch (error) {
+    console.error('Failed to sync version type to widget:', error);
   }
 };
