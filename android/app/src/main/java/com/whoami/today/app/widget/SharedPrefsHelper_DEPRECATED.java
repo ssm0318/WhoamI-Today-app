@@ -3,7 +3,7 @@ package com.whoami.today.app.widget;
 import android.content.Context;
 import android.content.SharedPreferences;
 
-public class SharedPrefsHelper {
+public class SharedPrefsHelper_DEPRECATED {
     private static final String PREFS_NAME = "WhoAmIWidgetPrefs";
 
     public static String getAccessToken(Context context) {

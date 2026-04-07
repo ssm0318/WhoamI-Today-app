@@ -13,8 +13,8 @@ import java.util.Calendar;
  * Schedules a one-shot alarm at the start of the next day (midnight, local timezone).
  * When the alarm fires, WidgetMidnightReceiver runs and refreshes the widget, then reschedules.
  */
-public class WidgetMidnightScheduler {
-    private static final String TAG = "WidgetMidnightScheduler";
+public class WidgetMidnightScheduler_DEPRECATED {
+    private static final String TAG = "WidgetMidnightScheduler_DEPRECATED";
 
     public static void scheduleNextMidnight(Context context) {
         if (context == null) return;
@@ -27,8 +27,8 @@ public class WidgetMidnightScheduler {
         Calendar nextMidnight = getNextMidnight();
         long triggerAt = nextMidnight.getTimeInMillis();
 
-        Intent intent = new Intent(context, WidgetMidnightReceiver.class);
-        intent.setAction(WidgetMidnightReceiver.ACTION_MIDNIGHT_REFRESH);
+        Intent intent = new Intent(context, WidgetMidnightReceiver_DEPRECATED.class);
+        intent.setAction(WidgetMidnightReceiver_DEPRECATED.ACTION_MIDNIGHT_REFRESH);
         PendingIntent pending = PendingIntent.getBroadcast(
                 context,
                 0,

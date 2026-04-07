@@ -1,4 +1,7 @@
 <resources>
     <string name="app_name">WhoAmI Today</string>
     <string name="widget_description">Stay connected with friends and discover daily questions.</string>
+    <string name="widget_photo_description">Display a photo from WhoAmI Today.</string>
+    <string name="widget_album_description">Display your check-in album cover.</string>
+    <string name="widget_checkin_description">Quick access to your check-in status.</string>
 </resources>

@@ -14,8 +14,8 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
-public class SpotifyManager {
-    private static final String TAG = "SpotifyManager";
+public class SpotifyManager_DEPRECATED {
+    private static final String TAG = "SpotifyManager_DEPRECATED";
     private static final String TOKEN_URL = "https://accounts.spotify.com/api/token";
     private static final String TRACK_URL = "https://api.spotify.com/v1/tracks/";
     private static final String PREFS_NAME = "WhoAmIWidgetPrefs";
@@ -24,7 +24,7 @@ public class SpotifyManager {
     private String accessToken;
     private long tokenExpiry;
 
-    public SpotifyManager(Context context) {
+    public SpotifyManager_DEPRECATED(Context context) {
         this.context = context;
     }
 

@@ -173,6 +173,21 @@ public class WidgetDataModule extends ReactContextBaseJavaModule {
         }
     }
 
+    @ReactMethod
+    public void syncVersionType(String versionType, Promise promise) {
+        try {
+            Context context = getReactApplicationContext();
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            prefs.edit()
+                .putString("user_version_type", versionType)
+                .apply();
+            updateWidgets(context);
+            promise.resolve(true);
+        } catch (Exception e) {
+            promise.reject("ERROR", e.getMessage());
+        }
+    }
+
     private void updateWidgets(Context context) {
         if (context == null) return;
         try {

@@ -5,16 +5,16 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.List;
 
-public class WidgetData {
+public class WidgetData_DEPRECATED {
     public MyCheckIn myCheckIn;
     public List<FriendUpdate> friendsWithUpdates;
     public List<PlaylistSong> sharedPlaylists;
     public QuestionOfDay questionOfDay;
 
-    public static WidgetData fromJson(String jsonString) {
+    public static WidgetData_DEPRECATED fromJson(String jsonString) {
         try {
             JSONObject json = new JSONObject(jsonString);
-            WidgetData data = new WidgetData();
+            WidgetData_DEPRECATED data = new WidgetData_DEPRECATED();
 
             // Parse my check-in
             if (json.has("my_check_in") && !json.isNull("my_check_in")) {

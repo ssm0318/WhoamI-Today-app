@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 /** Writes NDJSON debug lines to app files dir and to logcat (tag WhoAmIWidgetDebug) for adb logcat. */
-public class WidgetDebugLog {
+public class WidgetDebugLog_DEPRECATED {
     private static final String TAG = "WhoAmIWidgetDebug";
     private static final String FILENAME = "widget_debug.log";
 

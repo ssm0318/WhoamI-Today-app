@@ -30,11 +30,20 @@ android {
 
     namespace "com.whoami.today.app"
 
+    sourceSets {
+        main {
+            java {
+                // Exclude deprecated widget code (Manifest entries are commented out; layouts removed)
+                exclude '**/widget/*_DEPRECATED.java'
+            }
+        }
+    }
+
     defaultConfig {
         applicationId "com.whoami.today.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 10409
+        versionCode 10410
         versionName "1.6"
         // .env from repo root (react-native-config) so Config.SPOTIFY_* is available on Android
         def envFile = rootProject.file("../.env")

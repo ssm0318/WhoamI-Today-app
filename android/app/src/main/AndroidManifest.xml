@@ -64,9 +64,12 @@
       </intent-filter>
     </activity>
 
-    <!-- Widget Provider -->
+    <!-- ================================================================= -->
+    <!-- DEPRECATED WIDGETS - Commented out as of Feb 2026                -->
+    <!-- ================================================================= -->
+    <!--
     <receiver
-        android:name=".widget.WhoAmIWidgetProvider"
+        android:name=".widget.WhoAmIWidgetProvider_DEPRECATED"
         android:exported="true"
         android:label="WhoAmI Today">
         <intent-filter>
@@ -76,22 +79,68 @@
         </intent-filter>
         <meta-data
             android:name="android.appwidget.provider"
-            android:resource="@xml/widget_info_large" />
+            android:resource="@xml/widget_info_large_deprecated" />
     </receiver>
 
-    <!-- Widget Update Service: runs as foreground when started from background (Android 12+) -->
     <service
-        android:name=".widget.WidgetUpdateService"
+        android:name=".widget.WidgetUpdateService_DEPRECATED"
         android:exported="false"
         android:foregroundServiceType="dataSync" />
 
-    <!-- Widget midnight refresh: alarm fires at start of next day to refresh widget data -->
     <receiver
-        android:name=".widget.WidgetMidnightReceiver"
+        android:name=".widget.WidgetMidnightReceiver_DEPRECATED"
         android:exported="false">
         <intent-filter>
             <action android:name="com.whoami.today.app.WIDGET_MIDNIGHT_REFRESH" />
         </intent-filter>
     </receiver>
+    -->
+
+    <!-- ================================================================= -->
+    <!-- NEW WIDGETS - Feb 2026                                            -->
+    <!-- ================================================================= -->
+
+    <!-- Photo Widget (2x2) - Future API placeholder -->
+    <receiver
+        android:name=".widget.PhotoWidgetProvider"
+        android:exported="true"
+        android:label="WhoAmI Photo">
+        <intent-filter>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            <action android:name="com.whoami.today.app.WIDGET_UPDATE" />
+        </intent-filter>
+        <meta-data
+            android:name="android.appwidget.provider"
+            android:resource="@xml/widget_info_photo_2x2" />
+    </receiver>
+
+    <!-- Album Cover Widget (2x2) - Shows check-in album cover -->
+    <receiver
+        android:name=".widget.AlbumCoverWidgetProvider"
+        android:exported="true"
+        android:label="WhoAmI Album">
+        <intent-filter>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            <action android:name="com.whoami.today.app.WIDGET_UPDATE" />
+        </intent-filter>
+        <meta-data
+            android:name="android.appwidget.provider"
+            android:resource="@xml/widget_info_album_2x2" />
+    </receiver>
+
+    <!-- Check-in Widget (4x1) - Quick check-in access -->
+    <receiver
+        android:name=".widget.CheckinWidgetProvider"
+        android:exported="true"
+        android:label="WhoAmI Check-in">
+        <intent-filter>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            <action android:name="com.whoami.today.app.WIDGET_UPDATE" />
+        </intent-filter>
+        <meta-data
+            android:name="android.appwidget.provider"
+            android:resource="@xml/widget_info_checkin_4x1" />
+    </receiver>
+
   </application>
 </manifest>

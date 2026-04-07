@@ -1,3 +1,9 @@
+// =============================================================================
+// DEPRECATED - This widget provider has been deprecated as of Feb 2026.
+// Kept for reference. New widgets use PhotoWidgetProvider, AlbumCoverWidgetProvider,
+// and CheckinWidgetProvider.
+// =============================================================================
+
 package com.whoami.today.app.widget;
 
 import android.app.PendingIntent;
@@ -15,8 +21,8 @@ import android.widget.RemoteViews;
 import com.whoami.today.app.MainActivity;
 import com.whoami.today.app.R;
 
-public class WhoAmIWidgetProvider extends AppWidgetProvider {
-    private static final String TAG = "WhoAmIWidget";
+public class WhoAmIWidgetProvider_DEPRECATED extends AppWidgetProvider {
+    private static final String TAG = "WhoAmIWidget_DEPRECATED";
     private static final String PREFS_NAME = "WhoAmIWidgetPrefs";
     public static final String ACTION_REFRESH = "com.whoami.today.app.WIDGET_REFRESH";
 
@@ -27,7 +33,7 @@ public class WhoAmIWidgetProvider extends AppWidgetProvider {
         }
 
         // Start service to load album images (foreground on API 26+ so it can run when app is in background)
-        Intent serviceIntent = new Intent(context, WidgetUpdateService.class);
+        Intent serviceIntent = new Intent(context, WidgetUpdateService_DEPRECATED.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(serviceIntent);
         } else {
@@ -35,7 +41,7 @@ public class WhoAmIWidgetProvider extends AppWidgetProvider {
         }
 
         // Schedule next midnight refresh so widget updates when the date changes
-        WidgetMidnightScheduler.scheduleNextMidnight(context);
+        WidgetMidnightScheduler_DEPRECATED.scheduleNextMidnight(context);
     }
 
     @Override
@@ -58,7 +64,7 @@ public class WhoAmIWidgetProvider extends AppWidgetProvider {
             views = buildRemoteViews(context);
         } catch (Exception e) {
             Log.e(TAG, "updateAppWidget failed", e);
-            views = new RemoteViews(context.getPackageName(), R.layout.widget_large);
+            views = new RemoteViews(context.getPackageName(), R.layout.widget_large_deprecated);
             views.setTextViewText(R.id.question_text, "Tap to open app");
             try {
                 Intent appIntent = new Intent(context, MainActivity.class);
@@ -86,7 +92,7 @@ public class WhoAmIWidgetProvider extends AppWidgetProvider {
         RemoteViews views;
 
         // Use same large layout for both authenticated and unauthenticated; question area shows "Please Sign in" when not logged in
-        views = new RemoteViews(context.getPackageName(), R.layout.widget_large);
+        views = new RemoteViews(context.getPackageName(), R.layout.widget_large_deprecated);
 
         // Refresh button - triggers ACTION_REFRESH so onReceive runs onUpdate and WidgetUpdateService fetches fresh data
         Intent refreshIntent = new Intent(context, WhoAmIWidgetProvider.class);
@@ -107,7 +113,7 @@ public class WhoAmIWidgetProvider extends AppWidgetProvider {
         setupActionButton(context, views, R.id.friend_1, "whoami://app/users", 4);
         setupActionButton(context, views, R.id.friend_2, "whoami://app/users", 5);
         if (isLoggedIn) {
-            WidgetData cached = readCachedWidgetData(context);
+            WidgetData_DEPRECATED cached = readCachedWidgetData(context);
             boolean hasFriends = cached != null && cached.friendsWithUpdates != null && !cached.friendsWithUpdates.isEmpty();
             boolean hasPlaylists = cached != null && cached.sharedPlaylists != null && !cached.sharedPlaylists.isEmpty();
             if (hasFriends) {
@@ -166,10 +172,10 @@ public class WhoAmIWidgetProvider extends AppWidgetProvider {
         return views;
     }
 
-    private static WidgetData readCachedWidgetData(Context context) {
-        String json = SharedPrefsHelper.getWidgetData(context);
+    private static WidgetData_DEPRECATED readCachedWidgetData(Context context) {
+        String json = SharedPrefsHelper_DEPRECATED.getWidgetData(context);
         if (json == null || json.isEmpty()) return null;
-        return WidgetData.fromJson(json);
+        return WidgetData_DEPRECATED.fromJson(json);
     }
 
     public static void setupActionButton(Context context, RemoteViews views, int buttonId, String deepLink, int requestCode) {
@@ -221,7 +227,7 @@ public class WhoAmIWidgetProvider extends AppWidgetProvider {
     public void onEnabled(Context context) {
         super.onEnabled(context);
         // Schedule midnight refresh when the first widget instance is added
-        WidgetMidnightScheduler.scheduleNextMidnight(context);
+        WidgetMidnightScheduler_DEPRECATED.scheduleNextMidnight(context);
     }
 
     @Override

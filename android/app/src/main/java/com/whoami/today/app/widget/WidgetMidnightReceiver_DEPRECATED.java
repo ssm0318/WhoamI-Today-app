@@ -9,8 +9,8 @@ import android.util.Log;
  * Receives the "next midnight" alarm. Triggers widget refresh (WidgetUpdateService)
  * then reschedules the next midnight alarm so the widget refreshes when the date changes.
  */
-public class WidgetMidnightReceiver extends BroadcastReceiver {
-    private static final String TAG = "WidgetMidnightReceiver";
+public class WidgetMidnightReceiver_DEPRECATED extends BroadcastReceiver {
+    private static final String TAG = "WidgetMidnightReceiver_DEPRECATED";
     public static final String ACTION_MIDNIGHT_REFRESH = "com.whoami.today.app.WIDGET_MIDNIGHT_REFRESH";
 
     @Override
@@ -20,9 +20,9 @@ public class WidgetMidnightReceiver extends BroadcastReceiver {
 
         Log.d(TAG, "Midnight refresh: triggering widget update");
         // Trigger widget update (same as manual refresh: start WidgetUpdateService)
-        Intent serviceIntent = new Intent(context, WidgetUpdateService.class);
+        Intent serviceIntent = new Intent(context, WidgetUpdateService_DEPRECATED.class);
         context.startService(serviceIntent);
         // Reschedule next midnight so we refresh again when the date changes
-        WidgetMidnightScheduler.scheduleNextMidnight(context);
+        WidgetMidnightScheduler_DEPRECATED.scheduleNextMidnight(context);
     }
 }

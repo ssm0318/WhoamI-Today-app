@@ -20,13 +20,13 @@ import com.whoami.today.app.R;
 import java.util.HashMap;
 import java.util.Map;
 
-public class WidgetUpdateService extends IntentService {
-    private static final String TAG = "WidgetUpdateService";
+public class WidgetUpdateService_DEPRECATED extends IntentService {
+    private static final String TAG = "WidgetUpdateService_DEPRECATED";
     private static final String CHANNEL_ID = "widget_update";
     private static final int NOTIFICATION_ID = 9001;
 
-    public WidgetUpdateService() {
-        super("WidgetUpdateService");
+    public WidgetUpdateService_DEPRECATED() {
+        super("WidgetUpdateService_DEPRECATED");
     }
 
     @Override
@@ -75,7 +75,7 @@ public class WidgetUpdateService extends IntentService {
         Log.d(TAG, "Updating widget with album images...");
 
         // When not logged in, do not overwrite widget (provider already set "Please Sign in" on question card)
-        String accessToken = SharedPrefsHelper.getAccessToken(context);
+        String accessToken = SharedPrefsHelper_DEPRECATED.getAccessToken(context);
         boolean hasToken = accessToken != null && !accessToken.isEmpty();
         if (!hasToken) {
             Log.d(TAG, "Not logged in: skipping widget content update (question card stays 'Please Sign in')");
@@ -83,30 +83,30 @@ public class WidgetUpdateService extends IntentService {
         }
 
         AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
-        ComponentName componentName = new ComponentName(context, WhoAmIWidgetProvider.class);
+        ComponentName componentName = new ComponentName(context, WhoAmIWidgetProvider_DEPRECATED.class);
         int[] appWidgetIds = appWidgetManager.getAppWidgetIds(componentName);
         if (appWidgetIds == null || appWidgetIds.length == 0) return;
 
         // Show current data + loading spinner so content doesn’t disappear while fetching
-        String currentJson = SharedPrefsHelper.getWidgetData(context);
+        String currentJson = SharedPrefsHelper_DEPRECATED.getWidgetData(context);
         if (currentJson != null) {
-            WidgetData currentData = WidgetData.fromJson(currentJson);
+            WidgetData_DEPRECATED currentData = WidgetData_DEPRECATED.fromJson(currentJson);
             if (currentData != null) {
                 buildAndUpdateWidgets(context, appWidgetManager, appWidgetIds, currentData, true);
             }
         }
 
         // Fetch full widget data from API (profile, friends, playlists, question) and save to prefs
-        NetworkManager.fetchWidgetData(context);
+        NetworkManager_DEPRECATED.fetchWidgetData(context);
 
         // Load widget data (now populated by fetchWidgetData)
-        String widgetDataJson = SharedPrefsHelper.getWidgetData(context);
+        String widgetDataJson = SharedPrefsHelper_DEPRECATED.getWidgetData(context);
         if (widgetDataJson == null) {
             Log.d(TAG, "No widget data available");
             return;
         }
 
-        WidgetData widgetData = WidgetData.fromJson(widgetDataJson);
+        WidgetData_DEPRECATED widgetData = WidgetData_DEPRECATED.fromJson(widgetDataJson);
         if (widgetData == null) {
             Log.e(TAG, "Failed to parse widget data");
             return;
@@ -116,21 +116,21 @@ public class WidgetUpdateService extends IntentService {
     }
 
     private void buildAndUpdateWidgets(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds,
-                                       WidgetData widgetData, boolean showLoading) {
-        SpotifyManager spotifyManager = new SpotifyManager(context);
-        WidgetData.QuestionOfDay dailyQuestion = widgetData.questionOfDay;
+                                       WidgetData_DEPRECATED widgetData, boolean showLoading) {
+        SpotifyManager_DEPRECATED spotifyManager = new SpotifyManager_DEPRECATED(context);
+        WidgetData_DEPRECATED.QuestionOfDay dailyQuestion = widgetData.questionOfDay;
         if (dailyQuestion == null) {
-            dailyQuestion = NetworkManager.fetchFirstDailyQuestion(context);
+            dailyQuestion = NetworkManager_DEPRECATED.fetchFirstDailyQuestion(context);
         }
 
         for (int appWidgetId : appWidgetIds) {
             try {
-                RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_large);
-                WhoAmIWidgetProvider.setupClickHandlers(context, views);
+                RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_large_deprecated);
+                WhoAmIWidgetProvider_DEPRECATED.setupClickHandlers(context, views);
 
                 if (dailyQuestion != null && dailyQuestion.content != null && !dailyQuestion.content.isEmpty()) {
                     views.setTextViewText(R.id.question_text, dailyQuestion.content);
-                    WhoAmIWidgetProvider.setupActionButton(context, views, R.id.question_card,
+                    WhoAmIWidgetProvider_DEPRECATED.setupActionButton(context, views, R.id.question_card,
                         dailyQuestion.getDeepLink(), 11);
                     Log.d(TAG, "Set daily question: " + dailyQuestion.content);
                 }
@@ -138,11 +138,11 @@ public class WidgetUpdateService extends IntentService {
                 Map<String, Bitmap> albumImages = new HashMap<>();
                 if (widgetData.sharedPlaylists != null && widgetData.sharedPlaylists.size() > 0) {
                     for (int i = 0; i < Math.min(5, widgetData.sharedPlaylists.size()); i++) {
-                        WidgetData.PlaylistSong song = widgetData.sharedPlaylists.get(i);
+                        WidgetData_DEPRECATED.PlaylistSong song = widgetData.sharedPlaylists.get(i);
                         if (song.trackId != null && !song.trackId.isEmpty()) {
                             String albumImageUrl = spotifyManager.getAlbumImageUrl(song.trackId);
                             if (albumImageUrl != null) {
-                                Bitmap albumBitmap = ImageLoader.loadImageFromUrlForWidget(albumImageUrl, 96);
+                                Bitmap albumBitmap = ImageLoader_DEPRECATED.loadImageFromUrlForWidget(albumImageUrl, 96);
                                 if (albumBitmap != null) albumImages.put(song.trackId, albumBitmap);
                             }
                         }
@@ -152,19 +152,19 @@ public class WidgetUpdateService extends IntentService {
                 Map<Integer, Bitmap> profileImages = new HashMap<>();
                 if (widgetData.friendsWithUpdates != null) {
                     for (int i = 0; i < Math.min(2, widgetData.friendsWithUpdates.size()); i++) {
-                        WidgetData.FriendUpdate friend = widgetData.friendsWithUpdates.get(i);
+                        WidgetData_DEPRECATED.FriendUpdate friend = widgetData.friendsWithUpdates.get(i);
                         if (friend.profileImage != null && !friend.profileImage.isEmpty()) {
-                            Bitmap profileBitmap = ImageLoader.loadImageFromUrlForWidget(friend.profileImage, 96);
+                            Bitmap profileBitmap = ImageLoader_DEPRECATED.loadImageFromUrlForWidget(friend.profileImage, 96);
                             if (profileBitmap != null) profileImages.put(friend.id, profileBitmap);
                         }
                     }
                 }
                 if (widgetData.sharedPlaylists != null) {
                     for (int i = 0; i < Math.min(5, widgetData.sharedPlaylists.size()); i++) {
-                        WidgetData.PlaylistSong song = widgetData.sharedPlaylists.get(i);
+                        WidgetData_DEPRECATED.PlaylistSong song = widgetData.sharedPlaylists.get(i);
                         if (song.user.profileImage != null && !song.user.profileImage.isEmpty()
                                 && !profileImages.containsKey(song.user.id)) {
-                            Bitmap profileBitmap = ImageLoader.loadImageFromUrlForWidget(song.user.profileImage, 96);
+                            Bitmap profileBitmap = ImageLoader_DEPRECATED.loadImageFromUrlForWidget(song.user.profileImage, 96);
                             if (profileBitmap != null) profileImages.put(song.user.id, profileBitmap);
                         }
                     }
@@ -184,8 +184,8 @@ public class WidgetUpdateService extends IntentService {
         }
     }
 
-    private void updateCheckInViews(Context context, RemoteViews views, WidgetData data, SpotifyManager spotifyManager) {
-        WidgetData.MyCheckIn checkIn = data != null ? data.myCheckIn : null;
+    private void updateCheckInViews(Context context, RemoteViews views, WidgetData_DEPRECATED data, SpotifyManager_DEPRECATED spotifyManager) {
+        WidgetData_DEPRECATED.MyCheckIn checkIn = data != null ? data.myCheckIn : null;
 
         // I feel - mood emoji
         String mood = (checkIn != null && checkIn.mood != null && !checkIn.mood.isEmpty())
@@ -223,7 +223,7 @@ public class WidgetUpdateService extends IntentService {
             }
             Log.d(TAG, "[My Music] albumUrl=" + (albumUrl != null ? albumUrl : "null"));
             if (albumUrl != null) {
-                albumBitmap = ImageLoader.loadImageFromUrlForWidget(albumUrl, 96);
+                albumBitmap = ImageLoader_DEPRECATED.loadImageFromUrlForWidget(albumUrl, 96);
                 Log.d(TAG, "[My Music] loadImageFromUrl result: " + (albumBitmap != null ? "OK" : "null"));
                 if (albumBitmap == null) {
                     Log.d(TAG, "My Music: album image load failed for track " + checkIn.trackId);
@@ -233,7 +233,7 @@ public class WidgetUpdateService extends IntentService {
             }
         }
         if (albumBitmap != null) {
-            Bitmap rounded = ImageLoader.getCircularBitmap(albumBitmap);
+            Bitmap rounded = ImageLoader_DEPRECATED.getCircularBitmap(albumBitmap);
             views.setImageViewBitmap(R.id.my_music_album, rounded);
             views.setViewVisibility(R.id.my_music_album, View.VISIBLE);
             views.setViewVisibility(R.id.my_music_icon, View.GONE);
@@ -244,7 +244,7 @@ public class WidgetUpdateService extends IntentService {
         }
     }
 
-    private void updateFriendViews(Context context, RemoteViews views, WidgetData data, Map<Integer, Bitmap> profileImages) {
+    private void updateFriendViews(Context context, RemoteViews views, WidgetData_DEPRECATED data, Map<Integer, Bitmap> profileImages) {
         int[] friendAvatarIds = {R.id.friend_1_avatar, R.id.friend_2_avatar};
         int[] friendNameIds = {R.id.friend_1_name, R.id.friend_2_name};
         int[] friendContainerIds = {R.id.friend_1, R.id.friend_2};
@@ -252,17 +252,17 @@ public class WidgetUpdateService extends IntentService {
         boolean hasFriends = data.friendsWithUpdates != null && !data.friendsWithUpdates.isEmpty();
         for (int i = 0; i < 2; i++) {
             if (hasFriends && i < data.friendsWithUpdates.size()) {
-                WidgetData.FriendUpdate friend = data.friendsWithUpdates.get(i);
+                WidgetData_DEPRECATED.FriendUpdate friend = data.friendsWithUpdates.get(i);
                 views.setViewVisibility(friendContainerIds[i], View.VISIBLE);
                 views.setTextViewText(friendNameIds[i], friend.username);
                 if (profileImages.containsKey(friend.id)) {
                     Bitmap profileBitmap = profileImages.get(friend.id);
-                    Bitmap circularProfile = ImageLoader.getCircularBitmap(profileBitmap);
+                    Bitmap circularProfile = ImageLoader_DEPRECATED.getCircularBitmap(profileBitmap);
                     views.setImageViewBitmap(friendAvatarIds[i], circularProfile);
                 } else {
                     views.setImageViewResource(friendAvatarIds[i], R.drawable.default_profile);
                 }
-                WhoAmIWidgetProvider.setupActionButton(context, views, friendContainerIds[i],
+                WhoAmIWidgetProvider_DEPRECATED.setupActionButton(context, views, friendContainerIds[i],
                     "whoami://app/users/" + friend.username, 200 + i);
             } else {
                 views.setViewVisibility(friendContainerIds[i], View.GONE);
@@ -270,7 +270,7 @@ public class WidgetUpdateService extends IntentService {
         }
     }
 
-    private void updatePlaylistViews(Context context, RemoteViews views, WidgetData data, Map<String, Bitmap> albumImages, Map<Integer, Bitmap> profileImages) {
+    private void updatePlaylistViews(Context context, RemoteViews views, WidgetData_DEPRECATED data, Map<String, Bitmap> albumImages, Map<Integer, Bitmap> profileImages) {
         int[] albumViewIds = {R.id.playlist_1_album, R.id.playlist_2_album, R.id.playlist_3_album,
                               R.id.playlist_4_album, R.id.playlist_5_album};
         int[] profileViewIds = {R.id.playlist_1_profile, R.id.playlist_2_profile, R.id.playlist_3_profile,
@@ -284,26 +284,26 @@ public class WidgetUpdateService extends IntentService {
 
         if (data.sharedPlaylists != null) {
             for (int i = 0; i < Math.min(5, data.sharedPlaylists.size()); i++) {
-                WidgetData.PlaylistSong song = data.sharedPlaylists.get(i);
+                WidgetData_DEPRECATED.PlaylistSong song = data.sharedPlaylists.get(i);
 
                 // Set album image
                 if (albumImages.containsKey(song.trackId)) {
                     Bitmap albumBitmap = albumImages.get(song.trackId);
-                    Bitmap roundedAlbum = ImageLoader.getRoundedCornerBitmap(albumBitmap, 16);
+                    Bitmap roundedAlbum = ImageLoader_DEPRECATED.getRoundedCornerBitmap(albumBitmap, 16);
                     views.setImageViewBitmap(albumViewIds[i], roundedAlbum);
                 }
 
                 // Set profile image overlay, otherwise use default
                 if (profileImages.containsKey(song.user.id)) {
                     Bitmap profileBitmap = profileImages.get(song.user.id);
-                    Bitmap circularProfile = ImageLoader.getCircularBitmap(profileBitmap);
+                    Bitmap circularProfile = ImageLoader_DEPRECATED.getCircularBitmap(profileBitmap);
                     views.setImageViewBitmap(profileViewIds[i], circularProfile);
                 } else {
                     views.setImageViewResource(profileViewIds[i], R.drawable.default_profile);
                 }
 
                 // Set click handler to open Spotify
-                WhoAmIWidgetProvider.setupActionButton(context, views, containerIds[i],
+                WhoAmIWidgetProvider_DEPRECATED.setupActionButton(context, views, containerIds[i],
                     "spotify:track:" + song.trackId, 100 + i);
             }
         }

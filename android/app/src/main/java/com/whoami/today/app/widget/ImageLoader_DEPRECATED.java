@@ -14,8 +14,8 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
-public class ImageLoader {
-    private static final String TAG = "ImageLoader";
+public class ImageLoader_DEPRECATED {
+    private static final String TAG = "ImageLoader_DEPRECATED";
 
     public static Bitmap loadImageFromUrl(String imageUrl) {
         try {

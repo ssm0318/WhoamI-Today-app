@@ -13,8 +13,8 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
-public class NetworkManager {
-    private static final String TAG = "NetworkManager";
+public class NetworkManager_DEPRECATED {
+    private static final String TAG = "NetworkManager_DEPRECATED";
     private static final String BASE_URL = "https://whoami-admin-group.gina-park.site";
 
     /**
@@ -22,8 +22,8 @@ public class NetworkManager {
      * Saves to SharedPreferences so WidgetUpdateService can use it.
      */
     public static boolean fetchWidgetData(Context context) {
-        String csrfToken = SharedPrefsHelper.getCsrfToken(context);
-        String accessToken = SharedPrefsHelper.getAccessToken(context);
+        String csrfToken = SharedPrefsHelper_DEPRECATED.getCsrfToken(context);
+        String accessToken = SharedPrefsHelper_DEPRECATED.getAccessToken(context);
         boolean hasTokens = csrfToken != null && accessToken != null && !csrfToken.isEmpty() && !accessToken.isEmpty();
         if (!hasTokens) {
             Log.d(TAG, "fetchWidgetData: No auth tokens");
@@ -32,7 +32,7 @@ public class NetworkManager {
         try {
             String cookie = "csrftoken=" + csrfToken + "; access_token=" + accessToken;
             JSONObject existing = new JSONObject();
-            String existingJson = SharedPrefsHelper.getWidgetData(context);
+            String existingJson = SharedPrefsHelper_DEPRECATED.getWidgetData(context);
             if (existingJson != null && !existingJson.isEmpty()) {
                 try {
                     existing = new JSONObject(existingJson);
@@ -72,7 +72,7 @@ public class NetworkManager {
             } else {
                 root.put("shared_playlists", new JSONArray());
             }
-            WidgetData.QuestionOfDay question = fetchFirstDailyQuestion(context);
+            WidgetData_DEPRECATED.QuestionOfDay question = fetchFirstDailyQuestion(context);
             if (question != null) {
                 JSONObject qJson = new JSONObject();
                 qJson.put("id", question.id);
@@ -81,7 +81,7 @@ public class NetworkManager {
                 qJson.put("created_at", question.createdAt != null ? question.createdAt : "");
                 root.put("question_of_day", qJson);
             }
-            SharedPrefsHelper.saveWidgetData(context, root.toString());
+            SharedPrefsHelper_DEPRECATED.saveWidgetData(context, root.toString());
             Log.d(TAG, "fetchWidgetData: saved friends=" + (friends != null ? friends.length() : 0) + " playlists=" + (playlists != null ? playlists.length() : 0));
             return true;
         } catch (Exception e) {
@@ -111,7 +111,7 @@ public class NetworkManager {
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setUseCaches(false);
-            conn.setRequestProperty("X-CSRFToken", SharedPrefsHelper.getCsrfToken(context));
+            conn.setRequestProperty("X-CSRFToken", SharedPrefsHelper_DEPRECATED.getCsrfToken(context));
             conn.setRequestProperty("Cookie", cookie);
             conn.setRequestProperty("Cache-Control", "no-cache, no-store");
             conn.setRequestProperty("Pragma", "no-cache");
@@ -138,7 +138,7 @@ public class NetworkManager {
             URL url = new URL(BASE_URL + "/api/user/friends/updates/");
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
-            conn.setRequestProperty("X-CSRFToken", SharedPrefsHelper.getCsrfToken(context));
+            conn.setRequestProperty("X-CSRFToken", SharedPrefsHelper_DEPRECATED.getCsrfToken(context));
             conn.setRequestProperty("Cookie", cookie);
             conn.setConnectTimeout(10000);
             conn.setReadTimeout(10000);
@@ -174,7 +174,7 @@ public class NetworkManager {
             URL url = new URL(BASE_URL + "/api/playlist/feed");
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
-            conn.setRequestProperty("X-CSRFToken", SharedPrefsHelper.getCsrfToken(context));
+            conn.setRequestProperty("X-CSRFToken", SharedPrefsHelper_DEPRECATED.getCsrfToken(context));
             conn.setRequestProperty("Cookie", cookie);
             conn.setConnectTimeout(10000);
             conn.setReadTimeout(10000);
@@ -199,9 +199,9 @@ public class NetworkManager {
         return null;
     }
 
-    public static WidgetData.QuestionOfDay fetchFirstDailyQuestion(Context context) {
+    public static WidgetData_DEPRECATED.QuestionOfDay fetchFirstDailyQuestion(Context context) {
         // Try daily questions first
-        WidgetData.QuestionOfDay question = fetchFromDailyQuestions(context);
+        WidgetData_DEPRECATED.QuestionOfDay question = fetchFromDailyQuestions(context);
 
         // Fallback to general questions if daily failed or is null
         if (question == null) {
@@ -212,10 +212,10 @@ public class NetworkManager {
         return question;
     }
 
-    private static WidgetData.QuestionOfDay fetchFromDailyQuestions(Context context) {
+    private static WidgetData_DEPRECATED.QuestionOfDay fetchFromDailyQuestions(Context context) {
         try {
-            String csrfToken = SharedPrefsHelper.getCsrfToken(context);
-            String accessToken = SharedPrefsHelper.getAccessToken(context);
+            String csrfToken = SharedPrefsHelper_DEPRECATED.getCsrfToken(context);
+            String accessToken = SharedPrefsHelper_DEPRECATED.getAccessToken(context);
 
             if (csrfToken == null || accessToken == null) {
                 Log.e(TAG, "No auth tokens available");
@@ -256,7 +256,7 @@ public class NetworkManager {
 
                 if (questionsArray.length() > 0) {
                     JSONObject firstQuestion = questionsArray.getJSONObject(0);
-                    WidgetData.QuestionOfDay question = WidgetData.QuestionOfDay.fromJson(firstQuestion);
+                    WidgetData_DEPRECATED.QuestionOfDay question = WidgetData_DEPRECATED.QuestionOfDay.fromJson(firstQuestion);
                     Log.d(TAG, "✅ Successfully fetched daily question - ID: " + question.id + ", Content: " + question.content);
                     return question;
                 }
@@ -273,10 +273,10 @@ public class NetworkManager {
         return null;
     }
 
-    private static WidgetData.QuestionOfDay fetchFromGeneralQuestions(Context context) {
+    private static WidgetData_DEPRECATED.QuestionOfDay fetchFromGeneralQuestions(Context context) {
         try {
-            String csrfToken = SharedPrefsHelper.getCsrfToken(context);
-            String accessToken = SharedPrefsHelper.getAccessToken(context);
+            String csrfToken = SharedPrefsHelper_DEPRECATED.getCsrfToken(context);
+            String accessToken = SharedPrefsHelper_DEPRECATED.getAccessToken(context);
 
             if (csrfToken == null || accessToken == null) {
                 Log.e(TAG, "No auth tokens available");
@@ -333,7 +333,7 @@ public class NetworkManager {
                         JSONObject firstQuestion = questionsArray.getJSONObject(0);
 
                         // Convert to QuestionOfDay format
-                        WidgetData.QuestionOfDay question = new WidgetData.QuestionOfDay();
+                        WidgetData_DEPRECATED.QuestionOfDay question = new WidgetData_DEPRECATED.QuestionOfDay();
                         question.id = String.valueOf(firstQuestion.optInt("id"));
                         question.content = firstQuestion.optString("content", "");
                         question.question = question.content;
