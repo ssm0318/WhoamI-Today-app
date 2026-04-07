@@ -11,8 +11,11 @@ import { RootNavigator } from '@navigation';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { RouteType } from '@types';
 import NavigationService from '@libs/NavigationService';
+import { triggerWidgetRefresh } from './src/native/WidgetDataModule';
 
 const PREFIXES = ['whoami://', 'https://whoami-admin-group.gina-park.site'];
+
+const WIDGET_REFRESH_URL = 'whoami://widget/refresh-checkin';
 
 /** Parse deep link URL to AppScreen url param (same as linking config parse). */
 function getAppScreenUrlParamFromDeepLink(fullUrl: string): string | null {
@@ -76,6 +79,12 @@ function buildLinking(
       }
       console.log('[Deep Link] getInitialURL:', url);
 
+      // Widget refresh only – reload widget timelines, do not navigate
+      if (url === WIDGET_REFRESH_URL) {
+        void triggerWidgetRefresh();
+        return null;
+      }
+
       // Handle Spotify URIs - open in Spotify app instead of our app
       if (url?.startsWith('spotify:')) {
         console.log('[Deep Link] Opening Spotify URL:', url);
@@ -100,6 +109,12 @@ function buildLinking(
     subscribe(listener) {
       const subscription = Linking.addEventListener('url', ({ url }) => {
         console.log('[Deep Link] Received URL:', url);
+
+        // Widget refresh only – reload widget timelines, do not navigate
+        if (url === WIDGET_REFRESH_URL) {
+          void triggerWidgetRefresh();
+          return;
+        }
 
         // Handle Spotify URIs - open in Spotify app instead of our app
         if (url?.startsWith('spotify:')) {
