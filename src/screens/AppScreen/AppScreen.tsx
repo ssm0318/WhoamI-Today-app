@@ -41,6 +41,7 @@ import {
   setCachedCheckInForWidget,
 } from '../../utils/widgetCheckInCache';
 import { setWidgetDataStale } from '../../utils/widgetDataStale';
+import { fetchSpotifyAlbumImageUrl } from '../../utils/spotifyAlbumImage';
 
 const BASE_URL = APP_CONSTS.WEB_VIEW_URL;
 
@@ -363,10 +364,13 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
 
     (async () => {
       try {
-        const response = (await ApiService.API.get(
-          'user/me/profile',
-        )) as unknown;
-        const res = response as {
+        const [profileResponse, songResponse] = await Promise.all([
+          ApiService.API.get('user/me/profile') as Promise<unknown>,
+          ApiService.API.get('check_in/song/').catch(
+            () => [],
+          ) as Promise<unknown>,
+        ]);
+        const res = profileResponse as {
           check_in?: {
             id: number;
             is_active: boolean;
@@ -374,12 +378,21 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
             mood?: string;
             social_battery?: string | null;
             description?: string;
-            track_id?: string;
-            album_image_url?: string | null;
           };
         };
+        const songs = songResponse as {
+          track_id: string;
+          is_active: boolean;
+        }[];
+        const trackId =
+          (Array.isArray(songs) ? songs.find((s) => s.is_active) : null)
+            ?.track_id ?? '';
         const checkIn = res?.check_in;
         if (checkIn) {
+          let albumImageUrl: string | null = null;
+          if (trackId.trim()) {
+            albumImageUrl = await fetchSpotifyAlbumImageUrl(trackId);
+          }
           const payload = {
             id: checkIn.id,
             isActive: checkIn.is_active,
@@ -387,8 +400,8 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
             mood: checkIn.mood ?? '',
             socialBattery: checkIn.social_battery ?? null,
             description: checkIn.description ?? '',
-            trackId: checkIn.track_id ?? '',
-            albumImageUrl: checkIn.album_image_url ?? null,
+            trackId,
+            albumImageUrl,
           };
           await syncMyCheckInToWidget(payload);
           setCachedCheckInForWidget(payload);
@@ -424,9 +437,14 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         };
         logWidgetDiagnostics();
         setTimeout(logWidgetDiagnostics, 1200);
-        ApiService.API.get('user/me/profile')
-          .then((response: unknown) => {
-            const res = response as {
+        Promise.all([
+          ApiService.API.get('user/me/profile') as Promise<unknown>,
+          ApiService.API.get('check_in/song/').catch(
+            () => [],
+          ) as Promise<unknown>,
+        ])
+          .then(async ([profileResponse, songResponse]) => {
+            const res = profileResponse as {
               check_in?: {
                 id: number;
                 is_active: boolean;
@@ -434,12 +452,21 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
                 mood?: string;
                 social_battery?: string | null;
                 description?: string;
-                track_id?: string;
-                album_image_url?: string | null;
               };
             };
+            const songs = songResponse as {
+              track_id: string;
+              is_active: boolean;
+            }[];
+            const trackId =
+              (Array.isArray(songs) ? songs.find((s) => s.is_active) : null)
+                ?.track_id ?? '';
             const checkIn = res?.check_in;
             if (checkIn) {
+              let albumImageUrl: string | null = null;
+              if (trackId.trim()) {
+                albumImageUrl = await fetchSpotifyAlbumImageUrl(trackId);
+              }
               setCachedCheckInForWidget({
                 id: checkIn.id,
                 isActive: checkIn.is_active,
@@ -447,8 +474,8 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
                 mood: checkIn.mood ?? '',
                 socialBattery: checkIn.social_battery ?? null,
                 description: checkIn.description ?? '',
-                trackId: checkIn.track_id ?? '',
-                albumImageUrl: checkIn.album_image_url ?? null,
+                trackId,
+                albumImageUrl,
               });
             }
           })
