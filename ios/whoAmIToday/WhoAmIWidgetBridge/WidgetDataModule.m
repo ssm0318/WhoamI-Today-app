@@ -183,8 +183,27 @@ RCT_EXPORT_METHOD(getWidgetDiagnostics:(RCTPromiseResolveBlock)resolve
         return;
     }
     NSString *mood = [sharedDefaults stringForKey:@"widget_last_seen_mood"] ?: @"(never)";
+    NSString *battery = [sharedDefaults stringForKey:@"widget_last_seen_battery"] ?: @"(never)";
+    NSString *feelingDisplay = [sharedDefaults stringForKey:@"widget_last_feeling_display"] ?: @"(never)";
+    NSString *batteryDisplay = [sharedDefaults stringForKey:@"widget_last_battery_display"] ?: @"(never)";
     NSString *dateStr = [sharedDefaults stringForKey:@"widget_last_getTimeline_at"] ?: @"";
-    resolve(@{@"lastSeenMood": mood, @"lastGetTimelineAt": dateStr});
+
+    // Also read the raw my_check_in JSON so we can inspect what was written by the bridge
+    NSString *myCheckInJson = @"(none)";
+    NSData *checkInData = [sharedDefaults dataForKey:@"my_check_in"];
+    if (checkInData) {
+        NSString *jsonStr = [[NSString alloc] initWithData:checkInData encoding:NSUTF8StringEncoding];
+        if (jsonStr) myCheckInJson = jsonStr;
+    }
+
+    resolve(@{
+        @"lastSeenMood": mood,
+        @"lastSeenBattery": battery,
+        @"lastFeelingDisplay": feelingDisplay,
+        @"lastBatteryDisplay": batteryDisplay,
+        @"lastGetTimelineAt": dateStr,
+        @"myCheckInJson": myCheckInJson
+    });
 }
 
 @end

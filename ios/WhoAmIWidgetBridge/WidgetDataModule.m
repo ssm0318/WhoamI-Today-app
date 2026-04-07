@@ -4,7 +4,18 @@
 
 RCT_EXPORT_MODULE();
 
-static NSString *const kWidgetKind = @"WhoAmITodayWidget";
+static NSArray *kWidgetKinds = nil;
+
++ (void)initialize {
+    if (self == [WidgetDataModule class]) {
+        kWidgetKinds = @[
+            @"WhoAmITodayWidget",
+            @"PhotoWidget",
+            @"AlbumCoverWidget",
+            @"CheckinWidget"
+        ];
+    }
+}
 
 - (void)reloadWidgetTimelines {
     if (@available(iOS 14.0, *)) {
@@ -18,7 +29,9 @@ static NSString *const kWidgetKind = @"WhoAmITodayWidget";
                     if ([sharedCenter respondsToSelector:reloadKind]) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-                        [sharedCenter performSelector:reloadKind withObject:kWidgetKind];
+                        for (NSString *kind in kWidgetKinds) {
+                            [sharedCenter performSelector:reloadKind withObject:kind];
+                        }
 #pragma clang diagnostic pop
                     }
                 }
@@ -171,6 +184,26 @@ RCT_EXPORT_METHOD(getWidgetDiagnostics:(RCTPromiseResolveBlock)resolve
     NSString *mood = [sharedDefaults stringForKey:@"widget_last_seen_mood"] ?: @"(never)";
     NSString *dateStr = [sharedDefaults stringForKey:@"widget_last_getTimeline_at"] ?: @"";
     resolve(@{@"lastSeenMood": mood, @"lastGetTimelineAt": dateStr});
+}
+
+// Sync user version type to App Group UserDefaults
+RCT_EXPORT_METHOD(syncVersionType:(NSString *)versionType
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+    NSUserDefaults *sharedDefaults = [[NSUserDefaults alloc]
+        initWithSuiteName:@"group.com.whoami.today.app"];
+
+    if (sharedDefaults) {
+        [sharedDefaults setObject:versionType forKey:@"user_version_type"];
+        [sharedDefaults synchronize];
+
+        [self reloadWidgetTimelines];
+
+        resolve(@YES);
+    } else {
+        reject(@"ERROR", @"Failed to access shared UserDefaults", nil);
+    }
 }
 
 @end

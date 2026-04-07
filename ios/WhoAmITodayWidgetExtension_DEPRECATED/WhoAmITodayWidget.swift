@@ -1,3 +1,9 @@
+// =============================================================================
+// DEPRECATED - This widget has been deprecated as of Feb 2026.
+// Kept for reference. New widgets are in WhoAmITodayWidgets extension.
+// =============================================================================
+
+/*
 import WidgetKit
 import SwiftUI
 
@@ -299,3 +305,4 @@ struct WhoAmITodayWidget: Widget {
 } timeline: {
     WidgetEntry(date: .now, data: .empty, isAuthenticated: true, albumImageData: nil, playlistAlbumImages: [:], profileImages: [:], isRefreshing: false)
 }
+*/
