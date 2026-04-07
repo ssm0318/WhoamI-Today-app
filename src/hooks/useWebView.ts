@@ -21,6 +21,7 @@ import {
 } from '../native/WidgetDataModule';
 import { setWidgetDataStale } from '../utils/widgetDataStale';
 import { setCachedCheckInForWidget } from '../utils/widgetCheckInCache';
+import { fetchSpotifyAlbumImageUrl } from '../utils/spotifyAlbumImage';
 import ApiService from '../apis/API';
 
 interface FileData {
@@ -239,6 +240,10 @@ const useWebView = () => {
                   }
                 | undefined;
               if (raw && typeof raw.id === 'number') {
+                let albumImageUrl: string | null = raw.album_image_url ?? null;
+                if (!albumImageUrl && raw.track_id?.trim()) {
+                  albumImageUrl = await fetchSpotifyAlbumImageUrl(raw.track_id);
+                }
                 const payload = {
                   id: raw.id,
                   isActive: raw.is_active ?? true,
@@ -247,17 +252,20 @@ const useWebView = () => {
                   socialBattery: raw.social_battery ?? null,
                   description: raw.description ?? '',
                   trackId: raw.track_id ?? '',
-                  albumImageUrl: raw.album_image_url ?? null,
+                  albumImageUrl,
                 };
                 await syncMyCheckInToWidget(payload);
                 setCachedCheckInForWidget(payload);
                 await triggerWidgetRefresh();
                 return;
               }
-              const response = (await ApiService.API.get(
-                'user/me/profile',
-              )) as unknown;
-              const res = response as {
+              const [profileResponse, songResponse] = await Promise.all([
+                ApiService.API.get('user/me/profile') as Promise<unknown>,
+                ApiService.API.get('check_in/song/').catch(
+                  () => [],
+                ) as Promise<unknown>,
+              ]);
+              const res = profileResponse as {
                 check_in?: {
                   id: number;
                   is_active: boolean;
@@ -265,12 +273,21 @@ const useWebView = () => {
                   mood?: string;
                   social_battery?: string | null;
                   description?: string;
-                  track_id?: string;
-                  album_image_url?: string | null;
                 };
               };
+              const songs = songResponse as {
+                track_id: string;
+                is_active: boolean;
+              }[];
+              const trackId =
+                (Array.isArray(songs) ? songs.find((s) => s.is_active) : null)
+                  ?.track_id ?? '';
               const checkIn = res?.check_in;
               if (checkIn) {
+                let albumImageUrl: string | null = null;
+                if (trackId.trim()) {
+                  albumImageUrl = await fetchSpotifyAlbumImageUrl(trackId);
+                }
                 const payload = {
                   id: checkIn.id,
                   isActive: checkIn.is_active,
@@ -278,8 +295,8 @@ const useWebView = () => {
                   mood: checkIn.mood ?? '',
                   socialBattery: checkIn.social_battery ?? null,
                   description: checkIn.description ?? '',
-                  trackId: checkIn.track_id ?? '',
-                  albumImageUrl: checkIn.album_image_url ?? null,
+                  trackId,
+                  albumImageUrl,
                 };
                 await syncMyCheckInToWidget(payload);
                 setCachedCheckInForWidget(payload);
