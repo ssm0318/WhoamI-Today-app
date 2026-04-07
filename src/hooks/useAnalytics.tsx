@@ -25,7 +25,7 @@ const useAnalytics = (tokens: {
     await analyticsInstance.setUserId(userId);
     await analyticsInstance.setUserProperties({
       username: username,
-      user_id: userId,
+      // user_id is reserved by Firebase; use setUserId() above instead
     });
   };
 
@@ -63,7 +63,6 @@ const useAnalytics = (tokens: {
     await analyticsInstance.setUserId(null);
     await analyticsInstance.setUserProperties({
       username: null,
-      user_id: null,
     });
 
     await trackEvent('session_end');
