@@ -3,6 +3,7 @@ import { useAppStateActiveEffect } from '@hooks';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { userApis } from '@apis';
 import { VersionType } from '../types/user.type';
+import { syncVersionTypeToWidget } from '../native/WidgetDataModule';
 
 // Constants
 const USER_VERSION_KEY = '@user_version';
@@ -83,6 +84,9 @@ const useVersionCheckUpdate = (tokens: {
         // Update version change state
         setVersionChanged(true);
       }
+
+      // Sync version type to native widgets (always sync, not just on change)
+      await syncVersionTypeToWidget(currentVersion || VersionType.DEFAULT);
 
       return {
         hasChanged,
