@@ -8,9 +8,10 @@ export const IS_ANDROID = Platform.OS === 'android';
 // NOTE
 // This hostname should be used when developing locally
 // Must be changed to PROD when actually archiving
-export const WEB_VIEW_DEV_HOSTNAME = '192.168.90.9';
-export const IS_ADMIN = true; // Whether it is admin environment
-export const IS_DEV = false; // Whether it is development environment
+export const WEB_VIEW_DEV_HOSTNAME = '192.168.219.123';
+export const IS_ADMIN = false; // Whether it is admin environment
+// Local WebView + LAN frontend: use DEV URLs below. Set false before release/archive builds.
+export const IS_DEV = true;
 
 export const WEB_VIEW_URL_INFO = {
   DEV: `http://${WEB_VIEW_DEV_HOSTNAME}:3000`,
