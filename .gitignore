@@ -76,6 +76,9 @@ yarn-error.log
 .vscode/
 .idea/
 
+# Cursor (agent plans/skills are tracked; local logs are not)
+.cursor/debug.log
+
 # OS generated files
 Thumbs.db
 
