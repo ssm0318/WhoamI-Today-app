@@ -420,7 +420,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         runWidgetSync();
       }
       if (state === 'active' && tokens.access_token && tokens.csrftoken) {
-        triggerWidgetRefresh();
+        runWidgetSync();
         const logWidgetDiagnostics = () => {
           getWidgetDiagnostics()
             .then((d) => {
@@ -437,49 +437,6 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         };
         logWidgetDiagnostics();
         setTimeout(logWidgetDiagnostics, 1200);
-        Promise.all([
-          ApiService.API.get('user/me/profile') as Promise<unknown>,
-          ApiService.API.get('check_in/song/').catch(
-            () => [],
-          ) as Promise<unknown>,
-        ])
-          .then(async ([profileResponse, songResponse]) => {
-            const res = profileResponse as {
-              check_in?: {
-                id: number;
-                is_active: boolean;
-                created_at: string;
-                mood?: string;
-                social_battery?: string | null;
-                description?: string;
-              };
-            };
-            const songs = songResponse as {
-              track_id: string;
-              is_active: boolean;
-            }[];
-            const trackId =
-              (Array.isArray(songs) ? songs.find((s) => s.is_active) : null)
-                ?.track_id ?? '';
-            const checkIn = res?.check_in;
-            if (checkIn) {
-              let albumImageUrl: string | null = null;
-              if (trackId.trim()) {
-                albumImageUrl = await fetchSpotifyAlbumImageUrl(trackId);
-              }
-              setCachedCheckInForWidget({
-                id: checkIn.id,
-                isActive: checkIn.is_active,
-                createdAt: checkIn.created_at,
-                mood: checkIn.mood ?? '',
-                socialBattery: checkIn.social_battery ?? null,
-                description: checkIn.description ?? '',
-                trackId,
-                albumImageUrl,
-              });
-            }
-          })
-          .catch(() => undefined);
       }
     },
     [tokens.access_token, tokens.csrftoken, runWidgetSync],
