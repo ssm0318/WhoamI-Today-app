@@ -53,3 +53,22 @@ struct MyCheckIn: Codable {
         }
     }
 }
+
+// One track from the shared playlist (someone else's song that the user discovers).
+// Synced from the RN app via syncSharedPlaylistTrack — widget reads the cached binary
+// images directly from SharedDataManager and never makes network calls.
+struct SharedPlaylistTrack: Codable {
+    let id: Int
+    let trackId: String
+    let albumImageUrl: String?
+    let sharerUsername: String
+    let sharerProfileImageUrl: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case trackId = "track_id"
+        case albumImageUrl = "album_image_url"
+        case sharerUsername = "sharer_username"
+        case sharerProfileImageUrl = "sharer_profile_image_url"
+    }
+}

@@ -25,74 +25,92 @@ struct CheckinWidgetEntry: TimelineEntry {
 }
 
 struct CheckinWidgetProvider: TimelineProvider {
-    func placeholder(in context: Context) -> CheckinWidgetEntry {
-        CheckinWidgetEntry(date: Date(), isAuthenticated: true, isDefaultVersion: false, myCheckIn: nil, albumImageData: nil)
-    }
-
-    func getSnapshot(in context: Context, completion: @escaping (CheckinWidgetEntry) -> Void) {
-        let entry = CheckinWidgetEntry(
+    // Build an entry synchronously from whatever is currently in the App Group.
+    // Used by placeholder, getSnapshot, and getTimeline so they all reflect real data.
+    private func currentEntry() -> CheckinWidgetEntry {
+        CheckinWidgetEntry(
             date: Date(),
             isAuthenticated: SharedDataManager.shared.isAuthenticated,
             isDefaultVersion: SharedDataManager.shared.isDefaultVersion,
             myCheckIn: SharedDataManager.shared.myCheckIn,
             albumImageData: SharedDataManager.shared.cachedAlbumImageData
         )
-        completion(entry)
+    }
+
+    func placeholder(in context: Context) -> CheckinWidgetEntry {
+        // Previously hardcoded myCheckIn: nil, which caused iOS's cached placeholder
+        // snapshot to show "checkIn=nil" on the home screen forever. Read real data.
+        currentEntry()
+    }
+
+    func getSnapshot(in context: Context, completion: @escaping (CheckinWidgetEntry) -> Void) {
+        completion(currentEntry())
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<CheckinWidgetEntry>) -> Void) {
-        Task {
-            let isAuth = SharedDataManager.shared.isAuthenticated
-            let isDefault = SharedDataManager.shared.isDefaultVersion
-            let checkIn = SharedDataManager.shared.myCheckIn
-            var albumImageData: Data? = SharedDataManager.shared.cachedAlbumImageData
+        // Synchronous reads only — the completion is called immediately, avoiding
+        // the "Task { … await URLSession } → maybe completion never fires" hazard.
+        let isAuth = SharedDataManager.shared.isAuthenticated
+        let isDefault = SharedDataManager.shared.isDefaultVersion
+        let rawCheckInBytes = SharedDataManager.shared.rawMyCheckInBytes
+        let checkIn = SharedDataManager.shared.myCheckIn
+        let albumImageData: Data? = SharedDataManager.shared.cachedAlbumImageData
 
-            // Diagnostic logging — figure out why mood/battery render as "?" boxes
-            if let c = checkIn {
-                let moodScalars = c.mood.unicodeScalars.map { String(format: "U+%04X", $0.value) }.joined(separator: " ")
-                let battScalars = (c.socialBattery ?? "").unicodeScalars.map { String(format: "U+%04X", $0.value) }.joined(separator: " ")
-                widgetLogger.notice("getTimeline: id=\(c.id, privacy: .public) mood='\(c.mood, privacy: .public)' [\(moodScalars, privacy: .public)] feelingDisplay='\(c.feelingDisplay ?? "nil", privacy: .public)' batt='\(c.socialBattery ?? "nil", privacy: .public)' [\(battScalars, privacy: .public)] batteryDisplay='\(c.batteryDisplay ?? "nil", privacy: .public)' descLen=\(c.description.count, privacy: .public) trackId='\(c.trackId, privacy: .public)' albumUrl='\(c.albumImageUrl ?? "nil", privacy: .public)'")
-                SharedDataManager.shared.writeDiagnostics(
-                    mood: c.mood,
-                    battery: c.socialBattery ?? "nil",
-                    feelingDisplay: c.feelingDisplay ?? "nil",
-                    batteryDisplay: c.batteryDisplay ?? "nil"
-                )
-            } else {
-                widgetLogger.notice("getTimeline: myCheckIn=nil isAuth=\(isAuth, privacy: .public) isDefault=\(isDefault, privacy: .public)")
-                SharedDataManager.shared.writeDiagnostics(
-                    mood: "(nil checkIn)",
-                    battery: "(nil checkIn)",
-                    feelingDisplay: "(nil checkIn)",
-                    batteryDisplay: "(nil checkIn)"
-                )
-            }
+        // Record raw-bytes-present vs decode-success separately so we can tell whether
+        // the App Group read failed OR JSON decoding failed when checkIn ends up nil.
+        SharedDataManager.shared.writeCheckInRawState(
+            rawBytesPresent: rawCheckInBytes != nil,
+            decodeOk: checkIn != nil
+        )
 
-            if isAuth && !isDefault {
-                if let checkIn = checkIn,
-                   let urlString = checkIn.albumImageUrl,
-                   let url = URL(string: urlString) {
-                    do {
-                        let (data, _) = try await URLSession.shared.data(from: url)
-                        albumImageData = data
-                        SharedDataManager.shared.cachedAlbumImageData = data
-                    } catch {
-                        widgetLogger.error("Failed to fetch album image: \(error.localizedDescription, privacy: .public)")
-                    }
+        // Diagnostic logging — figure out why mood/battery render as "?" boxes
+        if let c = checkIn {
+            let moodScalars = c.mood.unicodeScalars.map { String(format: "U+%04X", $0.value) }.joined(separator: " ")
+            let battScalars = (c.socialBattery ?? "").unicodeScalars.map { String(format: "U+%04X", $0.value) }.joined(separator: " ")
+            widgetLogger.notice("getTimeline: id=\(c.id, privacy: .public) mood='\(c.mood, privacy: .public)' [\(moodScalars, privacy: .public)] feelingDisplay='\(c.feelingDisplay ?? "nil", privacy: .public)' batt='\(c.socialBattery ?? "nil", privacy: .public)' [\(battScalars, privacy: .public)] batteryDisplay='\(c.batteryDisplay ?? "nil", privacy: .public)' descLen=\(c.description.count, privacy: .public) trackId='\(c.trackId, privacy: .public)' albumUrl='\(c.albumImageUrl ?? "nil", privacy: .public)'")
+            SharedDataManager.shared.writeDiagnostics(
+                mood: c.mood,
+                battery: c.socialBattery ?? "nil",
+                feelingDisplay: c.feelingDisplay ?? "nil",
+                batteryDisplay: c.batteryDisplay ?? "nil"
+            )
+        } else {
+            widgetLogger.notice("getTimeline: myCheckIn=nil isAuth=\(isAuth, privacy: .public) isDefault=\(isDefault, privacy: .public)")
+            SharedDataManager.shared.writeDiagnostics(
+                mood: "(nil checkIn)",
+                battery: "(nil checkIn)",
+                feelingDisplay: "(nil checkIn)",
+                batteryDisplay: "(nil checkIn)"
+            )
+        }
+
+        let entry = CheckinWidgetEntry(
+            date: Date(),
+            isAuthenticated: isAuth,
+            isDefaultVersion: isDefault,
+            myCheckIn: checkIn,
+            albumImageData: albumImageData
+        )
+
+        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: Date())!
+        let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
+        completion(timeline)
+
+        // Fire-and-forget: refresh the album image cache for the NEXT getTimeline call.
+        // Must not block the completion above — iOS may stop rendering if completion is
+        // delayed or if the Task gets cancelled.
+        if isAuth && !isDefault,
+           let checkIn = checkIn,
+           let urlString = checkIn.albumImageUrl,
+           let url = URL(string: urlString) {
+            Task.detached {
+                do {
+                    let (data, _) = try await URLSession.shared.data(from: url)
+                    SharedDataManager.shared.cachedAlbumImageData = data
+                } catch {
+                    // ignore — best-effort cache update
                 }
             }
-
-            let entry = CheckinWidgetEntry(
-                date: Date(),
-                isAuthenticated: isAuth,
-                isDefaultVersion: isDefault,
-                myCheckIn: checkIn,
-                albumImageData: albumImageData
-            )
-
-            let nextUpdate = Calendar.current.date(byAdding: .hour, value: 1, to: Date())!
-            let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
-            completion(timeline)
         }
     }
 }
@@ -113,9 +131,22 @@ struct CheckinWidgetView: View {
     }
 
     private var debugMoodText: String {
-        guard let c = entry.myCheckIn else { return "DBG: checkIn=nil" }
-        let scalars = c.mood.unicodeScalars.map { String(format: "%04X", $0.value) }.joined(separator: ".")
-        return "DBG: mood='\(c.mood)' [\(scalars)] disp='\(c.feelingDisplay ?? "nil")'"
+        // Read live data at render time, in addition to the entry iOS passed us.
+        // If entry.myCheckIn is nil but live is not, iOS is rendering a stale cached entry.
+        let live = SharedDataManager.shared.myCheckIn
+        let entryStatus: String
+        if let c = entry.myCheckIn {
+            entryStatus = "entry:mood='\(c.mood)'"
+        } else {
+            entryStatus = "entry:nil"
+        }
+        let liveStatus: String
+        if let l = live {
+            liveStatus = "live:mood='\(l.mood)'"
+        } else {
+            liveStatus = "live:nil"
+        }
+        return "v4 \(entryStatus) \(liveStatus)"
     }
 
     var checkinContent: some View {
@@ -148,31 +179,38 @@ struct CheckinWidgetView: View {
 
             Spacer(minLength: 4)
 
-            // Row of 3 equal-width cells aligned to bottom (flex-end)
+            // Row of 4 equal-width cells aligned to bottom (flex-end)
             GeometryReader { geometry in
                 let spacing: CGFloat = 6
-                let cellWidth = (geometry.size.width - spacing * 2) / 3
+                let cellWidth = (geometry.size.width - spacing * 3) / 4
                 let boxSize = min(cellWidth - 4, geometry.size.height - 4)
                 HStack(spacing: spacing) {
                     CheckInButton(
                         emoji: entry.myCheckIn?.feelingDisplay,
-                        description: entry.myCheckIn?.description,
-                        title: "I feel",
-                        deepLink: "whoami://app/check-in/edit",
+                        description: nil,
+                        title: "My Mood",
+                        deepLink: "whoami://app/update?editor=mood",
                         boxSize: boxSize
                     )
                     CheckInButton(
                         emoji: entry.myCheckIn?.batteryDisplay,
                         description: nil,
                         title: "My Battery",
-                        deepLink: "whoami://app/check-in/edit",
+                        deepLink: "whoami://app/update?editor=battery",
                         boxSize: boxSize
                     )
                     MusicButton(
                         albumImageData: entry.albumImageData,
                         hasCheckIn: entry.myCheckIn != nil,
                         title: "My Music",
-                        deepLink: "whoami://app/check-in/edit",
+                        deepLink: "whoami://app/update?editor=song",
+                        boxSize: boxSize
+                    )
+                    CheckInButton(
+                        emoji: nil,
+                        description: entry.myCheckIn?.description,
+                        title: "My Thought",
+                        deepLink: "whoami://app/update?editor=thought",
                         boxSize: boxSize
                     )
                 }
@@ -299,7 +337,9 @@ struct MusicButton: View {
 }
 
 struct CheckinWidget: Widget {
-    let kind: String = "CheckinWidget"
+    // Bumped from "CheckinWidget" to force iOS to treat this as a brand-new widget
+    // and discard all cached snapshots / persisted timeline entries for the old kind.
+    let kind: String = "CheckinWidgetV2"
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: CheckinWidgetProvider()) { entry in
