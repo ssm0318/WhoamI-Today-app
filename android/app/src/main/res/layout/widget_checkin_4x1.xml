@@ -1,67 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/widget_checkin_container"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@drawable/widget_background"
-    android:paddingStart="6dp"
-    android:paddingEnd="6dp"
-    android:paddingTop="2dp"
-    android:paddingBottom="1dp">
+    android:layout_height="match_parent">
 
-    <!-- Header: My Checkin (left) + refresh icon (right) -->
+    <!-- Inner container is wrap_content + vertical center, so the visible widget
+         shrinks to its content height even when the launcher allocates a taller row -->
+    <LinearLayout
+        android:id="@+id/widget_checkin_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:orientation="vertical"
+        android:background="@drawable/widget_background"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="12dp">
+
+    <!-- Row of 4 buttons -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
         android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingBottom="1dp">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="My Checkin"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:textColor="#000000" />
-
-        <ImageButton
-            android:id="@+id/btn_refresh"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:background="@null"
-            android:src="@drawable/ic_widget_refresh"
-            android:contentDescription="Refresh"
-            android:scaleType="centerInside"
-            android:padding="4dp" />
-    </LinearLayout>
-
-    <!-- Row of 4 buttons: compact for 4x1, no spacer so widget doesn't look empty -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical|center_horizontal"
+        android:gravity="center_horizontal"
         android:baselineAligned="false">
 
-        <!-- I feel Button -->
+        <!-- I feel Button (left-aligned in column so it lines up with the title) -->
         <LinearLayout
             android:id="@+id/btn_i_feel"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:gravity="center_horizontal"
+            android:gravity="start"
             android:paddingStart="0dp"
             android:paddingEnd="0dp"
             android:paddingTop="0dp"
             android:paddingBottom="2dp">
 
             <FrameLayout
-                android:layout_width="56dp"
-                android:layout_height="56dp"
+                android:layout_width="76dp"
+                android:layout_height="76dp"
                 android:background="@drawable/widget_emoji_button_bg">
 
                 <TextView
@@ -70,19 +50,9 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
                     android:text="+"
-                    android:textSize="24sp"
+                    android:textSize="32sp"
                     android:textColor="#888888" />
             </FrameLayout>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="I feel"
-                android:textSize="11sp"
-                android:textColor="#333333"
-                android:layout_marginTop="1dp"
-                android:maxLines="1"
-                android:ellipsize="end" />
         </LinearLayout>
 
         <!-- My Battery Button -->
@@ -99,8 +69,8 @@
             android:paddingBottom="2dp">
 
             <FrameLayout
-                android:layout_width="56dp"
-                android:layout_height="56dp"
+                android:layout_width="76dp"
+                android:layout_height="76dp"
                 android:background="@drawable/widget_emoji_button_bg">
 
                 <TextView
@@ -109,19 +79,9 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
                     android:text="+"
-                    android:textSize="24sp"
+                    android:textSize="32sp"
                     android:textColor="#888888" />
             </FrameLayout>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Battery"
-                android:textSize="11sp"
-                android:textColor="#333333"
-                android:layout_marginTop="1dp"
-                android:maxLines="1"
-                android:ellipsize="end" />
         </LinearLayout>
 
         <!-- My Music Button -->
@@ -138,8 +98,8 @@
             android:paddingBottom="2dp">
 
             <FrameLayout
-                android:layout_width="56dp"
-                android:layout_height="56dp"
+                android:layout_width="76dp"
+                android:layout_height="76dp"
                 android:background="@drawable/widget_emoji_button_bg">
 
                 <ImageView
@@ -155,67 +115,66 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
                     android:text="+"
-                    android:textSize="24sp"
+                    android:textSize="32sp"
                     android:textColor="#888888" />
 
-                <!-- Spotify icon top-left of My Music box -->
+                <!-- Spotify/Playlist icon top-left of My Music box -->
                 <ImageView
                     android:layout_width="12dp"
                     android:layout_height="12dp"
                     android:layout_gravity="top|start"
                     android:layout_marginStart="4dp"
                     android:layout_marginTop="4dp"
-                    android:src="@drawable/ic_widget_spotify"
-                    android:contentDescription="Spotify" />
+                    android:src="@drawable/ic_playlist"
+                    android:contentDescription="Music" />
             </FrameLayout>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="My Music"
-                android:textSize="11sp"
-                android:textColor="#333333"
-                android:layout_marginTop="1dp"
-                android:maxLines="1"
-                android:ellipsize="end" />
         </LinearLayout>
 
-        <!-- Add / + Button (navigate to check-in edit) -->
+        <!-- My Thought Button (right-aligned in column for symmetry with first cell) -->
         <LinearLayout
-            android:id="@+id/btn_add"
+            android:id="@+id/btn_my_thought"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:gravity="center_horizontal"
+            android:gravity="end"
             android:paddingStart="0dp"
             android:paddingEnd="0dp"
             android:paddingTop="0dp"
             android:paddingBottom="2dp">
 
             <FrameLayout
-                android:layout_width="56dp"
-                android:layout_height="56dp"
+                android:layout_width="76dp"
+                android:layout_height="76dp"
                 android:background="@drawable/widget_emoji_button_bg">
 
+                <!-- Plus sign shown when description is empty -->
                 <TextView
+                    android:id="@+id/my_thought_plus"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
                     android:text="+"
-                    android:textSize="24sp"
+                    android:textSize="32sp"
                     android:textColor="#888888" />
-            </FrameLayout>
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Add"
-                android:textSize="11sp"
-                android:textColor="#333333"
-                android:layout_marginTop="1dp"
-                android:maxLines="1"
-                android:ellipsize="end" />
+                <!-- Description text shown when non-empty (3 lines, top-left) -->
+                <TextView
+                    android:id="@+id/my_thought_description"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_gravity="top|start"
+                    android:gravity="top|start"
+                    android:padding="6dp"
+                    android:maxLines="3"
+                    android:ellipsize="end"
+                    android:textSize="11sp"
+                    android:textColor="#BF000000"
+                    android:includeFontPadding="false"
+                    android:lineSpacingMultiplier="0.95"
+                    android:visibility="gone" />
+            </FrameLayout>
         </LinearLayout>
     </LinearLayout>
-</LinearLayout>
+    </LinearLayout>
+</FrameLayout>

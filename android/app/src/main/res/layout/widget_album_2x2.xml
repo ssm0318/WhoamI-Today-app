@@ -14,15 +14,27 @@
         android:scaleType="centerCrop"
         android:visibility="gone" />
 
-    <!-- Spotify icon top-left, slightly inset from corner -->
+    <!-- Playlist icon top-left, slightly inset from corner -->
     <ImageView
         android:layout_width="22dp"
         android:layout_height="22dp"
         android:layout_gravity="top|start"
         android:layout_marginStart="10dp"
         android:layout_marginTop="10dp"
-        android:src="@drawable/ic_widget_spotify"
-        android:contentDescription="Spotify" />
+        android:src="@drawable/ic_playlist"
+        android:contentDescription="Playlist" />
+
+    <!-- Friend profile image top-right, circular -->
+    <ImageView
+        android:id="@+id/friend_profile_image"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_gravity="top|end"
+        android:layout_marginEnd="10dp"
+        android:layout_marginTop="10dp"
+        android:scaleType="centerCrop"
+        android:visibility="gone"
+        android:contentDescription="Friend Profile" />
 
     <!-- Placeholder when no album available -->
     <LinearLayout
@@ -39,14 +51,6 @@
             android:layout_height="wrap_content"
             android:text="🎵"
             android:textSize="32sp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="My Music"
-            android:textSize="12sp"
-            android:textColor="#888888"
-            android:layout_marginTop="4dp" />
 
     </LinearLayout>
 
