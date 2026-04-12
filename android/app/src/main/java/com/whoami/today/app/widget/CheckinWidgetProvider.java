@@ -36,6 +36,18 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
     private static final ExecutorService executor = Executors.newSingleThreadExecutor();
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
 
+    // Per-editor deep links (must match iOS CheckinWidget.swift)
+    private static final String DEEP_LINK_MOOD    = "whoami://app/update?editor=mood";
+    private static final String DEEP_LINK_BATTERY = "whoami://app/update?editor=battery";
+    private static final String DEEP_LINK_SONG    = "whoami://app/update?editor=song";
+    private static final String DEEP_LINK_THOUGHT = "whoami://app/update?editor=thought";
+
+    // Distinct requestCodes so PendingIntent.getActivity does not dedupe across buttons
+    private static final int REQ_MOOD    = 1;
+    private static final int REQ_BATTERY = 2;
+    private static final int REQ_SONG    = 3;
+    private static final int REQ_THOUGHT = 4;
+
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
         for (int appWidgetId : appWidgetIds) {
@@ -49,6 +61,7 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
                     PendingIntent pendingIntent = PendingIntent.getActivity(
                         context, 0, loginIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
                     fallback.setOnClickPendingIntent(R.id.signin_button, pendingIntent);
+                    fallback.setTextViewText(R.id.signin_description, "Sign in to view your check-in status");
                     appWidgetManager.updateAppWidget(appWidgetId, fallback);
                 } catch (Exception e2) {
                     Log.e(TAG, "Fallback update failed", e2);
@@ -61,20 +74,31 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
     public void onReceive(Context context, Intent intent) {
         super.onReceive(context, intent);
         String action = intent.getAction();
+        Log.d(TAG, "[onReceive] Received broadcast: " + action);
         if ("com.whoami.today.app.WIDGET_UPDATE".equals(action)) {
+            Log.d(TAG, "[onReceive] WIDGET_UPDATE broadcast received, triggering widget update");
             AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
             int[] appWidgetIds = appWidgetManager.getAppWidgetIds(
                 new android.content.ComponentName(context, CheckinWidgetProvider.class));
+            Log.d(TAG, "[onReceive] Found " + appWidgetIds.length + " widget(s) to update");
             onUpdate(context, appWidgetManager, appWidgetIds);
         }
     }
 
     static void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId) {
+        long startTime = System.currentTimeMillis();
+        Log.d(TAG, "[updateAppWidget] START - Widget ID: " + appWidgetId);
+        
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String accessToken = prefs.getString("access_token", "");
         String versionType = prefs.getString("user_version_type", VERSION_TYPE_DEFAULT);
         boolean isAuthenticated = accessToken != null && !accessToken.isEmpty();
         boolean isDefaultVersion = VERSION_TYPE_DEFAULT.equals(versionType);
+
+        Log.d(TAG, "[updateAppWidget] Auth state - isAuthenticated: " + isAuthenticated + 
+                   ", accessTokenLen: " + (accessToken != null ? accessToken.length() : 0) +
+                   ", versionType: " + versionType + 
+                   ", isDefaultVersion: " + isDefaultVersion);
 
         RemoteViews views;
 
@@ -84,6 +108,7 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
             PendingIntent pendingIntent = PendingIntent.getActivity(
                 context, 0, loginIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             views.setOnClickPendingIntent(R.id.signin_button, pendingIntent);
+            views.setTextViewText(R.id.signin_description, "Sign in to view your check-in status");
             appWidgetManager.updateAppWidget(appWidgetId, views);
             return;
         }
@@ -93,31 +118,39 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
             views.setViewVisibility(R.id.btn_i_feel, View.INVISIBLE);
             views.setViewVisibility(R.id.btn_my_battery, View.INVISIBLE);
             views.setViewVisibility(R.id.btn_my_music, View.INVISIBLE);
-            views.setViewVisibility(R.id.btn_add, View.INVISIBLE);
-            Intent refreshIntent = new Intent(context, CheckinWidgetProvider.class);
-            refreshIntent.setAction("com.whoami.today.app.WIDGET_UPDATE");
-            PendingIntent refreshPendingIntent = PendingIntent.getBroadcast(
-                context, 0, refreshIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-            views.setOnClickPendingIntent(R.id.btn_refresh, refreshPendingIntent);
+            views.setViewVisibility(R.id.btn_my_thought, View.INVISIBLE);
             appWidgetManager.updateAppWidget(appWidgetId, views);
             return;
         }
 
         String widgetDataJson = prefs.getString("widget_data", "{}");
+        Log.d(TAG, "[updateAppWidget] Raw widget_data from prefs: " + widgetDataJson);
+        
         String mood = null;
         String socialBattery = null;
+        String description = null;
         String albumImageUrl = null;
         String trackIdForOEmbed = null;
 
         try {
             JSONObject widgetData = new JSONObject(widgetDataJson);
+            Log.d(TAG, "[updateAppWidget] Parsed widget_data JSON, has my_check_in: " + widgetData.has("my_check_in"));
+            
             if (widgetData.has("my_check_in")) {
                 JSONObject myCheckIn = widgetData.getJSONObject("my_check_in");
+                Log.d(TAG, "[updateAppWidget] my_check_in object: " + myCheckIn.toString());
+                
                 if (myCheckIn.has("mood") && !myCheckIn.isNull("mood")) {
                     mood = myCheckIn.getString("mood");
+                    Log.d(TAG, "[updateAppWidget] Extracted mood: " + mood);
                 }
                 if (myCheckIn.has("social_battery") && !myCheckIn.isNull("social_battery")) {
                     socialBattery = myCheckIn.getString("social_battery");
+                    Log.d(TAG, "[updateAppWidget] Extracted social_battery: " + socialBattery);
+                }
+                if (myCheckIn.has("description") && !myCheckIn.isNull("description")) {
+                    description = myCheckIn.getString("description");
+                    Log.d(TAG, "[updateAppWidget] Extracted description length: " + (description != null ? description.length() : 0));
                 }
                 // Prefer album_image_url; fallback to alternate keys (album_cover_url, photo_url)
                 for (String key : new String[]{"album_image_url", "album_cover_url", "photo_url"}) {
@@ -125,34 +158,30 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
                         String url = myCheckIn.optString(key, null);
                         if (url != null && !url.isEmpty()) {
                             albumImageUrl = url;
+                            Log.d(TAG, "[updateAppWidget] Found album image URL from key '" + key + "': " + url);
                             break;
                         }
                     }
                 }
                 if (albumImageUrl == null) {
                     String tid = myCheckIn.optString("track_id", null);
-                    if (tid != null && !tid.trim().isEmpty()) trackIdForOEmbed = tid.trim();
+                    if (tid != null && !tid.trim().isEmpty()) {
+                        trackIdForOEmbed = tid.trim();
+                        Log.d(TAG, "[updateAppWidget] No album URL, will use oEmbed for track_id: " + trackIdForOEmbed);
+                    }
                 }
+            } else {
+                Log.w(TAG, "[updateAppWidget] No my_check_in in widget_data - widget will show empty state");
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error parsing widget data", e);
+            Log.e(TAG, "[updateAppWidget] Error parsing widget data", e);
         }
 
         views = new RemoteViews(context.getPackageName(), R.layout.widget_checkin_4x1);
 
-        Intent checkInIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("whoami://app/check-in/edit"));
-        PendingIntent checkInPendingIntent = PendingIntent.getActivity(
-            context, 0, checkInIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        
-        Intent refreshIntent = new Intent(context, CheckinWidgetProvider.class);
-        refreshIntent.setAction("com.whoami.today.app.WIDGET_UPDATE");
-        PendingIntent refreshPendingIntent = PendingIntent.getBroadcast(
-            context, 0, refreshIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        views.setOnClickPendingIntent(R.id.btn_refresh, refreshPendingIntent);
-        views.setOnClickPendingIntent(R.id.btn_i_feel, checkInPendingIntent);
-        views.setOnClickPendingIntent(R.id.btn_my_battery, checkInPendingIntent);
-        views.setOnClickPendingIntent(R.id.btn_my_music, checkInPendingIntent);
-        views.setOnClickPendingIntent(R.id.btn_add, checkInPendingIntent);
+        // Refresh: keep local broadcast (avoids cold-start splash)
+        // 4 per-editor deep links (matches iOS)
+        applyCheckinClickIntents(context, views);
 
         if (mood != null && !mood.isEmpty()) {
             views.setTextViewText(R.id.i_feel_emoji, getMoodEmoji(mood));
@@ -166,6 +195,8 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
             views.setTextViewText(R.id.my_battery_emoji, "+");
         }
 
+        applyThoughtContent(views, description);
+
         final boolean hasAlbumUrl = albumImageUrl != null && !albumImageUrl.isEmpty();
         if (hasAlbumUrl || trackIdForOEmbed != null) {
             views.setViewVisibility(R.id.my_music_icon, View.GONE);
@@ -176,6 +207,7 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
             final String trackId = trackIdForOEmbed;
             final String finalMood = mood;
             final String finalSocialBattery = socialBattery;
+            final String finalDescription = description;
             executor.execute(() -> {
                 String urlToLoad = imageUrl;
                 if (urlToLoad == null && trackId != null) {
@@ -184,13 +216,10 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
                 if (urlToLoad == null) {
                     mainHandler.post(() -> {
                         RemoteViews fallbackViews = new RemoteViews(context.getPackageName(), R.layout.widget_checkin_4x1);
-                        fallbackViews.setOnClickPendingIntent(R.id.btn_refresh, refreshPendingIntent);
-                        fallbackViews.setOnClickPendingIntent(R.id.btn_i_feel, checkInPendingIntent);
-                        fallbackViews.setOnClickPendingIntent(R.id.btn_my_battery, checkInPendingIntent);
-                        fallbackViews.setOnClickPendingIntent(R.id.btn_my_music, checkInPendingIntent);
-                        fallbackViews.setOnClickPendingIntent(R.id.btn_add, checkInPendingIntent);
+                        applyCheckinClickIntents(context, fallbackViews);
                         fallbackViews.setTextViewText(R.id.i_feel_emoji, finalMood != null && !finalMood.isEmpty() ? getMoodEmoji(finalMood) : "+");
                         fallbackViews.setTextViewText(R.id.my_battery_emoji, finalSocialBattery != null && !finalSocialBattery.isEmpty() ? getBatteryEmoji(finalSocialBattery) : "+");
+                        applyThoughtContent(fallbackViews, finalDescription);
                         fallbackViews.setViewVisibility(R.id.my_music_album, View.GONE);
                         fallbackViews.setViewVisibility(R.id.my_music_icon, View.VISIBLE);
                         fallbackViews.setTextViewText(R.id.my_music_icon, "🎵");
@@ -202,15 +231,12 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
                 Bitmap bitmap = loadBitmapFromUrl(finalUrl);
                 mainHandler.post(() -> {
                     RemoteViews updatedViews = new RemoteViews(context.getPackageName(), R.layout.widget_checkin_4x1);
-                    
-                    updatedViews.setOnClickPendingIntent(R.id.btn_refresh, refreshPendingIntent);
-                    updatedViews.setOnClickPendingIntent(R.id.btn_i_feel, checkInPendingIntent);
-                    updatedViews.setOnClickPendingIntent(R.id.btn_my_battery, checkInPendingIntent);
-                    updatedViews.setOnClickPendingIntent(R.id.btn_my_music, checkInPendingIntent);
-                    updatedViews.setOnClickPendingIntent(R.id.btn_add, checkInPendingIntent);
-                    
+
+                    applyCheckinClickIntents(context, updatedViews);
+
                     updatedViews.setTextViewText(R.id.i_feel_emoji, finalMood != null && !finalMood.isEmpty() ? getMoodEmoji(finalMood) : "+");
                     updatedViews.setTextViewText(R.id.my_battery_emoji, finalSocialBattery != null && !finalSocialBattery.isEmpty() ? getBatteryEmoji(finalSocialBattery) : "+");
+                    applyThoughtContent(updatedViews, finalDescription);
 
                     if (bitmap != null) {
                         updatedViews.setImageViewBitmap(R.id.my_music_album, bitmap);
@@ -229,6 +255,44 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
             views.setViewVisibility(R.id.my_music_icon, View.VISIBLE);
             views.setTextViewText(R.id.my_music_icon, "+");
             appWidgetManager.updateAppWidget(appWidgetId, views);
+            
+            long elapsed = System.currentTimeMillis() - startTime;
+            Log.d(TAG, "[updateAppWidget] COMPLETE (no album) - Widget ID: " + appWidgetId + ", Elapsed: " + elapsed + "ms");
+        }
+    }
+
+    /** Build a PendingIntent that opens the app via a deep link with a unique requestCode. */
+    private static PendingIntent buildDeepLinkPendingIntent(Context context, String uri, int requestCode) {
+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
+        return PendingIntent.getActivity(
+            context,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /** Apply per-editor deep link PendingIntents to all 4 check-in buttons. */
+    private static void applyCheckinClickIntents(Context context, RemoteViews views) {
+        views.setOnClickPendingIntent(R.id.btn_i_feel,
+            buildDeepLinkPendingIntent(context, DEEP_LINK_MOOD, REQ_MOOD));
+        views.setOnClickPendingIntent(R.id.btn_my_battery,
+            buildDeepLinkPendingIntent(context, DEEP_LINK_BATTERY, REQ_BATTERY));
+        views.setOnClickPendingIntent(R.id.btn_my_music,
+            buildDeepLinkPendingIntent(context, DEEP_LINK_SONG, REQ_SONG));
+        views.setOnClickPendingIntent(R.id.btn_my_thought,
+            buildDeepLinkPendingIntent(context, DEEP_LINK_THOUGHT, REQ_THOUGHT));
+    }
+
+    /** Show description text in My Thought slot if non-empty, otherwise show "+". */
+    private static void applyThoughtContent(RemoteViews views, String description) {
+        String trimmed = description == null ? "" : description.trim();
+        if (!trimmed.isEmpty()) {
+            views.setTextViewText(R.id.my_thought_description, trimmed);
+            views.setViewVisibility(R.id.my_thought_description, View.VISIBLE);
+            views.setViewVisibility(R.id.my_thought_plus, View.GONE);
+        } else {
+            views.setViewVisibility(R.id.my_thought_description, View.GONE);
+            views.setViewVisibility(R.id.my_thought_plus, View.VISIBLE);
         }
     }
 
@@ -269,11 +333,33 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
             connection.setReadTimeout(5000);
             connection.connect();
             InputStream input = connection.getInputStream();
-            return BitmapFactory.decodeStream(input);
+            Bitmap bitmap = BitmapFactory.decodeStream(input);
+            if (bitmap != null) {
+                return getRoundedCornerBitmap(bitmap, 16);
+            }
+            return null;
         } catch (Exception e) {
             Log.e(TAG, "Error loading bitmap from URL", e);
             return null;
         }
+    }
+
+    private static Bitmap getRoundedCornerBitmap(Bitmap bitmap, float cornerRadius) {
+        Bitmap output = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas canvas = new android.graphics.Canvas(output);
+
+        final android.graphics.Paint paint = new android.graphics.Paint();
+        final android.graphics.Rect rect = new android.graphics.Rect(0, 0, bitmap.getWidth(), bitmap.getHeight());
+        final android.graphics.RectF rectF = new android.graphics.RectF(rect);
+
+        paint.setAntiAlias(true);
+        canvas.drawARGB(0, 0, 0, 0);
+        canvas.drawRoundRect(rectF, cornerRadius, cornerRadius, paint);
+
+        paint.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN));
+        canvas.drawBitmap(bitmap, rect, rect, paint);
+
+        return output;
     }
 
     /** Fetch album/thumbnail URL from Spotify oEmbed (no auth). Used when widget_data has track_id but no album_image_url. */

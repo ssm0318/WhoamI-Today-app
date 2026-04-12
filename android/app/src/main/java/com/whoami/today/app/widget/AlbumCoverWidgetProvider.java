@@ -8,9 +8,16 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
+import android.graphics.Rect;
+import android.graphics.RectF;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.widget.RemoteViews;
@@ -49,6 +56,7 @@ public class AlbumCoverWidgetProvider extends AppWidgetProvider {
                     PendingIntent pendingIntent = PendingIntent.getActivity(
                         context, 0, loginIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
                     fallback.setOnClickPendingIntent(R.id.signin_button, pendingIntent);
+                    fallback.setTextViewText(R.id.signin_description, "Sign in to see what music your friends are sharing");
                     appWidgetManager.updateAppWidget(appWidgetId, fallback);
                 } catch (Exception e2) {
                     Log.e(TAG, "Fallback update failed", e2);
@@ -70,11 +78,17 @@ public class AlbumCoverWidgetProvider extends AppWidgetProvider {
     }
 
     static void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId) {
+        long startTime = System.currentTimeMillis();
+        Log.d(TAG, "[updateAppWidget] START - Widget ID: " + appWidgetId);
+        
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String accessToken = prefs.getString("access_token", "");
         String versionType = prefs.getString("user_version_type", VERSION_TYPE_DEFAULT);
         boolean isAuthenticated = accessToken != null && !accessToken.isEmpty();
         boolean isDefaultVersion = VERSION_TYPE_DEFAULT.equals(versionType);
+
+        Log.d(TAG, "[updateAppWidget] Auth state - isAuthenticated: " + isAuthenticated + 
+                   ", versionType: " + versionType);
 
         RemoteViews views;
 
@@ -84,129 +98,148 @@ public class AlbumCoverWidgetProvider extends AppWidgetProvider {
             PendingIntent pendingIntent = PendingIntent.getActivity(
                 context, 0, loginIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             views.setOnClickPendingIntent(R.id.signin_button, pendingIntent);
+            views.setTextViewText(R.id.signin_description, "Sign in to see what music your friends are sharing");
             appWidgetManager.updateAppWidget(appWidgetId, views);
-        } else if (isDefaultVersion) {
+            Log.d(TAG, "[updateAppWidget] Showing sign-in view");
+            return;
+        }
+        
+        if (isDefaultVersion) {
             views = new RemoteViews(context.getPackageName(), R.layout.widget_album_2x2);
             views.setViewVisibility(R.id.album_image, View.GONE);
             views.setViewVisibility(R.id.album_placeholder, View.GONE);
+            views.setViewVisibility(R.id.friend_profile_image, View.GONE);
             appWidgetManager.updateAppWidget(appWidgetId, views);
-        } else {
-            String widgetDataJson = prefs.getString("widget_data", "{}");
-            String albumImageUrl = null;
-            String trackIdForOEmbed = null;
-            try {
-                JSONObject widgetData = new JSONObject(widgetDataJson);
-                if (widgetData.has("my_check_in")) {
-                    JSONObject myCheckIn = widgetData.getJSONObject("my_check_in");
-                    for (String key : new String[]{"album_image_url", "album_cover_url", "photo_url"}) {
-                        if (myCheckIn.has(key) && !myCheckIn.isNull(key)) {
-                            String url = myCheckIn.optString(key, null);
-                            if (url != null && !url.isEmpty()) {
-                                albumImageUrl = url;
-                                break;
-                            }
-                        }
+            Log.d(TAG, "[updateAppWidget] Default version - empty widget");
+            return;
+        }
+
+        // Read shared playlist track data
+        String widgetDataJson = prefs.getString("widget_data", "{}");
+        String albumImageBase64 = prefs.getString("widget_shared_playlist_album_image_base64", "");
+        String avatarImageBase64 = prefs.getString("widget_shared_playlist_avatar_image_base64", "");
+        
+        Log.d(TAG, "[updateAppWidget] Base64 lengths - album: " + albumImageBase64.length() + 
+                   ", avatar: " + avatarImageBase64.length());
+
+        views = new RemoteViews(context.getPackageName(), R.layout.widget_album_2x2);
+        Intent playlistIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("whoami://app/shared-playlist"));
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+            context, 0, playlistIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        views.setOnClickPendingIntent(R.id.widget_album_container, pendingIntent);
+
+        if (albumImageBase64.isEmpty() && avatarImageBase64.isEmpty()) {
+            views.setViewVisibility(R.id.album_image, View.GONE);
+            views.setViewVisibility(R.id.album_placeholder, View.VISIBLE);
+            views.setViewVisibility(R.id.friend_profile_image, View.GONE);
+            appWidgetManager.updateAppWidget(appWidgetId, views);
+            Log.d(TAG, "[updateAppWidget] No images - showing placeholder");
+            return;
+        }
+
+        // Show placeholder first, then load images in background
+        views.setViewVisibility(R.id.album_image, View.GONE);
+        views.setViewVisibility(R.id.album_placeholder, View.VISIBLE);
+        views.setViewVisibility(R.id.friend_profile_image, View.GONE);
+        appWidgetManager.updateAppWidget(appWidgetId, views);
+
+        final String finalAlbumBase64 = albumImageBase64;
+        final String finalAvatarBase64 = avatarImageBase64;
+        
+        executor.execute(() -> {
+            Bitmap albumBitmap = null;
+            Bitmap avatarBitmap = null;
+            
+            if (!finalAlbumBase64.isEmpty()) {
+                try {
+                    byte[] decodedBytes = Base64.decode(finalAlbumBase64, Base64.DEFAULT);
+                    albumBitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
+                    if (albumBitmap != null) {
+                        albumBitmap = getRoundedCornerBitmap(albumBitmap, 16);
                     }
-                    if (albumImageUrl == null) {
-                        String tid = myCheckIn.optString("track_id", null);
-                        if (tid != null && !tid.trim().isEmpty()) trackIdForOEmbed = tid.trim();
-                    }
+                    Log.d(TAG, "[updateAppWidget] Album bitmap decoded: " + (albumBitmap != null));
+                } catch (Exception e) {
+                    Log.e(TAG, "[updateAppWidget] Failed to decode album image", e);
                 }
-            } catch (Exception e) {
-                Log.e(TAG, "Error parsing widget data", e);
+            }
+            
+            if (!finalAvatarBase64.isEmpty()) {
+                try {
+                    byte[] decodedBytes = Base64.decode(finalAvatarBase64, Base64.DEFAULT);
+                    Bitmap rawAvatar = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
+                    if (rawAvatar != null) {
+                        avatarBitmap = getCircularBitmap(rawAvatar);
+                    }
+                    Log.d(TAG, "[updateAppWidget] Avatar bitmap decoded: " + (avatarBitmap != null));
+                } catch (Exception e) {
+                    Log.e(TAG, "[updateAppWidget] Failed to decode avatar image", e);
+                }
             }
 
-            views = new RemoteViews(context.getPackageName(), R.layout.widget_album_2x2);
-            Intent checkInIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("whoami://app/check-in/edit"));
-            PendingIntent pendingIntent = PendingIntent.getActivity(
-                context, 0, checkInIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-            views.setOnClickPendingIntent(R.id.widget_album_container, pendingIntent);
-
-            final boolean hasUrl = albumImageUrl != null && !albumImageUrl.isEmpty();
-            if (hasUrl || trackIdForOEmbed != null) {
-                views.setViewVisibility(R.id.album_image, View.GONE);
-                views.setViewVisibility(R.id.album_placeholder, View.VISIBLE);
-                appWidgetManager.updateAppWidget(appWidgetId, views);
-
-                final String imageUrl = albumImageUrl;
-                final String trackId = trackIdForOEmbed;
-                executor.execute(() -> {
-                    String urlToLoad = imageUrl;
-                    if (urlToLoad == null && trackId != null) {
-                        urlToLoad = fetchAlbumImageUrlFromSpotifyOEmbed(trackId);
-                    }
-                    if (urlToLoad == null) {
-                        mainHandler.post(() -> {
-                            RemoteViews fallbackViews = new RemoteViews(context.getPackageName(), R.layout.widget_album_2x2);
-                            fallbackViews.setOnClickPendingIntent(R.id.widget_album_container, pendingIntent);
-                            fallbackViews.setViewVisibility(R.id.album_image, View.GONE);
-                            fallbackViews.setViewVisibility(R.id.album_placeholder, View.VISIBLE);
-                            appWidgetManager.updateAppWidget(appWidgetId, fallbackViews);
-                        });
-                        return;
-                    }
-                    Bitmap bitmap = loadBitmapFromUrl(urlToLoad);
-                    mainHandler.post(() -> {
-                        RemoteViews updatedViews = new RemoteViews(context.getPackageName(), R.layout.widget_album_2x2);
-                        updatedViews.setOnClickPendingIntent(R.id.widget_album_container, pendingIntent);
-                        if (bitmap != null) {
-                            updatedViews.setImageViewBitmap(R.id.album_image, bitmap);
-                            updatedViews.setViewVisibility(R.id.album_image, View.VISIBLE);
-                            updatedViews.setViewVisibility(R.id.album_placeholder, View.GONE);
-                        } else {
-                            updatedViews.setViewVisibility(R.id.album_image, View.GONE);
-                            updatedViews.setViewVisibility(R.id.album_placeholder, View.VISIBLE);
-                        }
-                        appWidgetManager.updateAppWidget(appWidgetId, updatedViews);
-                    });
-                });
-            } else {
-                views.setViewVisibility(R.id.album_image, View.GONE);
-                views.setViewVisibility(R.id.album_placeholder, View.VISIBLE);
-                appWidgetManager.updateAppWidget(appWidgetId, views);
-            }
-        }
+            final Bitmap finalAlbum = albumBitmap;
+            final Bitmap finalAvatar = avatarBitmap;
+            
+            mainHandler.post(() -> {
+                RemoteViews updatedViews = new RemoteViews(context.getPackageName(), R.layout.widget_album_2x2);
+                updatedViews.setOnClickPendingIntent(R.id.widget_album_container, pendingIntent);
+                
+                if (finalAlbum != null) {
+                    updatedViews.setImageViewBitmap(R.id.album_image, finalAlbum);
+                    updatedViews.setViewVisibility(R.id.album_image, View.VISIBLE);
+                    updatedViews.setViewVisibility(R.id.album_placeholder, View.GONE);
+                } else {
+                    updatedViews.setViewVisibility(R.id.album_image, View.GONE);
+                    updatedViews.setViewVisibility(R.id.album_placeholder, View.VISIBLE);
+                }
+                
+                if (finalAvatar != null) {
+                    updatedViews.setImageViewBitmap(R.id.friend_profile_image, finalAvatar);
+                    updatedViews.setViewVisibility(R.id.friend_profile_image, View.VISIBLE);
+                } else {
+                    updatedViews.setViewVisibility(R.id.friend_profile_image, View.GONE);
+                }
+                
+                appWidgetManager.updateAppWidget(appWidgetId, updatedViews);
+                
+                long elapsed = System.currentTimeMillis() - startTime;
+                Log.d(TAG, "[updateAppWidget] COMPLETE - Elapsed: " + elapsed + "ms");
+            });
+        });
     }
 
-    private static Bitmap loadBitmapFromUrl(String urlString) {
-        try {
-            URL url = new URL(urlString);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setDoInput(true);
-            connection.setConnectTimeout(5000);
-            connection.setReadTimeout(5000);
-            connection.connect();
-            InputStream input = connection.getInputStream();
-            return BitmapFactory.decodeStream(input);
-        } catch (Exception e) {
-            Log.e(TAG, "Error loading bitmap from URL", e);
-            return null;
-        }
+    private static Bitmap getRoundedCornerBitmap(Bitmap bitmap, float cornerRadius) {
+        Bitmap output = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(output);
+
+        final Paint paint = new Paint();
+        final Rect rect = new Rect(0, 0, bitmap.getWidth(), bitmap.getHeight());
+        final RectF rectF = new RectF(rect);
+
+        paint.setAntiAlias(true);
+        canvas.drawARGB(0, 0, 0, 0);
+        canvas.drawRoundRect(rectF, cornerRadius, cornerRadius, paint);
+
+        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+        canvas.drawBitmap(bitmap, rect, rect, paint);
+
+        return output;
     }
 
-    /** Fetch album/thumbnail URL from Spotify oEmbed (no auth). Used when widget_data has track_id but no album_image_url. */
-    private static String fetchAlbumImageUrlFromSpotifyOEmbed(String trackId) {
-        try {
-            String trackUrl = "https://open.spotify.com/track/" + Uri.encode(trackId);
-            URL url = new URL("https://open.spotify.com/oembed?url=" + Uri.encode(trackUrl));
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(5000);
-            conn.connect();
-            if (conn.getResponseCode() != 200) return null;
-            StringBuilder sb = new StringBuilder();
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) sb.append(line);
-            }
-            JSONObject json = new JSONObject(sb.toString());
-            if (json.has("thumbnail_url") && !json.isNull("thumbnail_url")) {
-                return json.getString("thumbnail_url");
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "Spotify oEmbed fetch failed for track_id=" + trackId, e);
-        }
-        return null;
+    private static Bitmap getCircularBitmap(Bitmap bitmap) {
+        int size = Math.min(bitmap.getWidth(), bitmap.getHeight());
+        Bitmap output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(output);
+
+        final Paint paint = new Paint();
+        final Rect rect = new Rect(0, 0, size, size);
+
+        paint.setAntiAlias(true);
+        canvas.drawARGB(0, 0, 0, 0);
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint);
+
+        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+        canvas.drawBitmap(bitmap, null, rect, paint);
+
+        return output;
     }
 }
