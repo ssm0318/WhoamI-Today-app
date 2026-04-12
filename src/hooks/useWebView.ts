@@ -224,6 +224,13 @@ const useWebView = () => {
         case 'WIDGET_DATA_UPDATED': {
           // If web sends check_in in the message (when user saves check-in), use it so widget
           // matches the app screen without waiting for API. Otherwise fetch from API.
+          console.log(
+            '[WidgetSync] WIDGET_DATA_UPDATED received from WebView',
+            {
+              hasCheckInPayload: !!data.check_in,
+              payload: data.check_in,
+            },
+          );
           setWidgetDataStale(true);
           (async () => {
             try {
@@ -240,6 +247,11 @@ const useWebView = () => {
                   }
                 | undefined;
               if (raw && typeof raw.id === 'number') {
+                console.log(
+                  '[WidgetSync] WIDGET_DATA_UPDATED: using inline payload (id=' +
+                    raw.id +
+                    ')',
+                );
                 let albumImageUrl: string | null = raw.album_image_url ?? null;
                 if (!albumImageUrl && raw.track_id?.trim()) {
                   albumImageUrl = await fetchSpotifyAlbumImageUrl(raw.track_id);
@@ -257,8 +269,17 @@ const useWebView = () => {
                 await syncMyCheckInToWidget(payload);
                 setCachedCheckInForWidget(payload);
                 await triggerWidgetRefresh();
+                // Trigger another refresh after a short delay to ensure widget updates
+                setTimeout(() => {
+                  triggerWidgetRefresh().catch(() => {
+                    // Ignore errors on delayed refresh
+                  });
+                }, 500);
                 return;
               }
+              console.log(
+                '[WidgetSync] WIDGET_DATA_UPDATED: no inline payload, fetching from API',
+              );
               const [profileResponse, songResponse] = await Promise.all([
                 ApiService.API.get('user/me/profile') as Promise<unknown>,
                 ApiService.API.get('check_in/song/').catch(
@@ -275,13 +296,27 @@ const useWebView = () => {
                   description?: string;
                 };
               };
-              const songs = songResponse as {
-                track_id: string;
-                is_active: boolean;
-              }[];
+              // /check_in/song/ returns DRF-paginated shape: { count, next, previous, results: [...] }
+              type SongItem = { track_id: string; is_active: boolean };
+              const songsResRaw = songResponse as
+                | SongItem[]
+                | { results?: SongItem[] }
+                | null
+                | undefined;
+              let songsList: SongItem[] = [];
+              if (Array.isArray(songsResRaw)) {
+                songsList = songsResRaw;
+              } else if (songsResRaw && Array.isArray(songsResRaw.results)) {
+                songsList = songsResRaw.results as SongItem[];
+              }
+              console.log('[WidgetSync] WIDGET_DATA_UPDATED: API responses', {
+                hasCheckInInProfile: !!res?.check_in,
+                checkInRaw: res?.check_in,
+                songsListLen: songsList.length,
+                songsRaw: songsResRaw,
+              });
               const trackId =
-                (Array.isArray(songs) ? songs.find((s) => s.is_active) : null)
-                  ?.track_id ?? '';
+                songsList.find((s) => s.is_active)?.track_id ?? '';
               const checkIn = res?.check_in;
               if (checkIn) {
                 let albumImageUrl: string | null = null;
@@ -302,8 +337,14 @@ const useWebView = () => {
                 setCachedCheckInForWidget(payload);
               }
               await triggerWidgetRefresh();
+              // Trigger another refresh after a short delay to ensure widget updates
+              setTimeout(() => {
+                triggerWidgetRefresh().catch(() => {
+                  // Ignore errors on delayed refresh
+                });
+              }, 500);
             } catch (err) {
-              console.warn('[useWebView] WIDGET_DATA_UPDATED failed:', err);
+              console.warn('[WidgetSync] WIDGET_DATA_UPDATED failed:', err);
               await triggerWidgetRefresh();
             }
           })();
