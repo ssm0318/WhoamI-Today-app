@@ -123,7 +123,7 @@ public class AlbumCoverWidgetProvider extends AppWidgetProvider {
                    ", avatar: " + avatarImageBase64.length());
 
         views = new RemoteViews(context.getPackageName(), R.layout.widget_album_2x2);
-        Intent playlistIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("whoami://app/shared-playlist"));
+        Intent playlistIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("whoami://app/discover"));
         PendingIntent pendingIntent = PendingIntent.getActivity(
             context, 0, playlistIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         views.setOnClickPendingIntent(R.id.widget_album_container, pendingIntent);
@@ -133,15 +133,10 @@ public class AlbumCoverWidgetProvider extends AppWidgetProvider {
             views.setViewVisibility(R.id.album_placeholder, View.VISIBLE);
             views.setViewVisibility(R.id.friend_profile_image, View.GONE);
             appWidgetManager.updateAppWidget(appWidgetId, views);
-            Log.d(TAG, "[updateAppWidget] No images - showing placeholder");
+            Log.d(TAG, "[updateAppWidget] No images - showing placeholder, trying API fetch");
+            fetchSharedPlaylistFromApi(context, appWidgetManager, appWidgetId, prefs);
             return;
         }
-
-        // Show placeholder first, then load images in background
-        views.setViewVisibility(R.id.album_image, View.GONE);
-        views.setViewVisibility(R.id.album_placeholder, View.VISIBLE);
-        views.setViewVisibility(R.id.friend_profile_image, View.GONE);
-        appWidgetManager.updateAppWidget(appWidgetId, views);
 
         final String finalAlbumBase64 = albumImageBase64;
         final String finalAvatarBase64 = avatarImageBase64;
@@ -205,6 +200,169 @@ public class AlbumCoverWidgetProvider extends AppWidgetProvider {
                 Log.d(TAG, "[updateAppWidget] COMPLETE - Elapsed: " + elapsed + "ms");
             });
         });
+    }
+
+    /**
+     * When widget has no shared playlist data, fetch from API and update.
+     */
+    private static void fetchSharedPlaylistFromApi(Context context, AppWidgetManager appWidgetManager,
+            int appWidgetId, SharedPreferences prefs) {
+        String apiBaseUrl = prefs.getString("api_base_url", "https://whoami-test-group.gina-park.site/api/");
+        String accessToken = prefs.getString("access_token", "");
+        String csrftoken = prefs.getString("csrftoken", "");
+
+        if (apiBaseUrl.isEmpty() || accessToken.isEmpty()) {
+            Log.w(TAG, "[fetchSharedPlaylist] Missing api_base_url or access_token, skipping");
+            return;
+        }
+
+        executor.execute(() -> {
+            try {
+                // Fetch discover feed
+                String endpoint = apiBaseUrl + "user/discover/?page=1";
+                Log.d(TAG, "[fetchSharedPlaylist] Fetching: " + endpoint);
+
+                URL url = new URL(endpoint);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+                conn.setRequestProperty("Cookie",
+                        "csrftoken=" + csrftoken + "; access_token=" + accessToken);
+                conn.setRequestProperty("X-CSRFToken", csrftoken);
+                conn.connect();
+
+                if (conn.getResponseCode() != 200) {
+                    Log.w(TAG, "[fetchSharedPlaylist] API returned " + conn.getResponseCode());
+                    return;
+                }
+
+                StringBuilder sb = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) sb.append(line);
+                }
+
+                JSONObject discover = new JSONObject(sb.toString());
+                org.json.JSONArray musicTracks = discover.optJSONArray("music_tracks");
+                if (musicTracks == null || musicTracks.length() == 0) {
+                    Log.w(TAG, "[fetchSharedPlaylist] No music_tracks in discover response");
+                    return;
+                }
+
+                // Pick first track
+                JSONObject picked = musicTracks.getJSONObject(0);
+                String trackId = picked.optString("track_id", "");
+                JSONObject user = picked.optJSONObject("user");
+                String sharerUsername = user != null ? user.optString("username", "") : "";
+                String profileImageUrl = user != null
+                        ? (user.optString("profile_image", user.optString("profile_pic", "")))
+                        : "";
+
+                Log.d(TAG, "[fetchSharedPlaylist] Picked track: " + trackId + " from " + sharerUsername);
+
+                // Get album image URL from Spotify oEmbed
+                String albumImageUrl = null;
+                if (!trackId.isEmpty()) {
+                    albumImageUrl = fetchAlbumImageUrl(trackId);
+                }
+
+                // Download and encode images as base64
+                String albumBase64 = "";
+                String avatarBase64 = "";
+
+                if (albumImageUrl != null && !albumImageUrl.isEmpty()) {
+                    albumBase64 = downloadImageAsBase64(albumImageUrl);
+                }
+                if (!profileImageUrl.isEmpty()) {
+                    avatarBase64 = downloadImageAsBase64(profileImageUrl);
+                }
+
+                if (albumBase64.isEmpty() && avatarBase64.isEmpty()) {
+                    Log.w(TAG, "[fetchSharedPlaylist] Could not download any images");
+                    return;
+                }
+
+                // Save to SharedPreferences
+                JSONObject sharedTrack = new JSONObject();
+                sharedTrack.put("id", picked.optInt("id", 0));
+                sharedTrack.put("track_id", trackId);
+                sharedTrack.put("sharer_username", sharerUsername);
+
+                String existingJson = prefs.getString("widget_data", "{}");
+                JSONObject root = new JSONObject(existingJson);
+                root.put("shared_playlist_track", sharedTrack);
+
+                SharedPreferences.Editor editor = prefs.edit();
+                editor.putString("widget_data", root.toString());
+                if (!albumBase64.isEmpty()) {
+                    editor.putString("widget_shared_playlist_album_image_base64", albumBase64);
+                }
+                if (!avatarBase64.isEmpty()) {
+                    editor.putString("widget_shared_playlist_avatar_image_base64", avatarBase64);
+                }
+                editor.commit();
+
+                Log.d(TAG, "[fetchSharedPlaylist] Saved - albumBase64Len: " + albumBase64.length()
+                        + ", avatarBase64Len: " + avatarBase64.length());
+
+                // Re-render widget on main thread
+                mainHandler.post(() -> updateAppWidget(context, appWidgetManager, appWidgetId));
+
+            } catch (Exception e) {
+                Log.e(TAG, "[fetchSharedPlaylist] Failed", e);
+            }
+        });
+    }
+
+    /** Fetch album image URL from Spotify oEmbed. */
+    private static String fetchAlbumImageUrl(String trackId) {
+        try {
+            String trackUrl = "https://open.spotify.com/track/" + Uri.encode(trackId);
+            URL url = new URL("https://open.spotify.com/oembed?url=" + Uri.encode(trackUrl));
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+            conn.connect();
+            if (conn.getResponseCode() != 200) return null;
+            StringBuilder sb = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) sb.append(line);
+            }
+            JSONObject json = new JSONObject(sb.toString());
+            return json.optString("thumbnail_url", null);
+        } catch (Exception e) {
+            Log.w(TAG, "[fetchAlbumImageUrl] Failed for " + trackId, e);
+            return null;
+        }
+    }
+
+    /** Download an image URL and return as base64 string. */
+    private static String downloadImageAsBase64(String imageUrl) {
+        try {
+            URL url = new URL(imageUrl);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setDoInput(true);
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+            conn.connect();
+            InputStream input = conn.getInputStream();
+            java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = input.read(buffer)) != -1) {
+                baos.write(buffer, 0, bytesRead);
+            }
+            input.close();
+            return Base64.encodeToString(baos.toByteArray(), Base64.DEFAULT);
+        } catch (Exception e) {
+            Log.w(TAG, "[downloadImageAsBase64] Failed for " + imageUrl, e);
+            return "";
+        }
     }
 
     private static Bitmap getRoundedCornerBitmap(Bitmap bitmap, float cornerRadius) {

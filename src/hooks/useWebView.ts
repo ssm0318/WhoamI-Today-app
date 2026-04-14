@@ -36,6 +36,7 @@ const useWebView = () => {
   const ref = useRef<WebView>(null);
   const navigation = useNavigationService();
   const [tokens, setTokens] = useState({ csrftoken: '', access_token: '' });
+  const [tokenLoadComplete, setTokenLoadComplete] = useState(false);
   const { getCookie } = CookieStorage;
   const { registerOrUpdatePushToken } = useFirebaseMessage();
   const [isCanGoBack, setIsCanGoBack] = useState(false);
@@ -63,6 +64,7 @@ const useWebView = () => {
     const fetchTokens = async () => {
       const { access_token, csrftoken } = await getCookie();
       setTokens({ access_token, csrftoken });
+      setTokenLoadComplete(true);
     };
 
     fetchTokens();
@@ -370,6 +372,7 @@ const useWebView = () => {
     postMessage,
     injectCookieScript,
     tokens,
+    tokenLoadComplete,
     isCanGoBack,
     openCamera,
     openGallery,

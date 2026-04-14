@@ -174,14 +174,21 @@ public class WidgetDataModule extends ReactContextBaseJavaModule {
                 myCheckIn.put("created_at", createdAt);
                 Log.d(TAG, "[syncMyCheckIn] created_at: " + createdAt);
             }
-            if (checkInData.hasKey("mood")) {
-                String mood = checkInData.getString("mood");
-                myCheckIn.put("mood", mood);
+            if (checkInData.hasKey("mood") && !checkInData.isNull("mood")) {
+                String mood;
+                com.facebook.react.bridge.ReadableType moodType = checkInData.getType("mood");
+                if (moodType == com.facebook.react.bridge.ReadableType.Array) {
+                    com.facebook.react.bridge.ReadableArray arr = checkInData.getArray("mood");
+                    mood = (arr != null && arr.size() > 0) ? arr.getString(0) : "";
+                } else {
+                    mood = checkInData.getString("mood");
+                }
+                myCheckIn.put("mood", mood != null ? mood : "");
                 Log.d(TAG, "[syncMyCheckIn] mood: " + mood);
             }
             if (checkInData.hasKey("social_battery")) {
-                String socialBattery = checkInData.getString("social_battery");
-                myCheckIn.put("social_battery", socialBattery);
+                String socialBattery = checkInData.isNull("social_battery") ? null : checkInData.getString("social_battery");
+                myCheckIn.put("social_battery", socialBattery != null ? socialBattery : JSONObject.NULL);
                 Log.d(TAG, "[syncMyCheckIn] social_battery: " + socialBattery);
             }
             if (checkInData.hasKey("description")) {
@@ -208,8 +215,8 @@ public class WidgetDataModule extends ReactContextBaseJavaModule {
             boolean success = prefs.edit().putString("widget_data", finalJson).commit();
             
             Log.d(TAG, "[syncMyCheckIn] Data saved to SharedPreferences with commit(): " + success);
-            
-            updateWidgetsWithFollowUp(context);
+
+            updateCheckinWidget(context);
             
             long elapsed = System.currentTimeMillis() - startTime;
             Log.d(TAG, "[syncMyCheckIn] COMPLETE - Elapsed: " + elapsed + "ms");
@@ -232,7 +239,22 @@ public class WidgetDataModule extends ReactContextBaseJavaModule {
             root.remove("my_check_in");
             boolean success = prefs.edit().putString("widget_data", root.toString()).commit();
             Log.d(TAG, "[clearMyCheckIn] my_check_in cleared with commit(): " + success);
-            updateWidgetsWithFollowUp(context);
+            updateCheckinWidget(context);
+            promise.resolve(true);
+        } catch (Exception e) {
+            promise.reject("ERROR", e.getMessage());
+        }
+    }
+
+    @ReactMethod
+    public void syncApiBaseUrl(String url, Promise promise) {
+        try {
+            Context context = getReactApplicationContext();
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            boolean success = prefs.edit()
+                .putString("api_base_url", url)
+                .commit();
+            Log.d(TAG, "[syncApiBaseUrl] API base URL saved: " + url + ", commit: " + success);
             promise.resolve(true);
         } catch (Exception e) {
             promise.reject("ERROR", e.getMessage());
@@ -328,8 +350,8 @@ public class WidgetDataModule extends ReactContextBaseJavaModule {
             
             long elapsed = System.currentTimeMillis() - startTime;
             Log.d(TAG, "[syncSharedPlaylistTrack] Data saved with commit(): " + success + ", Elapsed: " + elapsed + "ms");
-            
-            updateWidgetsWithFollowUp(context);
+
+            updateAlbumWidget(context);
             
             promise.resolve(true);
         } catch (Exception e) {
@@ -363,8 +385,8 @@ public class WidgetDataModule extends ReactContextBaseJavaModule {
                 .commit();
             
             Log.d(TAG, "[clearSharedPlaylistTrack] Cleared with commit(): " + success);
-            
-            updateWidgetsWithFollowUp(context);
+
+            updateAlbumWidget(context);
             
             promise.resolve(true);
         } catch (Exception e) {
@@ -458,8 +480,8 @@ public class WidgetDataModule extends ReactContextBaseJavaModule {
             
             long elapsed = System.currentTimeMillis() - startTime;
             Log.d(TAG, "[syncFriendPost] Data saved with commit(): " + success + ", Elapsed: " + elapsed + "ms");
-            
-            updateWidgetsWithFollowUp(context);
+
+            updatePhotoWidget(context);
             
             promise.resolve(true);
         } catch (Exception e) {
@@ -493,8 +515,8 @@ public class WidgetDataModule extends ReactContextBaseJavaModule {
                 .commit();
             
             Log.d(TAG, "[clearFriendPost] Cleared with commit(): " + success);
-            
-            updateWidgetsWithFollowUp(context);
+
+            updatePhotoWidget(context);
             
             promise.resolve(true);
         } catch (Exception e) {
@@ -621,60 +643,53 @@ public class WidgetDataModule extends ReactContextBaseJavaModule {
         }
     }
 
-    private void updateWidgets(Context context) {
+    /** Update only the specified widget provider class. */
+    private void updateWidget(Context context, Class<?> providerClass) {
         if (context == null) return;
         try {
             AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
-            
-            // Update CheckinWidget
-            ComponentName checkinProvider = new ComponentName(context, com.whoami.today.app.widget.CheckinWidgetProvider.class);
-            int[] checkinIds = appWidgetManager.getAppWidgetIds(checkinProvider);
-            if (checkinIds.length > 0) {
-                Log.d(TAG, "[updateWidgets] Triggering update for " + checkinIds.length + " CheckinWidget(s)");
-                Intent checkinIntent = new Intent(context, com.whoami.today.app.widget.CheckinWidgetProvider.class);
-                checkinIntent.setAction(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
-                checkinIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, checkinIds);
-                context.sendBroadcast(checkinIntent);
+            ComponentName provider = new ComponentName(context, providerClass);
+            int[] ids = appWidgetManager.getAppWidgetIds(provider);
+            if (ids.length > 0) {
+                Intent intent = new Intent(context, providerClass);
+                intent.setAction(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
+                intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids);
+                context.sendBroadcast(intent);
             }
-            
-            // Update AlbumCoverWidget
-            ComponentName albumProvider = new ComponentName(context, com.whoami.today.app.widget.AlbumCoverWidgetProvider.class);
-            int[] albumIds = appWidgetManager.getAppWidgetIds(albumProvider);
-            if (albumIds.length > 0) {
-                Log.d(TAG, "[updateWidgets] Triggering update for " + albumIds.length + " AlbumCoverWidget(s)");
-                Intent albumIntent = new Intent(context, com.whoami.today.app.widget.AlbumCoverWidgetProvider.class);
-                albumIntent.setAction(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
-                albumIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, albumIds);
-                context.sendBroadcast(albumIntent);
-            }
-            
-            // Update PhotoWidget
-            ComponentName photoProvider = new ComponentName(context, com.whoami.today.app.widget.PhotoWidgetProvider.class);
-            int[] photoIds = appWidgetManager.getAppWidgetIds(photoProvider);
-            if (photoIds.length > 0) {
-                Log.d(TAG, "[updateWidgets] Triggering update for " + photoIds.length + " PhotoWidget(s)");
-                Intent photoIntent = new Intent(context, com.whoami.today.app.widget.PhotoWidgetProvider.class);
-                photoIntent.setAction(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
-                photoIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, photoIds);
-                context.sendBroadcast(photoIntent);
-            }
-            
-            Log.d(TAG, "[updateWidgets] Widget update broadcasts sent");
         } catch (Exception e) {
-            Log.e(TAG, "updateWidgets failed", e);
+            Log.e(TAG, "updateWidget failed for " + providerClass.getSimpleName(), e);
         }
+    }
+
+    /** Update all widget types. Used for auth token changes. */
+    private void updateWidgets(Context context) {
+        if (context == null) return;
+        updateWidget(context, com.whoami.today.app.widget.CheckinWidgetProvider.class);
+        updateWidget(context, com.whoami.today.app.widget.AlbumCoverWidgetProvider.class);
+        updateWidget(context, com.whoami.today.app.widget.PhotoWidgetProvider.class);
+        Log.d(TAG, "[updateWidgets] All widget update broadcasts sent");
     }
 
     private void updateWidgetsWithFollowUp(Context context) {
         if (context == null) return;
-        
         updateWidgets(context);
-        
-        // iOS-style delayed retry: send another broadcast after 800ms to ensure
-        // SharedPreferences data has been fully written to disk
         mainHandler.postDelayed(() -> {
-            Log.d(TAG, "[updateWidgetsWithFollowUp] Sending delayed follow-up widget update broadcast");
             updateWidgets(context);
         }, 800);
+    }
+
+    /** Update only CheckinWidget. */
+    private void updateCheckinWidget(Context context) {
+        updateWidget(context, com.whoami.today.app.widget.CheckinWidgetProvider.class);
+    }
+
+    /** Update only AlbumCoverWidget. */
+    private void updateAlbumWidget(Context context) {
+        updateWidget(context, com.whoami.today.app.widget.AlbumCoverWidgetProvider.class);
+    }
+
+    /** Update only PhotoWidget (friend post). */
+    private void updatePhotoWidget(Context context) {
+        updateWidget(context, com.whoami.today.app.widget.PhotoWidgetProvider.class);
     }
 }

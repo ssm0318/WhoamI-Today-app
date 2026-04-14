@@ -37,6 +37,7 @@ import {
   syncMyCheckInToWidget,
   syncSharedPlaylistTrackToWidget,
   syncFriendPostToWidget,
+  clearFriendPostFromWidget,
   syncTokensToWidget,
   triggerWidgetRefresh,
 } from '../../native/WidgetDataModule';
@@ -78,6 +79,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     postMessage,
     injectCookieScript,
     tokens,
+    tokenLoadComplete,
     isCanGoBack,
   } = useWebView();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -94,7 +96,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   // Detect version changes
   const versionChanged = useVersionCheckUpdate(tokens);
 
-  // Reload WebView when version changes
+  // Reload on version change (rare, after the initial load)
   useEffect(() => {
     if (versionChanged && ref.current) {
       console.log('[AppScreen] Version changed, reloading WebView');
@@ -126,25 +128,6 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
       APP_CONSTS.SPOTIFY_CLIENT_ID,
       APP_CONSTS.SPOTIFY_CLIENT_SECRET,
     );
-  }, []);
-
-  useEffect(() => {
-    const shouldReload = tokens.access_token && tokens.csrftoken && ref.current;
-    if (shouldReload) {
-      console.log('[AppScreen] Reloading WebView due to changes:', {
-        access_token: !!tokens.access_token,
-        csrftoken: !!tokens.csrftoken,
-      });
-      ref.current.reload();
-    }
-  }, [tokens.access_token, tokens.csrftoken]);
-
-  // Reload WebView only when app is completely terminated and restarted
-  useEffect(() => {
-    if (tokens.access_token && tokens.csrftoken) {
-      console.log('[AppScreen] App cold started, reloading WebView');
-      ref.current?.reload();
-    }
   }, []);
 
   const onPressHardwareBackButtonRef = useRef<() => boolean>(() => false);
@@ -295,6 +278,15 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
 
   // WebView rendering function: deep link → load base first, then redirect in onLoadEnd
   const renderWebView = () => {
+    // Wait until token loading is complete before rendering WebView
+    // This avoids a useless first load with empty cookies followed by a reload
+    if (!tokenLoadComplete) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#0000ff" />
+        </View>
+      );
+    }
     return (
       <WebView
         key={isDeepLinkPath ? `${BASE_URL}-redirect-${url}` : initialUri}
@@ -337,9 +329,12 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         contentInsetAdjustmentBehavior={
           Platform.OS === 'ios' ? 'automatic' : 'never'
         }
+        startInLoadingState={!isWebViewLoaded}
         renderLoading={() => (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#0000ff" />
+            {!isWebViewLoaded && (
+              <ActivityIndicator size="large" color="#0000ff" />
+            )}
           </View>
         )}
         onLoadEnd={() => {
@@ -547,50 +542,66 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         }
 
         // ── Friend post sync (independent from myCheckIn and shared playlist) ──
-        // Fetches /user/feed/full/?page=1 → picks a random unread post → fetches author avatar
-        // and post image (if any) as base64 → syncs to PhotoWidget. Wrapped in its own try/catch
-        // so a feed failure can't break the other flows.
+        // Fetches /user/friends/ → picks a random friend with unread posts → uses
+        // latest_unread_post for content/images → syncs to PhotoWidget.
         try {
-          console.log(
-            '[WidgetSync] Fetching friend posts from /user/feed/full/?page=1',
-          );
-          const feedResponse = (await ApiService.API.get('user/feed/full/', {
-            params: { page: 1 },
-          })) as {
-            results?: Array<{
+          console.log('[WidgetSync] Fetching friend list from /user/friends/');
+          const friendsRaw = await ApiService.API.get('user/friends/', {
+            params: { type: 'all' },
+          });
+          // Response may be paginated {results:[...]} or plain array
+          type FriendItem = {
+            id: number;
+            username: string;
+            profile_image: string | null;
+            unread_post_cnt: number;
+            latest_unread_post: {
               id: number;
               type: string;
               content: string;
               images: string[];
-              current_user_read: boolean;
-              author_detail: {
-                username: string;
-                profile_image: string | null;
-              };
-            }>;
+            } | null;
           };
-          const allPosts = feedResponse?.results ?? [];
-          const unreadPosts = allPosts.filter((p) => !p.current_user_read);
-          console.log('[WidgetSync] Friend posts count:', {
-            total: allPosts.length,
-            unread: unreadPosts.length,
+          const allFriends: FriendItem[] = Array.isArray(friendsRaw)
+            ? friendsRaw
+            : (friendsRaw as any)?.results ?? [];
+          console.log('[WidgetSync] Friend list response:', {
+            isArray: Array.isArray(friendsRaw),
+            friendCount: allFriends.length,
+            sample: allFriends[0]
+              ? {
+                  username: allFriends[0].username,
+                  unread_post_cnt: allFriends[0].unread_post_cnt,
+                  hasLatestPost: !!allFriends[0].latest_unread_post,
+                }
+              : null,
           });
-          if (unreadPosts.length > 0) {
-            const randomIdx = Math.floor(Math.random() * unreadPosts.length);
-            const picked = unreadPosts[randomIdx];
-            console.log('[WidgetSync] Picked random unread post:', {
+          const friendsWithPosts = allFriends.filter(
+            (f) => f.unread_post_cnt > 0 && f.latest_unread_post,
+          );
+          console.log('[WidgetSync] Friends with unread posts:', {
+            total: allFriends.length,
+            withPosts: friendsWithPosts.length,
+          });
+          if (friendsWithPosts.length > 0) {
+            const randomIdx = Math.floor(
+              Math.random() * friendsWithPosts.length,
+            );
+            const pickedFriend = friendsWithPosts[randomIdx];
+            const post = pickedFriend.latest_unread_post!;
+            console.log('[WidgetSync] Picked friend with unread post:', {
               idx: randomIdx,
-              id: picked.id,
-              type: picked.type,
-              contentLen: picked.content?.length ?? 0,
-              imagesCount: picked.images?.length ?? 0,
-              authorUsername: picked.author_detail.username,
-              hasAuthorImage: !!picked.author_detail.profile_image,
+              friendUsername: pickedFriend.username,
+              profileImage: pickedFriend.profile_image,
+              postId: post.id,
+              postType: post.type,
+              contentLen: post.content?.length ?? 0,
+              imagesCount: post.images?.length ?? 0,
             });
             const [authorImageBase64, postImageBase64] = await Promise.all([
-              fetchImageAsBase64(picked.author_detail.profile_image),
-              picked.images && picked.images.length > 0
-                ? fetchImageAsBase64(picked.images[0])
+              fetchImageAsBase64(pickedFriend.profile_image),
+              post.images && post.images.length > 0
+                ? fetchImageAsBase64(post.images[0])
                 : Promise.resolve(''),
             ]);
             console.log('[WidgetSync] Friend post images fetched', {
@@ -599,20 +610,21 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
             });
             await syncFriendPostToWidget(
               {
-                id: picked.id,
-                type: picked.type,
-                content: picked.content,
-                images: picked.images,
-                currentUserRead: picked.current_user_read,
-                authorUsername: picked.author_detail.username,
+                id: post.id,
+                type: post.type,
+                content: post.content,
+                images: post.images,
+                currentUserRead: false,
+                authorUsername: pickedFriend.username,
               },
               authorImageBase64,
               postImageBase64,
             );
           } else {
             console.warn(
-              '[WidgetSync] No unread posts in friend feed — PhotoWidget will show empty state',
+              '[WidgetSync] No friends with unread posts — clearing PhotoWidget',
             );
+            await clearFriendPostFromWidget();
           }
         } catch (fpErr) {
           console.warn('[WidgetSync] Friend post sync failed:', fpErr);
@@ -626,6 +638,16 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
       }
     })();
   }, [tokens.access_token, tokens.csrftoken]);
+
+  // Run widget sync once when tokens first become available (cold start)
+  const initialSyncDoneRef = useRef(false);
+  useEffect(() => {
+    if (!tokens.access_token || !tokens.csrftoken) return;
+    if (initialSyncDoneRef.current) return;
+    initialSyncDoneRef.current = true;
+    console.log('[WidgetSync] Initial token load → triggering runWidgetSync');
+    runWidgetSync();
+  }, [tokens.access_token, tokens.csrftoken, runWidgetSync]);
 
   useAppStateEffect(
     (state) => {

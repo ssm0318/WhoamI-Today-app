@@ -171,7 +171,8 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
                     }
                 }
             } else {
-                Log.w(TAG, "[updateAppWidget] No my_check_in in widget_data - widget will show empty state");
+                Log.w(TAG, "[updateAppWidget] No my_check_in in widget_data - will try API fetch");
+                fetchCheckInFromApi(context, appWidgetManager, appWidgetId, prefs);
             }
         } catch (Exception e) {
             Log.e(TAG, "[updateAppWidget] Error parsing widget data", e);
@@ -259,6 +260,153 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
             long elapsed = System.currentTimeMillis() - startTime;
             Log.d(TAG, "[updateAppWidget] COMPLETE (no album) - Widget ID: " + appWidgetId + ", Elapsed: " + elapsed + "ms");
         }
+    }
+
+    /**
+     * When widget has no check-in data, fetch directly from API in background
+     * and update the widget once data arrives.
+     */
+    private static void fetchCheckInFromApi(Context context, AppWidgetManager appWidgetManager,
+            int appWidgetId, SharedPreferences prefs) {
+        String apiBaseUrl = prefs.getString("api_base_url", "https://whoami-test-group.gina-park.site/api/");
+        String accessToken = prefs.getString("access_token", "");
+        String csrftoken = prefs.getString("csrftoken", "");
+
+        if (apiBaseUrl.isEmpty() || accessToken.isEmpty()) {
+            Log.w(TAG, "[fetchCheckInFromApi] Missing api_base_url or access_token, skipping");
+            return;
+        }
+
+        executor.execute(() -> {
+            try {
+                String endpoint = apiBaseUrl + "user/me/profile";
+                Log.d(TAG, "[fetchCheckInFromApi] Fetching: " + endpoint);
+
+                URL url = new URL(endpoint);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+                conn.setRequestProperty("Cookie",
+                        "csrftoken=" + csrftoken + "; access_token=" + accessToken);
+                conn.setRequestProperty("X-CSRFToken", csrftoken);
+                conn.connect();
+
+                int responseCode = conn.getResponseCode();
+                if (responseCode != 200) {
+                    Log.w(TAG, "[fetchCheckInFromApi] API returned " + responseCode);
+                    return;
+                }
+
+                StringBuilder sb = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) sb.append(line);
+                }
+
+                JSONObject profile = new JSONObject(sb.toString());
+                if (!profile.has("check_in") || profile.isNull("check_in")) {
+                    Log.w(TAG, "[fetchCheckInFromApi] No check_in in profile response");
+                    return;
+                }
+
+                JSONObject apiCheckIn = profile.getJSONObject("check_in");
+                JSONObject myCheckIn = new JSONObject();
+
+                if (apiCheckIn.has("id")) myCheckIn.put("id", apiCheckIn.getInt("id"));
+                if (apiCheckIn.has("is_active")) myCheckIn.put("is_active", apiCheckIn.getBoolean("is_active"));
+                if (apiCheckIn.has("created_at")) myCheckIn.put("created_at", apiCheckIn.getString("created_at"));
+
+                // mood: API returns array of emoji strings — take first
+                if (apiCheckIn.has("mood") && !apiCheckIn.isNull("mood")) {
+                    Object moodObj = apiCheckIn.get("mood");
+                    if (moodObj instanceof org.json.JSONArray) {
+                        org.json.JSONArray arr = (org.json.JSONArray) moodObj;
+                        myCheckIn.put("mood", arr.length() > 0 ? arr.getString(0) : "");
+                    } else {
+                        myCheckIn.put("mood", moodObj.toString());
+                    }
+                }
+
+                // social_battery: nullable
+                if (apiCheckIn.has("social_battery") && !apiCheckIn.isNull("social_battery")) {
+                    myCheckIn.put("social_battery", apiCheckIn.getString("social_battery"));
+                } else {
+                    myCheckIn.put("social_battery", JSONObject.NULL);
+                }
+
+                // API returns "thought", widget expects "description"
+                if (apiCheckIn.has("thought") && !apiCheckIn.isNull("thought")) {
+                    myCheckIn.put("description", apiCheckIn.getString("thought"));
+                } else if (apiCheckIn.has("description") && !apiCheckIn.isNull("description")) {
+                    myCheckIn.put("description", apiCheckIn.getString("description"));
+                }
+
+                // Fetch active song from check_in/song/ endpoint
+                try {
+                    String songEndpoint = apiBaseUrl + "check_in/song/";
+                    Log.d(TAG, "[fetchCheckInFromApi] Fetching songs: " + songEndpoint);
+                    URL songUrl = new URL(songEndpoint);
+                    HttpURLConnection songConn = (HttpURLConnection) songUrl.openConnection();
+                    songConn.setRequestMethod("GET");
+                    songConn.setConnectTimeout(5000);
+                    songConn.setReadTimeout(5000);
+                    songConn.setRequestProperty("Cookie",
+                            "csrftoken=" + csrftoken + "; access_token=" + accessToken);
+                    songConn.setRequestProperty("X-CSRFToken", csrftoken);
+                    songConn.connect();
+                    if (songConn.getResponseCode() == 200) {
+                        StringBuilder songSb = new StringBuilder();
+                        try (BufferedReader r = new BufferedReader(
+                                new InputStreamReader(songConn.getInputStream(), StandardCharsets.UTF_8))) {
+                            String l; while ((l = r.readLine()) != null) songSb.append(l);
+                        }
+                        // Response: {results: [...]} or bare array
+                        String songBody = songSb.toString().trim();
+                        org.json.JSONArray songs;
+                        if (songBody.startsWith("{")) {
+                            JSONObject songObj = new JSONObject(songBody);
+                            songs = songObj.optJSONArray("results");
+                            if (songs == null) songs = new org.json.JSONArray();
+                        } else {
+                            songs = new org.json.JSONArray(songBody);
+                        }
+                        for (int i = 0; i < songs.length(); i++) {
+                            JSONObject song = songs.getJSONObject(i);
+                            if (song.optBoolean("is_active", false)) {
+                                String trackId = song.optString("track_id", "");
+                                if (!trackId.isEmpty()) {
+                                    myCheckIn.put("track_id", trackId);
+                                    String albumUrl = fetchAlbumImageUrlFromSpotifyOEmbed(trackId);
+                                    if (albumUrl != null) {
+                                        myCheckIn.put("album_image_url", albumUrl);
+                                    }
+                                    Log.d(TAG, "[fetchCheckInFromApi] Active song: " + trackId);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                } catch (Exception songErr) {
+                    Log.w(TAG, "[fetchCheckInFromApi] Song fetch failed (non-fatal)", songErr);
+                }
+
+                // Save to SharedPreferences
+                String existingJson = prefs.getString("widget_data", "{}");
+                JSONObject root = new JSONObject(existingJson);
+                root.put("my_check_in", myCheckIn);
+                prefs.edit().putString("widget_data", root.toString()).commit();
+
+                Log.d(TAG, "[fetchCheckInFromApi] Saved check-in from API: " + myCheckIn.toString());
+
+                // Update widget on main thread
+                mainHandler.post(() -> updateAppWidget(context, appWidgetManager, appWidgetId));
+
+            } catch (Exception e) {
+                Log.e(TAG, "[fetchCheckInFromApi] Failed", e);
+            }
+        });
     }
 
     /** Build a PendingIntent that opens the app via a deep link with a unique requestCode. */

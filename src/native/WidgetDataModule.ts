@@ -1,4 +1,5 @@
 import { NativeModules } from 'react-native';
+import { API_URL } from '../constants/app';
 
 interface MyCheckInData {
   id: number;
@@ -47,6 +48,7 @@ interface WidgetDataModuleInterface {
     postImageBase64: string,
   ): Promise<boolean>;
   clearFriendPost(): Promise<boolean>;
+  syncApiBaseUrl(url: string): Promise<boolean>;
   syncVersionType(versionType: string): Promise<boolean>;
   clearAuthTokens(): Promise<boolean>;
   clearMyCheckIn(): Promise<boolean>;
@@ -97,6 +99,10 @@ export const syncTokensToWidget = async (
     await (WidgetDataModule as WidgetDataModuleInterface).syncAuthTokens(
       csrftoken,
       accessToken,
+    );
+    // Also sync API base URL so widget can self-fetch check-in data
+    await (WidgetDataModule as WidgetDataModuleInterface).syncApiBaseUrl(
+      API_URL,
     );
     console.log('[WidgetSync] syncTokensToWidget native call succeeded');
   } catch (error) {
@@ -169,12 +175,17 @@ export const syncMyCheckInToWidget = async (checkIn: {
   });
 
   try {
+    // Normalize mood: API may return an array of emojis — widget expects a single string
+    const normalizedMood = Array.isArray(checkIn.mood)
+      ? checkIn.mood[0] ?? ''
+      : checkIn.mood;
+
     // Convert to snake_case for iOS native module
     const checkInData: MyCheckInData = {
       id: checkIn.id,
       is_active: checkIn.isActive,
       created_at: checkIn.createdAt,
-      mood: checkIn.mood,
+      mood: normalizedMood,
       social_battery: checkIn.socialBattery,
       description: checkIn.description,
       track_id: checkIn.trackId,
