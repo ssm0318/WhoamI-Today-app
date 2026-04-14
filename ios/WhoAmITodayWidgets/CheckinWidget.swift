@@ -1,9 +1,6 @@
 import WidgetKit
 import SwiftUI
 import UIKit
-import os
-
-private let widgetLogger = Logger(subsystem: "com.whoami.today.app.widgets", category: "CheckinWidget")
 
 extension View {
     @ViewBuilder
@@ -38,8 +35,6 @@ struct CheckinWidgetProvider: TimelineProvider {
     }
 
     func placeholder(in context: Context) -> CheckinWidgetEntry {
-        // Previously hardcoded myCheckIn: nil, which caused iOS's cached placeholder
-        // snapshot to show "checkIn=nil" on the home screen forever. Read real data.
         currentEntry()
     }
 
@@ -48,41 +43,10 @@ struct CheckinWidgetProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<CheckinWidgetEntry>) -> Void) {
-        // Synchronous reads only — the completion is called immediately, avoiding
-        // the "Task { … await URLSession } → maybe completion never fires" hazard.
         let isAuth = SharedDataManager.shared.isAuthenticated
         let isDefault = SharedDataManager.shared.isDefaultVersion
-        let rawCheckInBytes = SharedDataManager.shared.rawMyCheckInBytes
         let checkIn = SharedDataManager.shared.myCheckIn
         let albumImageData: Data? = SharedDataManager.shared.cachedAlbumImageData
-
-        // Record raw-bytes-present vs decode-success separately so we can tell whether
-        // the App Group read failed OR JSON decoding failed when checkIn ends up nil.
-        SharedDataManager.shared.writeCheckInRawState(
-            rawBytesPresent: rawCheckInBytes != nil,
-            decodeOk: checkIn != nil
-        )
-
-        // Diagnostic logging — figure out why mood/battery render as "?" boxes
-        if let c = checkIn {
-            let moodScalars = c.mood.unicodeScalars.map { String(format: "U+%04X", $0.value) }.joined(separator: " ")
-            let battScalars = (c.socialBattery ?? "").unicodeScalars.map { String(format: "U+%04X", $0.value) }.joined(separator: " ")
-            widgetLogger.notice("getTimeline: id=\(c.id, privacy: .public) mood='\(c.mood, privacy: .public)' [\(moodScalars, privacy: .public)] feelingDisplay='\(c.feelingDisplay ?? "nil", privacy: .public)' batt='\(c.socialBattery ?? "nil", privacy: .public)' [\(battScalars, privacy: .public)] batteryDisplay='\(c.batteryDisplay ?? "nil", privacy: .public)' descLen=\(c.description.count, privacy: .public) trackId='\(c.trackId, privacy: .public)' albumUrl='\(c.albumImageUrl ?? "nil", privacy: .public)'")
-            SharedDataManager.shared.writeDiagnostics(
-                mood: c.mood,
-                battery: c.socialBattery ?? "nil",
-                feelingDisplay: c.feelingDisplay ?? "nil",
-                batteryDisplay: c.batteryDisplay ?? "nil"
-            )
-        } else {
-            widgetLogger.notice("getTimeline: myCheckIn=nil isAuth=\(isAuth, privacy: .public) isDefault=\(isDefault, privacy: .public)")
-            SharedDataManager.shared.writeDiagnostics(
-                mood: "(nil checkIn)",
-                battery: "(nil checkIn)",
-                feelingDisplay: "(nil checkIn)",
-                batteryDisplay: "(nil checkIn)"
-            )
-        }
 
         let entry = CheckinWidgetEntry(
             date: Date(),
@@ -96,22 +60,93 @@ struct CheckinWidgetProvider: TimelineProvider {
         let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
         completion(timeline)
 
-        // Fire-and-forget: refresh the album image cache for the NEXT getTimeline call.
-        // Must not block the completion above — iOS may stop rendering if completion is
-        // delayed or if the Task gets cancelled.
-        if isAuth && !isDefault,
-           let checkIn = checkIn,
-           let urlString = checkIn.albumImageUrl,
-           let url = URL(string: urlString) {
+        // Fire-and-forget: self-fetch check-in from API when no cached data
+        if isAuth && !isDefault && checkIn == nil {
             Task.detached {
-                do {
-                    let (data, _) = try await URLSession.shared.data(from: url)
-                    SharedDataManager.shared.cachedAlbumImageData = data
-                } catch {
-                    // ignore — best-effort cache update
+                await Self.fetchCheckInFromApi()
+            }
+        }
+
+        // Fire-and-forget: refresh the album image cache for the NEXT getTimeline call.
+        if isAuth && !isDefault, let checkIn = checkIn {
+            Task.detached {
+                var imageUrl: URL? = nil
+                if let urlString = checkIn.albumImageUrl, let url = URL(string: urlString) {
+                    imageUrl = url
+                } else if !checkIn.trackId.isEmpty {
+                    // Spotify oEmbed fallback when only track_id is available
+                    imageUrl = await WidgetAPIHelper.fetchSpotifyAlbumImageUrl(trackId: checkIn.trackId)
+                }
+                if let url = imageUrl {
+                    if let data = await WidgetAPIHelper.downloadImageData(from: url) {
+                        SharedDataManager.shared.cachedAlbumImageData = data
+                    }
                 }
             }
         }
+    }
+
+    /// Fetch check-in from API, save to App Group, then reload timeline.
+    /// Matches Android CheckinWidgetProvider.fetchCheckInFromApi logic.
+    private static func fetchCheckInFromApi() async {
+        guard let profile = await WidgetAPIHelper.fetchJSON(endpoint: "user/me/profile") else { return }
+        guard let apiCheckIn = profile["check_in"] as? [String: Any] else { return }
+
+        // Build my_check_in JSON matching the MyCheckIn Codable model
+        var myCheckIn: [String: Any] = [:]
+        myCheckIn["id"] = apiCheckIn["id"] as? Int ?? 0
+        myCheckIn["is_active"] = apiCheckIn["is_active"] as? Bool ?? false
+        myCheckIn["created_at"] = apiCheckIn["created_at"] as? String ?? ""
+
+        // mood: API may return array of emoji strings — take first
+        if let moodArray = apiCheckIn["mood"] as? [String] {
+            myCheckIn["mood"] = moodArray.first ?? ""
+        } else {
+            myCheckIn["mood"] = apiCheckIn["mood"] as? String ?? ""
+        }
+
+        // social_battery: nullable
+        myCheckIn["social_battery"] = apiCheckIn["social_battery"] as? String
+
+        // API returns "thought", widget expects "description"
+        if let thought = apiCheckIn["thought"] as? String {
+            myCheckIn["description"] = thought
+        } else {
+            myCheckIn["description"] = apiCheckIn["description"] as? String ?? ""
+        }
+
+        // Default empty track_id
+        myCheckIn["track_id"] = ""
+
+        // Fetch active song from check_in/song/ endpoint
+        if let songJson = await WidgetAPIHelper.fetchJSON(endpoint: "check_in/song/") {
+            let songs: [[String: Any]]
+            if let results = songJson["results"] as? [[String: Any]] {
+                songs = results
+            } else {
+                songs = []
+            }
+            for song in songs {
+                if song["is_active"] as? Bool == true {
+                    let trackId = song["track_id"] as? String ?? ""
+                    if !trackId.isEmpty {
+                        myCheckIn["track_id"] = trackId
+                        // Get album image URL via Spotify oEmbed
+                        if let albumUrl = await WidgetAPIHelper.fetchSpotifyAlbumImageUrl(trackId: trackId) {
+                            myCheckIn["album_image_url"] = albumUrl.absoluteString
+                            // Cache the album image
+                            if let albumData = await WidgetAPIHelper.downloadImageData(from: albumUrl) {
+                                WidgetAPIHelper.storeData(albumData, forKey: "widget_album_image")
+                            }
+                        }
+                    }
+                    break
+                }
+            }
+        }
+
+        WidgetAPIHelper.storeJSON(myCheckIn, forKey: "my_check_in")
+        WidgetCenter.shared.reloadTimelines(ofKind: "CheckinWidgetV2")
     }
 }
 
@@ -130,25 +165,6 @@ struct CheckinWidgetView: View {
         }
     }
 
-    private var debugMoodText: String {
-        // Read live data at render time, in addition to the entry iOS passed us.
-        // If entry.myCheckIn is nil but live is not, iOS is rendering a stale cached entry.
-        let live = SharedDataManager.shared.myCheckIn
-        let entryStatus: String
-        if let c = entry.myCheckIn {
-            entryStatus = "entry:mood='\(c.mood)'"
-        } else {
-            entryStatus = "entry:nil"
-        }
-        let liveStatus: String
-        if let l = live {
-            liveStatus = "live:mood='\(l.mood)'"
-        } else {
-            liveStatus = "live:nil"
-        }
-        return "v4 \(entryStatus) \(liveStatus)"
-    }
-
     var checkinContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header: "My Checkin" left, refresh icon right
@@ -164,18 +180,8 @@ struct CheckinWidgetView: View {
                 }
             }
             .padding(.horizontal, 4)
-            .padding(.bottom, 2)
+            .padding(.bottom, 6)
             .unredacted()
-
-            // TEMP DEBUG STRIP — remove after diagnosis
-            Text(debugMoodText)
-                .font(.system(size: 7))
-                .foregroundColor(.red)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .padding(.horizontal, 4)
-                .padding(.bottom, 4)
-                .unredacted()
 
             Spacer(minLength: 4)
 

@@ -14,6 +14,7 @@
 		195E6B36C067DF7FF874B24C /* libPods-whoAmIToday-whoAmITodaySecond.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 0145302C611A9F26B06D91D6 /* libPods-whoAmIToday-whoAmITodaySecond.a */; };
 		2C16F4FA73DE139FEECD6858 /* libPods-whoAmIToday.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F2459E5ADCBE0FCBF447E655 /* libPods-whoAmIToday.a */; };
 		329FFB1B35C20B75A7CE3E5C /* SharedDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A43E660C6D82539824BB52BB /* SharedDataManager.swift */; };
+		A1B2C3D4E5F60718DEADBEEF /* WidgetAPIHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718BEEFDEAD /* WidgetAPIHelper.swift */; };
 		335346C12A04E11300E15B67 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 335346C02A04E11300E15B67 /* GoogleService-Info.plist */; };
 		337225952D9EBEAD004127FB /* AppDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = 13B07FB01A68108700A75B9A /* AppDelegate.mm */; };
 		337225962D9EBEAD004127FB /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 13B07FB71A68108700A75B9A /* main.m */; };
@@ -116,6 +117,7 @@
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = whoAmIToday/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		953F5D4083B006E75D45D6AC /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = whoAmIToday/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		A43E660C6D82539824BB52BB /* SharedDataManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SharedDataManager.swift; path = SharedDataManager.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718BEEFDEAD /* WidgetAPIHelper.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WidgetAPIHelper.swift; path = WidgetAPIHelper.swift; sourceTree = "<group>"; };
 		AE4F93D3DE7FCE3906A9CDF2 /* WhoAmITodayWidgets.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; name = WhoAmITodayWidgets.entitlements; path = WhoAmITodayWidgets.entitlements; sourceTree = "<group>"; };
 		C0CCC44585BDBA2B534517DD /* DefaultVersionView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DefaultVersionView.swift; path = DefaultVersionView.swift; sourceTree = "<group>"; };
 		CCC4B6840E26EC4FED138891 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
@@ -293,6 +295,7 @@
 				5412A1EDD1E2E221314FA1FB /* AlbumCoverWidget.swift */,
 				D6E58EE1A34674C60374CCBD /* CheckinWidget.swift */,
 				A43E660C6D82539824BB52BB /* SharedDataManager.swift */,
+				A1B2C3D4E5F60718BEEFDEAD /* WidgetAPIHelper.swift */,
 				605ECE7C4119C7D60C7FCDFE /* Assets.xcassets */,
 				DA52B36279E8148618B96C53 /* Info.plist */,
 				AE4F93D3DE7FCE3906A9CDF2 /* WhoAmITodayWidgets.entitlements */,
@@ -738,6 +741,7 @@
 				7D8F79E82B20C5B1DEF5FB2D /* SignInView.swift in Sources */,
 				5438CDA7740D874BF54F6612 /* DefaultVersionView.swift in Sources */,
 				CB7BDCD0CB12EA7DBD13FA64 /* WidgetModels.swift in Sources */,
+				A1B2C3D4E5F60718DEADBEEF /* WidgetAPIHelper.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

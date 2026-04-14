@@ -329,6 +329,18 @@ RCT_EXPORT_METHOD(getWidgetDiagnostics:(RCTPromiseResolveBlock)resolve
     NSInteger albumAvatarLen = [sharedDefaults integerForKey:@"album_widget_last_avatar_image_len"];
     NSString *albumDecodeErr = [sharedDefaults stringForKey:@"album_widget_last_decode_error"] ?: @"";
 
+    // Friend post diagnostics
+    NSData *fpJsonData = [sharedDefaults dataForKey:@"friend_post"];
+    NSString *fpJsonString = @"";
+    if (fpJsonData) {
+        NSString *decoded = [[NSString alloc] initWithData:fpJsonData encoding:NSUTF8StringEncoding];
+        if (decoded) {
+            fpJsonString = decoded;
+        }
+    }
+    NSData *fpImageData = [sharedDefaults dataForKey:@"widget_friend_post_image"];
+    NSData *fpAuthorData = [sharedDefaults dataForKey:@"widget_friend_post_author_image"];
+
     resolve(@{
         @"lastSeenMood": mood,
         @"lastSeenBattery": battery,
@@ -347,9 +359,107 @@ RCT_EXPORT_METHOD(getWidgetDiagnostics:(RCTPromiseResolveBlock)resolve
         @"albumLastAlbumImageLen": @(albumImgLen),
         @"albumLastAvatarImageLen": @(albumAvatarLen),
         @"albumLastDecodeError": albumDecodeErr,
+        @"friendPostJson": fpJsonString,
+        @"friendPostImageLen": @(fpImageData.length),
+        @"friendPostAuthorImageLen": @(fpAuthorData.length),
         @"csrftokenLen": @(csrfLen),
         @"accessTokenLen": @(accessLen)
     });
+}
+
+// Sync API base URL to App Group UserDefaults (used by widget self-fetch)
+RCT_EXPORT_METHOD(syncApiBaseUrl:(NSString *)url
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+    NSUserDefaults *sharedDefaults = [[NSUserDefaults alloc]
+        initWithSuiteName:@"group.com.whoami.today.app"];
+
+    if (sharedDefaults) {
+        [sharedDefaults setObject:url forKey:@"api_base_url"];
+        [sharedDefaults synchronize];
+
+        resolve(@YES);
+    } else {
+        reject(@"ERROR", @"Failed to access shared UserDefaults", nil);
+    }
+}
+
+// Sync a friend post to App Group UserDefaults.
+// Stores the post metadata as JSON, plus base64-decoded author avatar and post image binaries.
+// PhotoWidget reads these directly without making network calls.
+RCT_EXPORT_METHOD(syncFriendPost:(NSDictionary *)postData
+                  authorImageBase64:(NSString *)authorImageBase64
+                  postImageBase64:(NSString *)postImageBase64
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+    NSUserDefaults *sharedDefaults = [[NSUserDefaults alloc]
+        initWithSuiteName:@"group.com.whoami.today.app"];
+
+    if (!sharedDefaults) {
+        reject(@"ERROR", @"Failed to access shared UserDefaults", nil);
+        return;
+    }
+
+    // Post metadata → JSON
+    NSError *error;
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:postData
+                                                       options:0
+                                                         error:&error];
+    if (error) {
+        reject(@"ERROR", @"Failed to serialize friend post data", error);
+        return;
+    }
+    [sharedDefaults setObject:jsonData forKey:@"friend_post"];
+
+    // Author avatar binary (optional — empty string clears it)
+    if (authorImageBase64.length > 0) {
+        NSData *authorData = [[NSData alloc] initWithBase64EncodedString:authorImageBase64
+                                                                options:NSDataBase64DecodingIgnoreUnknownCharacters];
+        if (authorData) {
+            [sharedDefaults setObject:authorData forKey:@"widget_friend_post_author_image"];
+        }
+    } else {
+        [sharedDefaults removeObjectForKey:@"widget_friend_post_author_image"];
+    }
+
+    // Post image binary (optional)
+    if (postImageBase64.length > 0) {
+        NSData *postImgData = [[NSData alloc] initWithBase64EncodedString:postImageBase64
+                                                                  options:NSDataBase64DecodingIgnoreUnknownCharacters];
+        if (postImgData) {
+            [sharedDefaults setObject:postImgData forKey:@"widget_friend_post_image"];
+        }
+    } else {
+        [sharedDefaults removeObjectForKey:@"widget_friend_post_image"];
+    }
+
+    [sharedDefaults synchronize];
+
+    [self reloadWidgetTimelinesWithFollowUp];
+    resolve(@YES);
+}
+
+// Clear friend post data (used on logout)
+RCT_EXPORT_METHOD(clearFriendPost:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+    NSUserDefaults *sharedDefaults = [[NSUserDefaults alloc]
+        initWithSuiteName:@"group.com.whoami.today.app"];
+
+    if (sharedDefaults) {
+        [sharedDefaults removeObjectForKey:@"friend_post"];
+        [sharedDefaults removeObjectForKey:@"widget_friend_post_image"];
+        [sharedDefaults removeObjectForKey:@"widget_friend_post_author_image"];
+        [sharedDefaults synchronize];
+
+        [self reloadWidgetTimelines];
+
+        resolve(@YES);
+    } else {
+        reject(@"ERROR", @"Failed to access shared UserDefaults", nil);
+    }
 }
 
 // Sync user version type to App Group UserDefaults

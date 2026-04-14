@@ -30,6 +30,10 @@ class SharedDataManager {
         userVersionType == "default"
     }
 
+    var apiBaseUrl: String? {
+        sharedDefaults?.string(forKey: "api_base_url")
+    }
+
     var myCheckIn: MyCheckIn? {
         guard let data = sharedDefaults?.data(forKey: "my_check_in") else {
             return nil
@@ -41,6 +45,30 @@ class SharedDataManager {
         get { sharedDefaults?.data(forKey: "widget_album_image") }
         set {
             sharedDefaults?.set(newValue, forKey: "widget_album_image")
+            sharedDefaults?.synchronize()
+        }
+    }
+
+    // Friend post displayed in the PhotoWidget.
+    var friendPost: FriendPost? {
+        guard let data = sharedDefaults?.data(forKey: "friend_post") else {
+            return nil
+        }
+        return try? JSONDecoder().decode(FriendPost.self, from: data)
+    }
+
+    var cachedFriendPostImage: Data? {
+        get { sharedDefaults?.data(forKey: "widget_friend_post_image") }
+        set {
+            sharedDefaults?.set(newValue, forKey: "widget_friend_post_image")
+            sharedDefaults?.synchronize()
+        }
+    }
+
+    var cachedFriendPostAuthorImage: Data? {
+        get { sharedDefaults?.data(forKey: "widget_friend_post_author_image") }
+        set {
+            sharedDefaults?.set(newValue, forKey: "widget_friend_post_author_image")
             sharedDefaults?.synchronize()
         }
     }

@@ -54,6 +54,27 @@ struct MyCheckIn: Codable {
     }
 }
 
+// A friend's post displayed in the PhotoWidget.
+// Synced from the RN app via syncFriendPost — widget reads the cached binary
+// images directly from SharedDataManager.
+struct FriendPost: Codable {
+    let id: Int
+    let type: String
+    let content: String
+    let images: [String]
+    let currentUserRead: Bool
+    let authorUsername: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case type
+        case content
+        case images
+        case currentUserRead = "current_user_read"
+        case authorUsername = "author_username"
+    }
+}
+
 // One track from the shared playlist (someone else's song that the user discovers).
 // Synced from the RN app via syncSharedPlaylistTrack — widget reads the cached binary
 // images directly from SharedDataManager and never makes network calls.
