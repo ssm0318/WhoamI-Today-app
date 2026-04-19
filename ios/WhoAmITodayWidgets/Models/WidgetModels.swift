@@ -1,9 +1,9 @@
 import Foundation
 
 struct MyCheckIn: Codable {
-    let id: Int
-    let isActive: Bool
-    let createdAt: String
+    let id: Int?
+    let isActive: Bool?
+    let createdAt: String?
     let mood: String
     let socialBattery: String?
     let description: String

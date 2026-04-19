@@ -4,29 +4,50 @@
 
 RCT_EXPORT_MODULE();
 
-// Widget kind must match WhoAmITodayWidget.swift: let kind = "WhoAmITodayWidget"
-static NSString *const kWidgetKind = @"WhoAmITodayWidget";
+static NSArray *kWidgetKinds = nil;
 
-// Helper method to reload widget timelines using runtime check
++ (void)initialize {
+    if (self == [WidgetDataModule class]) {
+        kWidgetKinds = @[
+            @"WhoAmITodayWidget",
+            @"PhotoWidget",
+            // V2 kinds — old "AlbumCoverWidget" / "CheckinWidget" kinds were bumped
+            // to force iOS to discard cached snapshots for stale widget instances.
+            @"AlbumCoverWidgetV2",
+            @"CheckinWidgetV2"
+        ];
+    }
+}
+
 - (void)reloadWidgetTimelines {
     if (@available(iOS 14.0, *)) {
         Class WidgetCenterClass = NSClassFromString(@"WidgetCenter");
         if (WidgetCenterClass) {
             id sharedCenter = [WidgetCenterClass performSelector:@selector(shared)];
             if (sharedCenter) {
-                NSLog(@"[WidgetBridge] reloadWidgetTimelines: calling reloadAllTimelines");
                 [sharedCenter performSelector:@selector(reloadAllTimelines)];
-                // Also request our widget kind specifically; can help when app is in background
-                SEL reloadKindSel = NSSelectorFromString(@"reloadTimelinesOfKind:");
-                if ([sharedCenter respondsToSelector:reloadKindSel]) {
-                    [sharedCenter performSelector:reloadKindSel withObject:kWidgetKind];
-                    NSLog(@"[WidgetBridge] reloadWidgetTimelines: called reloadTimelines(ofKind: %@)", kWidgetKind);
+                if (@available(iOS 15.0, *)) {
+                    SEL reloadKind = NSSelectorFromString(@"reloadTimelinesOfKind:");
+                    if ([sharedCenter respondsToSelector:reloadKind]) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+                        for (NSString *kind in kWidgetKinds) {
+                            [sharedCenter performSelector:reloadKind withObject:kind];
+                        }
+#pragma clang diagnostic pop
+                    }
                 }
             }
-        } else {
-            NSLog(@"[WidgetBridge] reloadWidgetTimelines: WidgetCenter not available (iOS < 14)");
         }
     }
+}
+
+// Reload now and again after a short delay so the widget extension picks up App Group data after user has switched to home screen
+- (void)reloadWidgetTimelinesWithFollowUp {
+    [self reloadWidgetTimelines];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [self reloadWidgetTimelines];
+    });
 }
 
 // Sync auth tokens to App Group UserDefaults
@@ -77,13 +98,7 @@ RCT_EXPORT_METHOD(refreshWidgets:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 {
     if (@available(iOS 14.0, *)) {
-        [self reloadWidgetTimelines];
-        // Reload again after a short delay so the widget extension gets a chance to run when app is in background
-        __weak typeof(self) weakSelf = self;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            [weakSelf reloadWidgetTimelines];
-            NSLog(@"[WidgetBridge] refreshWidgets: delayed reload (0.6s) requested");
-        });
+        [self reloadWidgetTimelinesWithFollowUp];
         resolve(@YES);
     } else {
         reject(@"UNSUPPORTED", @"Widgets require iOS 14+", nil);
@@ -104,6 +119,24 @@ RCT_EXPORT_METHOD(syncSpotifyCredentials:(NSString *)clientId
         [sharedDefaults setObject:clientSecret forKey:@"spotify_client_secret"];
         [sharedDefaults synchronize];
 
+        resolve(@YES);
+    } else {
+        reject(@"ERROR", @"Failed to access shared UserDefaults", nil);
+    }
+}
+
+// Sync API base URL to App Group UserDefaults
+RCT_EXPORT_METHOD(syncApiBaseUrl:(NSString *)url
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+    NSUserDefaults *sharedDefaults = [[NSUserDefaults alloc]
+        initWithSuiteName:@"group.com.whoami.today.app"];
+
+    if (sharedDefaults) {
+        [sharedDefaults setObject:url forKey:@"api_base_url"];
+        [sharedDefaults synchronize];
+        NSLog(@"[WidgetBridge] syncApiBaseUrl: saved %@", url);
         resolve(@YES);
     } else {
         reject(@"ERROR", @"Failed to access shared UserDefaults", nil);
@@ -131,22 +164,8 @@ RCT_EXPORT_METHOD(syncMyCheckIn:(NSDictionary *)checkInData
 
         [sharedDefaults setObject:jsonData forKey:@"my_check_in"];
         [sharedDefaults synchronize];
-        NSString *mood = checkInData[@"mood"] ?: @"(nil)";
-        NSNumber *checkInId = checkInData[@"id"];
-        NSLog(@"[WidgetBridge] syncMyCheckIn: wrote my_check_in to App Group, id=%@ mood=%@", checkInId, mood);
 
-        [self reloadWidgetTimelines];
-
-        __weak typeof(self) weakSelf = self;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            [weakSelf reloadWidgetTimelines];
-            NSLog(@"[WidgetBridge] syncMyCheckIn: reload after 0.4s");
-        });
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            [weakSelf reloadWidgetTimelines];
-            NSLog(@"[WidgetBridge] syncMyCheckIn: second reload after 1.0s");
-        });
-
+        [self reloadWidgetTimelinesWithFollowUp];
         resolve(@YES);
     } else {
         reject(@"ERROR", @"Failed to access shared UserDefaults", nil);
@@ -172,14 +191,212 @@ RCT_EXPORT_METHOD(clearMyCheckIn:(RCTPromiseResolveBlock)resolve
     }
 }
 
-// Read widget diagnostics (when widget last ran getTimeline and what mood it saw) for debugging
+// Sync a shared-playlist track (someone else's song) to App Group UserDefaults.
+// Stores the track metadata as JSON, plus base64-decoded album image and sharer avatar
+// binaries. AlbumCoverWidget reads these directly without making network calls.
+RCT_EXPORT_METHOD(syncSharedPlaylistTrack:(NSDictionary *)trackData
+                  albumImageBase64:(NSString *)albumImageBase64
+                  avatarImageBase64:(NSString *)avatarImageBase64
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+    NSUserDefaults *sharedDefaults = [[NSUserDefaults alloc]
+        initWithSuiteName:@"group.com.whoami.today.app"];
+
+    if (!sharedDefaults) {
+        reject(@"ERROR", @"Failed to access shared UserDefaults", nil);
+        return;
+    }
+
+    // Track metadata → JSON
+    NSError *error;
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:trackData
+                                                       options:0
+                                                         error:&error];
+    if (error) {
+        reject(@"ERROR", @"Failed to serialize shared playlist track", error);
+        return;
+    }
+    [sharedDefaults setObject:jsonData forKey:@"shared_playlist_track"];
+
+    // Album image binary (optional — empty string clears it)
+    if (albumImageBase64.length > 0) {
+        NSData *albumData = [[NSData alloc] initWithBase64EncodedString:albumImageBase64
+                                                                options:NSDataBase64DecodingIgnoreUnknownCharacters];
+        if (albumData) {
+            [sharedDefaults setObject:albumData forKey:@"widget_shared_playlist_album_image"];
+        }
+    } else {
+        [sharedDefaults removeObjectForKey:@"widget_shared_playlist_album_image"];
+    }
+
+    // Sharer avatar binary (optional)
+    if (avatarImageBase64.length > 0) {
+        NSData *avatarData = [[NSData alloc] initWithBase64EncodedString:avatarImageBase64
+                                                                 options:NSDataBase64DecodingIgnoreUnknownCharacters];
+        if (avatarData) {
+            [sharedDefaults setObject:avatarData forKey:@"widget_shared_playlist_avatar_image"];
+        }
+    } else {
+        [sharedDefaults removeObjectForKey:@"widget_shared_playlist_avatar_image"];
+    }
+
+    [sharedDefaults synchronize];
+
+    [self reloadWidgetTimelinesWithFollowUp];
+    resolve(@YES);
+}
+
+// Clear shared playlist data (used on logout)
+RCT_EXPORT_METHOD(clearSharedPlaylistTrack:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+    NSUserDefaults *sharedDefaults = [[NSUserDefaults alloc]
+        initWithSuiteName:@"group.com.whoami.today.app"];
+
+    if (sharedDefaults) {
+        [sharedDefaults removeObjectForKey:@"shared_playlist_track"];
+        [sharedDefaults removeObjectForKey:@"widget_shared_playlist_album_image"];
+        [sharedDefaults removeObjectForKey:@"widget_shared_playlist_avatar_image"];
+        [sharedDefaults synchronize];
+
+        [self reloadWidgetTimelines];
+
+        resolve(@YES);
+    } else {
+        reject(@"ERROR", @"Failed to access shared UserDefaults", nil);
+    }
+}
+
+// Sync a friend post to App Group UserDefaults.
+// Stores the post metadata as JSON, plus base64-decoded author image and post image binaries.
+// PhotoWidget reads these directly without making network calls.
+RCT_EXPORT_METHOD(syncFriendPost:(NSDictionary *)postData
+                  authorImageBase64:(NSString *)authorImageBase64
+                  postImageBase64:(NSString *)postImageBase64
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+    NSUserDefaults *sharedDefaults = [[NSUserDefaults alloc]
+        initWithSuiteName:@"group.com.whoami.today.app"];
+
+    if (!sharedDefaults) {
+        reject(@"ERROR", @"Failed to access shared UserDefaults", nil);
+        return;
+    }
+
+    // Post metadata → JSON
+    NSError *error;
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:postData
+                                                       options:0
+                                                         error:&error];
+    if (error) {
+        reject(@"ERROR", @"Failed to serialize friend post data", error);
+        return;
+    }
+    [sharedDefaults setObject:jsonData forKey:@"friend_post"];
+
+    // Post image binary (optional)
+    if (postImageBase64.length > 0) {
+        NSData *postImageData = [[NSData alloc] initWithBase64EncodedString:postImageBase64
+                                                                    options:NSDataBase64DecodingIgnoreUnknownCharacters];
+        if (postImageData) {
+            [sharedDefaults setObject:postImageData forKey:@"widget_friend_post_image"];
+        }
+    } else {
+        [sharedDefaults removeObjectForKey:@"widget_friend_post_image"];
+    }
+
+    // Author image binary (optional)
+    if (authorImageBase64.length > 0) {
+        NSData *authorImageData = [[NSData alloc] initWithBase64EncodedString:authorImageBase64
+                                                                      options:NSDataBase64DecodingIgnoreUnknownCharacters];
+        if (authorImageData) {
+            [sharedDefaults setObject:authorImageData forKey:@"widget_friend_post_author_image"];
+        }
+    } else {
+        [sharedDefaults removeObjectForKey:@"widget_friend_post_author_image"];
+    }
+
+    [sharedDefaults synchronize];
+    NSLog(@"[WidgetBridge] syncFriendPost: saved friend_post to App Group, author=%@", postData[@"author_username"]);
+
+    [self reloadWidgetTimelinesWithFollowUp];
+    resolve(@YES);
+}
+
+// Clear friend post data from shared storage
+RCT_EXPORT_METHOD(clearFriendPost:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+    NSUserDefaults *sharedDefaults = [[NSUserDefaults alloc]
+        initWithSuiteName:@"group.com.whoami.today.app"];
+
+    if (sharedDefaults) {
+        [sharedDefaults removeObjectForKey:@"friend_post"];
+        [sharedDefaults removeObjectForKey:@"widget_friend_post_image"];
+        [sharedDefaults removeObjectForKey:@"widget_friend_post_author_image"];
+        [sharedDefaults synchronize];
+
+        [self reloadWidgetTimelines];
+
+        resolve(@YES);
+    } else {
+        reject(@"ERROR", @"Failed to access shared UserDefaults", nil);
+    }
+}
+
+// Sync user version type to App Group UserDefaults
+RCT_EXPORT_METHOD(syncVersionType:(NSString *)versionType
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+    NSUserDefaults *sharedDefaults = [[NSUserDefaults alloc]
+        initWithSuiteName:@"group.com.whoami.today.app"];
+
+    if (sharedDefaults) {
+        [sharedDefaults setObject:versionType forKey:@"user_version_type"];
+        [sharedDefaults synchronize];
+
+        [self reloadWidgetTimelines];
+
+        resolve(@YES);
+    } else {
+        reject(@"ERROR", @"Failed to access shared UserDefaults", nil);
+    }
+}
+
+// Read widget diagnostics for debugging
 RCT_EXPORT_METHOD(getWidgetDiagnostics:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 {
     NSUserDefaults *sharedDefaults = [[NSUserDefaults alloc]
         initWithSuiteName:@"group.com.whoami.today.app"];
     if (!sharedDefaults) {
-        resolve(@{@"lastSeenMood": @"(no suite)", @"lastGetTimelineAt": @""});
+        resolve(@{
+            @"lastSeenMood": @"(no suite)",
+            @"lastSeenBattery": @"(no suite)",
+            @"lastFeelingDisplay": @"(no suite)",
+            @"lastBatteryDisplay": @"(no suite)",
+            @"lastGetTimelineAt": @"",
+            @"myCheckInJson": @"",
+            @"myCheckInRawPresent": @NO,
+            @"myCheckInDecodeOk": @NO,
+            @"sharedPlaylistJson": @"",
+            @"sharedPlaylistAlbumImageLen": @0,
+            @"sharedPlaylistAvatarImageLen": @0,
+            @"friendPostJson": @"",
+            @"friendPostImageLen": @0,
+            @"friendPostAuthorImageLen": @0,
+            @"albumLastGetTimelineAt": @"(no suite)",
+            @"albumLastSawTrackId": @"(no suite)",
+            @"albumLastSharerUsername": @"(no suite)",
+            @"albumLastAlbumImageLen": @0,
+            @"albumLastAvatarImageLen": @0,
+            @"albumLastDecodeError": @"(no suite)",
+            @"csrftokenLen": @0,
+            @"accessTokenLen": @0
+        });
         return;
     }
     NSString *mood = [sharedDefaults stringForKey:@"widget_last_seen_mood"] ?: @"(never)";
@@ -188,13 +405,59 @@ RCT_EXPORT_METHOD(getWidgetDiagnostics:(RCTPromiseResolveBlock)resolve
     NSString *batteryDisplay = [sharedDefaults stringForKey:@"widget_last_battery_display"] ?: @"(never)";
     NSString *dateStr = [sharedDefaults stringForKey:@"widget_last_getTimeline_at"] ?: @"";
 
-    // Also read the raw my_check_in JSON so we can inspect what was written by the bridge
-    NSString *myCheckInJson = @"(none)";
-    NSData *checkInData = [sharedDefaults dataForKey:@"my_check_in"];
-    if (checkInData) {
-        NSString *jsonStr = [[NSString alloc] initWithData:checkInData encoding:NSUTF8StringEncoding];
-        if (jsonStr) myCheckInJson = jsonStr;
+    // Decode my_check_in (stored as NSData) back to a JSON string so the RN side can inspect it
+    NSData *jsonData = [sharedDefaults dataForKey:@"my_check_in"];
+    NSString *jsonString = @"";
+    if (jsonData) {
+        NSString *decoded = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+        if (decoded) {
+            jsonString = decoded;
+        }
     }
+
+    // Decode shared_playlist_track JSON
+    NSData *spJsonData = [sharedDefaults dataForKey:@"shared_playlist_track"];
+    NSString *spJsonString = @"";
+    if (spJsonData) {
+        NSString *decoded = [[NSString alloc] initWithData:spJsonData encoding:NSUTF8StringEncoding];
+        if (decoded) {
+            spJsonString = decoded;
+        }
+    }
+
+    NSData *spAlbumData = [sharedDefaults dataForKey:@"widget_shared_playlist_album_image"];
+    NSData *spAvatarData = [sharedDefaults dataForKey:@"widget_shared_playlist_avatar_image"];
+
+    // Decode friend_post JSON
+    NSData *fpJsonData = [sharedDefaults dataForKey:@"friend_post"];
+    NSString *fpJsonString = @"";
+    if (fpJsonData) {
+        NSString *decoded = [[NSString alloc] initWithData:fpJsonData encoding:NSUTF8StringEncoding];
+        if (decoded) {
+            fpJsonString = decoded;
+        }
+    }
+
+    NSData *fpImageData = [sharedDefaults dataForKey:@"widget_friend_post_image"];
+    NSData *fpAuthorImageData = [sharedDefaults dataForKey:@"widget_friend_post_author_image"];
+
+    // CheckinWidget raw-state flags (written from CheckinWidget.getTimeline)
+    BOOL checkInRawPresent = [sharedDefaults boolForKey:@"widget_my_check_in_raw_present"];
+    BOOL checkInDecodeOk   = [sharedDefaults boolForKey:@"widget_my_check_in_decode_ok"];
+
+    // Auth token presence
+    NSString *storedCsrf = [sharedDefaults stringForKey:@"csrftoken"] ?: @"";
+    NSString *storedAccess = [sharedDefaults stringForKey:@"access_token"] ?: @"";
+    NSInteger csrfLen = storedCsrf.length;
+    NSInteger accessLen = storedAccess.length;
+
+    // AlbumCoverWidget runtime diagnostics (written from AlbumCoverWidget.getTimeline)
+    NSString *albumLastAt    = [sharedDefaults stringForKey:@"album_widget_last_getTimeline_at"] ?: @"(never)";
+    NSString *albumTrackId   = [sharedDefaults stringForKey:@"album_widget_last_saw_track_id"] ?: @"(never)";
+    NSString *albumSharer    = [sharedDefaults stringForKey:@"album_widget_last_sharer_username"] ?: @"(never)";
+    NSInteger albumImgLen    = [sharedDefaults integerForKey:@"album_widget_last_album_image_len"];
+    NSInteger albumAvatarLen = [sharedDefaults integerForKey:@"album_widget_last_avatar_image_len"];
+    NSString *albumDecodeErr = [sharedDefaults stringForKey:@"album_widget_last_decode_error"] ?: @"";
 
     resolve(@{
         @"lastSeenMood": mood,
@@ -202,7 +465,23 @@ RCT_EXPORT_METHOD(getWidgetDiagnostics:(RCTPromiseResolveBlock)resolve
         @"lastFeelingDisplay": feelingDisplay,
         @"lastBatteryDisplay": batteryDisplay,
         @"lastGetTimelineAt": dateStr,
-        @"myCheckInJson": myCheckInJson
+        @"myCheckInJson": jsonString,
+        @"myCheckInRawPresent": @(checkInRawPresent),
+        @"myCheckInDecodeOk": @(checkInDecodeOk),
+        @"sharedPlaylistJson": spJsonString,
+        @"sharedPlaylistAlbumImageLen": @(spAlbumData.length),
+        @"sharedPlaylistAvatarImageLen": @(spAvatarData.length),
+        @"friendPostJson": fpJsonString,
+        @"friendPostImageLen": @(fpImageData.length),
+        @"friendPostAuthorImageLen": @(fpAuthorImageData.length),
+        @"albumLastGetTimelineAt": albumLastAt,
+        @"albumLastSawTrackId": albumTrackId,
+        @"albumLastSharerUsername": albumSharer,
+        @"albumLastAlbumImageLen": @(albumImgLen),
+        @"albumLastAvatarImageLen": @(albumAvatarLen),
+        @"albumLastDecodeError": albumDecodeErr,
+        @"csrftokenLen": @(csrfLen),
+        @"accessTokenLen": @(accessLen)
     });
 }
 

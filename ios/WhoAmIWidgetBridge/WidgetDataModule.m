@@ -64,14 +64,20 @@ RCT_EXPORT_METHOD(syncAuthTokens:(NSString *)csrftoken
         [sharedDefaults setObject:accessToken forKey:@"access_token"];
         [sharedDefaults synchronize];
 
-        // Reload widget timelines
-        [self reloadWidgetTimelines];
+        // Reload widget timelines with multiple delays to ensure the widget
+        // picks up the tokens after cfprefsd flushes across processes
+        [self reloadWidgetTimelinesWithFollowUp];
+        __weak typeof(self) weakSelf = self;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [weakSelf reloadWidgetTimelines];
+        });
 
         resolve(@YES);
     } else {
         reject(@"ERROR", @"Failed to access shared UserDefaults", nil);
     }
 }
+
 
 // Clear auth tokens from shared storage
 RCT_EXPORT_METHOD(clearAuthTokens:(RCTPromiseResolveBlock)resolve
@@ -127,6 +133,7 @@ RCT_EXPORT_METHOD(syncSpotifyCredentials:(NSString *)clientId
 
 // Sync my check-in data to App Group UserDefaults
 RCT_EXPORT_METHOD(syncMyCheckIn:(NSDictionary *)checkInData
+                  albumImageBase64:(NSString *)albumImageBase64
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 {
@@ -145,6 +152,18 @@ RCT_EXPORT_METHOD(syncMyCheckIn:(NSDictionary *)checkInData
         }
 
         [sharedDefaults setObject:jsonData forKey:@"my_check_in"];
+
+        // Store album image binary if provided
+        if (albumImageBase64.length > 0) {
+            NSData *imageData = [[NSData alloc] initWithBase64EncodedString:albumImageBase64
+                                                                   options:NSDataBase64DecodingIgnoreUnknownCharacters];
+            if (imageData) {
+                [sharedDefaults setObject:imageData forKey:@"widget_album_image"];
+            }
+        } else {
+            [sharedDefaults removeObjectForKey:@"widget_album_image"];
+        }
+
         [sharedDefaults synchronize];
 
         [self reloadWidgetTimelinesWithFollowUp];
@@ -201,26 +220,44 @@ RCT_EXPORT_METHOD(syncSharedPlaylistTrack:(NSDictionary *)trackData
     }
     [sharedDefaults setObject:jsonData forKey:@"shared_playlist_track"];
 
-    // Album image binary (optional — empty string clears it)
+    // Album image — store both in UserDefaults AND as a file for reliable widget access
+    NSURL *containerURL = [[NSFileManager defaultManager]
+        containerURLForSecurityApplicationGroupIdentifier:@"group.com.whoami.today.app"];
+
     if (albumImageBase64.length > 0) {
         NSData *albumData = [[NSData alloc] initWithBase64EncodedString:albumImageBase64
                                                                 options:NSDataBase64DecodingIgnoreUnknownCharacters];
         if (albumData) {
             [sharedDefaults setObject:albumData forKey:@"widget_shared_playlist_album_image"];
+            // Also write to file for direct widget access
+            if (containerURL) {
+                [albumData writeToURL:[containerURL URLByAppendingPathComponent:@"shared_playlist_album.bin"]
+                           atomically:YES];
+            }
         }
     } else {
         [sharedDefaults removeObjectForKey:@"widget_shared_playlist_album_image"];
+        if (containerURL) {
+            [[NSFileManager defaultManager] removeItemAtURL:[containerURL URLByAppendingPathComponent:@"shared_playlist_album.bin"] error:nil];
+        }
     }
 
-    // Sharer avatar binary (optional)
+    // Sharer avatar — same dual storage
     if (avatarImageBase64.length > 0) {
         NSData *avatarData = [[NSData alloc] initWithBase64EncodedString:avatarImageBase64
                                                                  options:NSDataBase64DecodingIgnoreUnknownCharacters];
         if (avatarData) {
             [sharedDefaults setObject:avatarData forKey:@"widget_shared_playlist_avatar_image"];
+            if (containerURL) {
+                [avatarData writeToURL:[containerURL URLByAppendingPathComponent:@"shared_playlist_avatar.bin"]
+                            atomically:YES];
+            }
         }
     } else {
         [sharedDefaults removeObjectForKey:@"widget_shared_playlist_avatar_image"];
+        if (containerURL) {
+            [[NSFileManager defaultManager] removeItemAtURL:[containerURL URLByAppendingPathComponent:@"shared_playlist_avatar.bin"] error:nil];
+        }
     }
 
     [sharedDefaults synchronize];

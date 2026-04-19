@@ -5,16 +5,43 @@ class SharedDataManager {
     private let suiteName = "group.com.whoami.today.app"
 
     private var sharedDefaults: UserDefaults? {
-        UserDefaults(suiteName: suiteName)
+        let defaults = UserDefaults(suiteName: suiteName)
+        defaults?.synchronize()
+        return defaults
     }
 
-    var csrfToken: String? {
-        sharedDefaults?.string(forKey: "csrftoken")
+    // Direct plist file reading via PropertyListSerialization — bypasses cfprefsd
+    // which can be stale in the widget process (especially on the iOS simulator).
+    private var plistDict: [String: Any]? {
+        guard let containerURL = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: suiteName
+        ) else { return nil }
+        let plistURL = containerURL
+            .appendingPathComponent("Library/Preferences/\(suiteName).plist")
+        guard let rawData = try? Data(contentsOf: plistURL),
+              let dict = try? PropertyListSerialization.propertyList(
+                  from: rawData, options: [], format: nil
+              ) as? [String: Any]
+        else { return nil }
+        return dict
     }
 
-    var accessToken: String? {
-        sharedDefaults?.string(forKey: "access_token")
+    // MARK: - Read helpers (UserDefaults first, plist file fallback)
+
+    private func string(forKey key: String) -> String? {
+        if let val = sharedDefaults?.string(forKey: key), !val.isEmpty { return val }
+        return plistDict?[key] as? String
     }
+
+    private func data(forKey key: String) -> Data? {
+        if let val = sharedDefaults?.data(forKey: key) { return val }
+        return plistDict?[key] as? Data
+    }
+
+    // MARK: - Auth
+
+    var csrfToken: String? { string(forKey: "csrftoken") }
+    var accessToken: String? { string(forKey: "access_token") }
 
     var isAuthenticated: Bool {
         let hasCsrf = csrfToken.map { !$0.isEmpty } ?? false
@@ -22,68 +49,47 @@ class SharedDataManager {
         return hasCsrf && hasAccess
     }
 
+    // MARK: - Version
+
     var userVersionType: String {
-        sharedDefaults?.string(forKey: "user_version_type") ?? "default"
+        string(forKey: "user_version_type") ?? "default"
     }
 
     var isDefaultVersion: Bool {
-        userVersionType == "default"
+        guard let vt = string(forKey: "user_version_type") else {
+            return false  // key not synced yet → don't gate content
+        }
+        return vt == "default"
     }
 
     var apiBaseUrl: String? {
         sharedDefaults?.string(forKey: "api_base_url")
     }
 
+    // MARK: - Check-in
+
     var myCheckIn: MyCheckIn? {
-        guard let data = sharedDefaults?.data(forKey: "my_check_in") else {
-            return nil
-        }
-        return try? JSONDecoder().decode(MyCheckIn.self, from: data)
+        guard let d = data(forKey: "my_check_in") else { return nil }
+        return try? JSONDecoder().decode(MyCheckIn.self, from: d)
     }
 
     var cachedAlbumImageData: Data? {
-        get { sharedDefaults?.data(forKey: "widget_album_image") }
+        get { data(forKey: "widget_album_image") }
         set {
             sharedDefaults?.set(newValue, forKey: "widget_album_image")
             sharedDefaults?.synchronize()
         }
     }
 
-    // Friend post displayed in the PhotoWidget.
-    var friendPost: FriendPost? {
-        guard let data = sharedDefaults?.data(forKey: "friend_post") else {
-            return nil
-        }
-        return try? JSONDecoder().decode(FriendPost.self, from: data)
-    }
+    // MARK: - Shared playlist
 
-    var cachedFriendPostImage: Data? {
-        get { sharedDefaults?.data(forKey: "widget_friend_post_image") }
-        set {
-            sharedDefaults?.set(newValue, forKey: "widget_friend_post_image")
-            sharedDefaults?.synchronize()
-        }
-    }
-
-    var cachedFriendPostAuthorImage: Data? {
-        get { sharedDefaults?.data(forKey: "widget_friend_post_author_image") }
-        set {
-            sharedDefaults?.set(newValue, forKey: "widget_friend_post_author_image")
-            sharedDefaults?.synchronize()
-        }
-    }
-
-    // Shared playlist track (someone else's song the user discovers).
-    // Kept separate from `myCheckIn` so AlbumCoverWidget and CheckinWidget never share state.
     var sharedPlaylistTrack: SharedPlaylistTrack? {
-        guard let data = sharedDefaults?.data(forKey: "shared_playlist_track") else {
-            return nil
-        }
-        return try? JSONDecoder().decode(SharedPlaylistTrack.self, from: data)
+        guard let d = data(forKey: "shared_playlist_track") else { return nil }
+        return try? JSONDecoder().decode(SharedPlaylistTrack.self, from: d)
     }
 
     var cachedSharedPlaylistAlbumImage: Data? {
-        get { sharedDefaults?.data(forKey: "widget_shared_playlist_album_image") }
+        get { data(forKey: "widget_shared_playlist_album_image") }
         set {
             sharedDefaults?.set(newValue, forKey: "widget_shared_playlist_album_image")
             sharedDefaults?.synchronize()
@@ -91,25 +97,114 @@ class SharedDataManager {
     }
 
     var cachedSharedPlaylistAvatarImage: Data? {
-        get { sharedDefaults?.data(forKey: "widget_shared_playlist_avatar_image") }
+        get { data(forKey: "widget_shared_playlist_avatar_image") }
         set {
             sharedDefaults?.set(newValue, forKey: "widget_shared_playlist_avatar_image")
             sharedDefaults?.synchronize()
         }
     }
 
-    // Raw bytes accessors — distinguish "key absent" from "decode failed"
-    var rawMyCheckInBytes: Data? {
-        sharedDefaults?.data(forKey: "my_check_in")
+    // MARK: - Friend post
+
+    var friendPost: FriendPost? {
+        guard let d = data(forKey: "friend_post") else { return nil }
+        return try? JSONDecoder().decode(FriendPost.self, from: d)
     }
 
-    var rawSharedPlaylistTrackBytes: Data? {
-        sharedDefaults?.data(forKey: "shared_playlist_track")
+    var cachedFriendPostImage: Data? {
+        get { data(forKey: "widget_friend_post_image") }
+        set {
+            sharedDefaults?.set(newValue, forKey: "widget_friend_post_image")
+            sharedDefaults?.synchronize()
+        }
     }
+
+    var cachedFriendPostAuthorImage: Data? {
+        get { data(forKey: "widget_friend_post_author_image") }
+        set {
+            sharedDefaults?.set(newValue, forKey: "widget_friend_post_author_image")
+            sharedDefaults?.synchronize()
+        }
+    }
+
+    // MARK: - Raw bytes accessors (for diagnostics)
+
+    var rawMyCheckInBytes: Data? { data(forKey: "my_check_in") }
+    var rawSharedPlaylistTrackBytes: Data? { data(forKey: "shared_playlist_track") }
 
     var appGroupReachable: Bool {
         sharedDefaults != nil
     }
+
+    // MARK: - Widget process diagnostics
+
+    /// Writes a heartbeat file so the host process can verify what the widget sees.
+    func writeWidgetHeartbeat(source: String) {
+        guard let containerURL = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: suiteName
+        ) else { return }
+
+        let plistURL = containerURL
+            .appendingPathComponent("Library/Preferences/\(suiteName).plist")
+        let plistExists = FileManager.default.fileExists(atPath: plistURL.path)
+        let plistSize = (try? FileManager.default.attributesOfItem(atPath: plistURL.path)[.size] as? Int) ?? 0
+
+        let ud = sharedDefaults
+        let udCsrf = ud?.string(forKey: "csrftoken") != nil
+        let udAccess = ud?.string(forKey: "access_token") != nil
+        let udCheckin = ud?.data(forKey: "my_check_in") != nil
+        let udPlaylist = ud?.data(forKey: "shared_playlist_track") != nil
+        let udFriend = ud?.data(forKey: "friend_post") != nil
+
+        let pd = plistDict
+        let pdCsrf = pd?["csrftoken"] as? String != nil
+        let pdAccess = pd?["access_token"] as? String != nil
+        let pdCheckin = pd?["my_check_in"] as? Data != nil
+        let pdFriend = pd?["friend_post"] as? Data != nil
+        let pdPlaylist = pd?["shared_playlist_track"] as? Data != nil
+
+        // Image data sizes
+        let albumImgLen = cachedSharedPlaylistAlbumImage?.count ?? 0
+        let avatarImgLen = cachedSharedPlaylistAvatarImage?.count ?? 0
+        let checkinAlbumLen = cachedAlbumImageData?.count ?? 0
+        let friendPostImgLen = cachedFriendPostImage?.count ?? 0
+
+        let csrfVal = string(forKey: "csrftoken")
+        let accessVal = string(forKey: "access_token")
+        let authResult = isAuthenticated
+        let defaultResult = isDefaultVersion
+        let versionVal = string(forKey: "user_version_type")
+
+        let lines = """
+        widget_heartbeat (\(source))
+        time: \(ISO8601DateFormatter().string(from: Date()))
+        container: \(containerURL.path)
+        plist_exists: \(plistExists), size: \(plistSize)
+        --- Computed values ---
+        isAuthenticated: \(authResult)
+        isDefaultVersion: \(defaultResult)
+        csrfToken: \(csrfVal != nil ? "'\(csrfVal!.prefix(8))...'" : "nil")
+        accessToken: \(accessVal != nil ? "'\(accessVal!.prefix(8))...'" : "nil")
+        versionType: \(versionVal ?? "nil")
+        --- UserDefaults ---
+        csrf: \(udCsrf), access: \(udAccess)
+        checkin: \(udCheckin), playlist: \(udPlaylist), friend: \(udFriend)
+        --- Plist File ---
+        dict_nil: \(pd == nil)
+        csrf: \(pdCsrf), access: \(pdAccess)
+        checkin: \(pdCheckin), playlist: \(pdPlaylist), friend: \(pdFriend)
+        --- Image sizes (bytes) ---
+        sharedPlaylistAlbum: \(albumImgLen)
+        sharedPlaylistAvatar: \(avatarImgLen)
+        checkinAlbum: \(checkinAlbumLen)
+        friendPostImage: \(friendPostImgLen)
+        """
+
+        let heartbeatURL = containerURL.appendingPathComponent("widget_heartbeat.txt")
+        try? lines.write(to: heartbeatURL, atomically: true, encoding: .utf8)
+    }
+
+    // MARK: - Diagnostic writes (widget → plist, always via UserDefaults)
 
     func writeDiagnostics(mood: String, battery: String, feelingDisplay: String, batteryDisplay: String) {
         let formatter = ISO8601DateFormatter()
@@ -121,14 +216,12 @@ class SharedDataManager {
         sharedDefaults?.synchronize()
     }
 
-    // Writes after CheckinWidget runs getTimeline — separates raw presence from decode success
     func writeCheckInRawState(rawBytesPresent: Bool, decodeOk: Bool) {
         sharedDefaults?.set(rawBytesPresent, forKey: "widget_my_check_in_raw_present")
         sharedDefaults?.set(decodeOk, forKey: "widget_my_check_in_decode_ok")
         sharedDefaults?.synchronize()
     }
 
-    // Writes after AlbumCoverWidget runs getTimeline
     func writeAlbumDiagnostics(
         trackId: String,
         sharerUsername: String,

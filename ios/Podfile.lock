@@ -976,9 +976,9 @@ PODS:
   - React-Mapbuffer (0.73.11):
     - glog
     - React-debug
-  - react-native-config (1.6.1):
-    - react-native-config/App (= 1.6.1)
-  - react-native-config/App (1.6.1):
+  - react-native-config (1.5.3):
+    - react-native-config/App (= 1.5.3)
+  - react-native-config/App (1.5.3):
     - React-Core
   - react-native-cookies (6.2.1):
     - React-Core
@@ -1175,7 +1175,9 @@ PODS:
     - FirebaseCoreExtension (= 10.15.0)
     - React-Core
     - RNFBApp
-  - RNGestureHandler (2.9.0):
+  - RNGestureHandler (2.16.2):
+    - glog
+    - RCT-Folly (= 2022.05.16.00)
     - React-Core
   - RNImageCropPicker (0.42.0):
     - React-Core
@@ -1462,7 +1464,7 @@ SPEC CHECKSUMS:
   React-jsinspector: a98428936fb888cc15d857226a26d9ac0a668a0e
   React-logger: 6e4873d1f9c54cca30f6c91a6617f8c91b75ba4c
   React-Mapbuffer: 57bf49a458398d329dad2bf8bc660e3e35b96989
-  react-native-config: 8ebcf99c9ed605aea6ecea5ecb80416c63f0fbdc
+  react-native-config: ea75335a7cca1d3326de1da384227e580a7c082e
   react-native-cookies: d648ab7025833b977c0b19e142503034f5f29411
   react-native-safe-area-context: 863c9695a24b9e6bb6c412f1c8ddb4dfc3ae3862
   react-native-webview: b30882679aaf3fdf8702f71ffc78fdc6c017dbe9
@@ -1493,7 +1495,7 @@ SPEC CHECKSUMS:
   RNFBAnalytics: 0ad41d39e17ef24396d8fd9862e9d5e41eb586ee
   RNFBApp: 1dbd9c7146d49cbb888cabc4bae795fa15f1f0cc
   RNFBMessaging: 0cf4262c9bf13ffea283d1876c795d4c68afc66f
-  RNGestureHandler: 5fe9e4f847b51d8cc9006cec6c7dc6718dd82809
+  RNGestureHandler: 1bee78004d2a26b1a3a9d2543ddd130525e9736b
   RNImageCropPicker: b0afedeefd8655254a15c34103718455fde6ce59
   RNNotifee: f668613592275af05cb2efe76079cdda2d4c22ca
   RNScreens: f112bc5442a9a0e468809c107a43f55882d6cd98

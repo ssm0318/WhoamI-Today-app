@@ -35,7 +35,10 @@ interface WidgetDataModuleInterface {
     clientId: string,
     clientSecret: string,
   ): Promise<boolean>;
-  syncMyCheckIn(checkInData: MyCheckInData): Promise<boolean>;
+  syncMyCheckIn(
+    checkInData: MyCheckInData,
+    albumImageBase64: string,
+  ): Promise<boolean>;
   syncSharedPlaylistTrack(
     trackData: SharedPlaylistTrackData,
     albumImageBase64: string,
@@ -192,13 +195,41 @@ export const syncMyCheckInToWidget = async (checkIn: {
       album_image_url: checkIn.albumImageUrl,
     };
 
+    // Fetch album image as base64 so the widget has it immediately
+    let albumImageBase64 = '';
+    if (checkIn.albumImageUrl) {
+      try {
+        const response = await fetch(checkIn.albumImageUrl);
+        const blob = await response.blob();
+        albumImageBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const dataUrl = reader.result as string;
+            resolve(dataUrl.split(',')[1] || '');
+          };
+          reader.readAsDataURL(blob);
+        });
+        console.log(
+          `[WidgetSync] Check-in album image fetched: ${albumImageBase64.length} base64 chars`,
+        );
+      } catch (imgError) {
+        console.warn(
+          '[WidgetSync] Failed to fetch check-in album image:',
+          imgError,
+        );
+      }
+    }
+
     await (WidgetDataModule as WidgetDataModuleInterface).syncMyCheckIn(
       checkInData,
+      albumImageBase64,
     );
     console.log(
       `[WidgetSync] syncMyCheckIn native call succeeded (mood='${
         checkIn.mood
-      }', desc='${(checkIn.description ?? '').slice(0, 30)}')`,
+      }', desc='${(checkIn.description ?? '').slice(0, 30)}', albumImg=${
+        albumImageBase64.length
+      })`,
     );
   } catch (error) {
     console.error('[WidgetSync] syncMyCheckIn native call FAILED:', error);

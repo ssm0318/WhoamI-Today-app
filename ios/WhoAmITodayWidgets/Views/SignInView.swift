@@ -1,20 +1,41 @@
 import SwiftUI
 
 struct SignInView: View {
+    var descriptionText: String = "Sign in to use WhoAmI Today"
+
     var body: some View {
-        Link(destination: URL(string: "whoami://app/login")!) {
-            HStack(spacing: 8) {
-                Text("Sign In")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
+        ZStack {
+            Color.white
+
+            VStack(spacing: 0) {
+                Image("WidgetAppLogo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 48, height: 48)
+                    .clipShape(Circle())
+                    .padding(.bottom, 12)
+
+                Link(destination: URL(string: "whoami://app/login")!) {
+                    Text("Sign In")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(Color(hex: "#6200EA") ?? Color.purple)
+                        )
+                }
+
+                Text(descriptionText)
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(hex: "#888888") ?? Color.gray)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .padding(.top, 12)
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color(hex: "#8700FF") ?? Color.purple)
-            )
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

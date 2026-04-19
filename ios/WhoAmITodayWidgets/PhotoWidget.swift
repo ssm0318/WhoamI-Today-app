@@ -83,7 +83,7 @@ struct PhotoWidgetProvider: TimelineProvider {
         let profileImageUrl = picked["profile_image"] as? String ?? ""
 
         // Build friend_post JSON
-        var friendPostDict: [String: Any] = [
+        let friendPostDict: [String: Any] = [
             "id": post["id"] as? Int ?? 0,
             "type": post["type"] as? String ?? "",
             "content": post["content"] as? String ?? "",
@@ -117,7 +117,7 @@ struct PhotoWidgetView: View {
     var body: some View {
         Group {
             if !entry.isAuthenticated {
-                SignInView()
+                SignInView(descriptionText: "Sign in to see the latest updates from your friends")
             } else if entry.isDefaultVersion {
                 DefaultVersionView()
             } else {

@@ -138,7 +138,7 @@ public class WidgetDataModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void syncMyCheckIn(ReadableMap checkInData, Promise promise) {
+    public void syncMyCheckIn(ReadableMap checkInData, String albumImageBase64, Promise promise) {
         long startTime = System.currentTimeMillis();
         try {
             Context context = getReactApplicationContext();
@@ -209,10 +209,21 @@ public class WidgetDataModule extends ReactContextBaseJavaModule {
             
             root.put("my_check_in", myCheckIn);
             String finalJson = root.toString();
-            
+
             Log.d(TAG, "[syncMyCheckIn] Final widget_data JSON to save: " + finalJson);
-            
-            boolean success = prefs.edit().putString("widget_data", finalJson).commit();
+
+            SharedPreferences.Editor editor = prefs.edit();
+            editor.putString("widget_data", finalJson);
+
+            // Store album image base64 if provided
+            if (albumImageBase64 != null && !albumImageBase64.isEmpty()) {
+                editor.putString("widget_checkin_album_image_base64", albumImageBase64);
+                Log.d(TAG, "[syncMyCheckIn] Album image base64 stored: " + albumImageBase64.length() + " chars");
+            } else {
+                editor.remove("widget_checkin_album_image_base64");
+            }
+
+            boolean success = editor.commit();
             
             Log.d(TAG, "[syncMyCheckIn] Data saved to SharedPreferences with commit(): " + success);
 

@@ -22,15 +22,34 @@ struct AlbumCoverWidgetEntry: TimelineEntry {
 }
 
 struct AlbumCoverWidgetProvider: TimelineProvider {
+    private let appGroup = "group.com.whoami.today.app"
+
+    /// Read image from file in App Group container (bypasses UserDefaults)
+    private func readFile(_ name: String) -> Data? {
+        guard let url = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: appGroup
+        )?.appendingPathComponent(name) else { return nil }
+        return try? Data(contentsOf: url)
+    }
+
+    /// Best-effort album image: file first, then UserDefaults/plist fallback
+    private func albumImage() -> Data? {
+        readFile("shared_playlist_album.bin") ?? SharedDataManager.shared.cachedSharedPlaylistAlbumImage
+    }
+
+    private func avatarImage() -> Data? {
+        readFile("shared_playlist_avatar.bin") ?? SharedDataManager.shared.cachedSharedPlaylistAvatarImage
+    }
+
     func placeholder(in context: Context) -> AlbumCoverWidgetEntry {
         let mgr = SharedDataManager.shared
         let track = mgr.sharedPlaylistTrack
         return AlbumCoverWidgetEntry(
             date: Date(),
-            isAuthenticated: mgr.isAuthenticated,
-            isDefaultVersion: mgr.isDefaultVersion,
-            albumImageData: mgr.cachedSharedPlaylistAlbumImage,
-            sharerAvatarData: mgr.cachedSharedPlaylistAvatarImage,
+            isAuthenticated: true,
+            isDefaultVersion: false,
+            albumImageData: albumImage(),
+            sharerAvatarData: avatarImage(),
             sharerUsername: track?.sharerUsername
         )
     }
@@ -40,10 +59,10 @@ struct AlbumCoverWidgetProvider: TimelineProvider {
         let track = mgr.sharedPlaylistTrack
         let entry = AlbumCoverWidgetEntry(
             date: Date(),
-            isAuthenticated: mgr.isAuthenticated,
-            isDefaultVersion: mgr.isDefaultVersion,
-            albumImageData: mgr.cachedSharedPlaylistAlbumImage,
-            sharerAvatarData: mgr.cachedSharedPlaylistAvatarImage,
+            isAuthenticated: true,
+            isDefaultVersion: false,
+            albumImageData: albumImage(),
+            sharerAvatarData: avatarImage(),
             sharerUsername: track?.sharerUsername
         )
         completion(entry)
@@ -117,24 +136,72 @@ struct AlbumCoverWidgetProvider: TimelineProvider {
 struct AlbumCoverWidgetView: View {
     let entry: AlbumCoverWidgetEntry
 
+    private var mgr: SharedDataManager { SharedDataManager.shared }
+
+    // Read images directly from files in App Group container — bypasses UserDefaults/cfprefsd
+    private var containerURL: URL? {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.whoami.today.app")
+    }
+    private var fileAlbumImage: Data? {
+        guard let url = containerURL?.appendingPathComponent("shared_playlist_album.bin") else { return nil }
+        return try? Data(contentsOf: url)
+    }
+    private var fileAvatarImage: Data? {
+        guard let url = containerURL?.appendingPathComponent("shared_playlist_avatar.bin") else { return nil }
+        return try? Data(contentsOf: url)
+    }
+
     var body: some View {
         Group {
-            if !entry.isAuthenticated {
-                SignInView()
-            } else if entry.isDefaultVersion {
-                DefaultVersionView()
+            if let data = fileAlbumImage, let img = UIImage(data: data) {
+                Image(uiImage: img)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
             } else {
-                albumContent
+                Text("Shared Playlist")
+                    .font(.system(size: 12))
+                    .foregroundColor(.gray)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(white: 0.96))
             }
+        }
+        .overlay(alignment: .topLeading) {
+            Image("IconPlaylist")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 18, height: 18)
+                .padding(6)
+        }
+        .overlay(alignment: .topTrailing) {
+            avatarOverlay
+        }
+        .widgetURL(URL(string: "whoami://app/discover"))
+    }
+
+    @ViewBuilder
+    private var avatarOverlay: some View {
+        if let avData = fileAvatarImage, let avImg = UIImage(data: avData) {
+            Image(uiImage: avImg)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 24, height: 24)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                .padding(6)
         }
     }
 
     @ViewBuilder
     var albumContent: some View {
+        // Try file first, then entry, then SharedDataManager
+        let albumImage = fileAlbumImage ?? entry.albumImageData ?? mgr.cachedSharedPlaylistAlbumImage
+        let avatarImage = fileAvatarImage ?? entry.sharerAvatarData ?? mgr.cachedSharedPlaylistAvatarImage
+        let track = mgr.sharedPlaylistTrack
+
         Link(destination: URL(string: "whoami://app/discover")!) {
             ZStack {
                 // Album art (or placeholder)
-                if let imageData = entry.albumImageData, let uiImage = UIImage(data: imageData) {
+                if let imageData = albumImage, let uiImage = UIImage(data: imageData) {
                     Image(uiImage: uiImage)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
@@ -142,8 +209,6 @@ struct AlbumCoverWidgetView: View {
                         .clipped()
                 } else {
                     VStack(spacing: 8) {
-                        Text("🎵")
-                            .font(.system(size: 32))
                         Text("Shared Playlist")
                             .font(.system(size: 12))
                             .foregroundColor(.gray)
@@ -196,9 +261,7 @@ struct AlbumCoverWidgetView: View {
 }
 
 struct AlbumCoverWidget: Widget {
-    // Bumped from "AlbumCoverWidget" to force iOS to discard all cached snapshots
-    // for the old kind.
-    let kind: String = "AlbumCoverWidgetV2"
+    let kind: String = "AlbumCoverWidgetV3"
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: AlbumCoverWidgetProvider()) { entry in

@@ -24,13 +24,14 @@ struct CheckinWidgetEntry: TimelineEntry {
 struct CheckinWidgetProvider: TimelineProvider {
     // Build an entry synchronously from whatever is currently in the App Group.
     // Used by placeholder, getSnapshot, and getTimeline so they all reflect real data.
-    private func currentEntry() -> CheckinWidgetEntry {
-        CheckinWidgetEntry(
+    private func currentEntry(forceAuth: Bool = false) -> CheckinWidgetEntry {
+        let mgr = SharedDataManager.shared
+        return CheckinWidgetEntry(
             date: Date(),
-            isAuthenticated: SharedDataManager.shared.isAuthenticated,
-            isDefaultVersion: SharedDataManager.shared.isDefaultVersion,
-            myCheckIn: SharedDataManager.shared.myCheckIn,
-            albumImageData: SharedDataManager.shared.cachedAlbumImageData
+            isAuthenticated: forceAuth ? true : mgr.isAuthenticated,
+            isDefaultVersion: forceAuth ? false : mgr.isDefaultVersion,
+            myCheckIn: mgr.myCheckIn,
+            albumImageData: mgr.cachedAlbumImageData
         )
     }
 
@@ -39,7 +40,8 @@ struct CheckinWidgetProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (CheckinWidgetEntry) -> Void) {
-        completion(currentEntry())
+        // Show content in snapshot; real auth checked in getTimeline
+        completion(currentEntry(forceAuth: true))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<CheckinWidgetEntry>) -> Void) {
@@ -156,7 +158,7 @@ struct CheckinWidgetView: View {
     var body: some View {
         Group {
             if !entry.isAuthenticated {
-                SignInView()
+                SignInView(descriptionText: "Sign in to view your check-in status")
             } else if entry.isDefaultVersion {
                 DefaultVersionView()
             } else {
@@ -280,11 +282,6 @@ struct CheckInButton: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-
-                Text(title)
-                    .font(.system(size: 10))
-                    .foregroundColor(.black)
-                    .lineLimit(1)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -331,11 +328,6 @@ struct MusicButton: View {
                         .padding(4)
                 }
                 .frame(maxWidth: .infinity)
-
-                Text(title)
-                    .font(.system(size: 10))
-                    .foregroundColor(.black)
-                    .lineLimit(1)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
