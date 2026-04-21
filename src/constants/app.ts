@@ -12,6 +12,8 @@ export const WEB_VIEW_DEV_HOSTNAME = '192.168.219.123';
 export const IS_ADMIN = false; // Whether it is admin environment
 // Local WebView + LAN frontend: use DEV URLs below. Set false before release/archive builds.
 export const IS_DEV = false;
+// Set true for TestFlight/dev builds to bypass maintenance page. Set false for App Store release.
+export const MAINTENANCE_BYPASS = true;
 
 export const WEB_VIEW_URL_INFO = {
   DEV: `http://${WEB_VIEW_DEV_HOSTNAME}:3000`,

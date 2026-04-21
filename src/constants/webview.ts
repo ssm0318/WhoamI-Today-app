@@ -7,8 +7,15 @@ document.head.appendChild(meta);
 const consoleLog = (type, ...args) => {
     const processArg = (arg) => {
         try {
-            if (typeof arg === 'object') {
-                return JSON.stringify(arg);
+            if (arg instanceof Error) {
+                return JSON.stringify({
+                    name: arg.name,
+                    message: arg.message,
+                    stack: arg.stack,
+                });
+            }
+            if (typeof arg === 'object' && arg !== null) {
+                return JSON.stringify(arg, Object.getOwnPropertyNames(arg));
             }
             return String(arg);
         } catch (error) {
@@ -19,6 +26,7 @@ const consoleLog = (type, ...args) => {
     const logMessage = args.map(processArg).join(' ');
     window.ReactNativeWebView.postMessage(JSON.stringify({
         'actionType': 'CONSOLE',
+        'type': type,
         'data': logMessage
     }));
 };
