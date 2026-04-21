@@ -63,6 +63,7 @@ interface WidgetDataModuleInterface {
     lastBatteryDisplay: string;
     lastGetTimelineAt: string;
     myCheckInJson: string;
+    myCheckInJsonFile: string;
     myCheckInRawPresent: boolean;
     myCheckInDecodeOk: boolean;
     sharedPlaylistJson: string;
@@ -258,11 +259,13 @@ export const syncSharedPlaylistTrackToWidget = async (
   avatarImageBase64: string,
 ): Promise<void> => {
   if (!WidgetDataModule) {
-    console.warn('[WidgetSync] WidgetDataModule native module not available');
+    console.warn(
+      '[WidgetSync][SharedSync][native-module-unavailable] WidgetDataModule missing',
+    );
     return;
   }
 
-  console.log('[WidgetSync] syncSharedPlaylistTrackToWidget called with:', {
+  console.log('[WidgetSync][SharedSync][prepare]', {
     id: track.id,
     trackId: track.trackId,
     sharerUsername: track.sharerUsername,
@@ -272,6 +275,11 @@ export const syncSharedPlaylistTrackToWidget = async (
   });
 
   try {
+    console.log('[WidgetSync][SharedSync][build-payload]', {
+      hasTrackId: !!track.trackId,
+      hasAlbumImageUrl: !!track.albumImageUrl,
+      hasSharerProfileImageUrl: !!track.sharerProfileImageUrl,
+    });
     const trackData: SharedPlaylistTrackData = {
       id: track.id,
       track_id: track.trackId,
@@ -280,17 +288,23 @@ export const syncSharedPlaylistTrackToWidget = async (
       sharer_profile_image_url: track.sharerProfileImageUrl,
     };
 
+    console.log('[WidgetSync][SharedSync][native-call-start]', {
+      trackId: track.trackId,
+      sharerUsername: track.sharerUsername,
+    });
     await (
       WidgetDataModule as WidgetDataModuleInterface
     ).syncSharedPlaylistTrack(trackData, albumImageBase64, avatarImageBase64);
-    console.log(
-      `[WidgetSync] syncSharedPlaylistTrack native call succeeded (sharer='${track.sharerUsername}')`,
-    );
+    console.log('[WidgetSync][SharedSync][native-call-success]', {
+      trackId: track.trackId,
+      sharerUsername: track.sharerUsername,
+    });
   } catch (error) {
-    console.error(
-      '[WidgetSync] syncSharedPlaylistTrack native call FAILED:',
+    console.error('[WidgetSync][SharedSync][native-call-failed]', {
+      trackId: track.trackId,
+      sharerUsername: track.sharerUsername,
       error,
-    );
+    });
   }
 };
 
@@ -313,6 +327,7 @@ export const getWidgetDiagnostics = async (): Promise<{
   lastBatteryDisplay: string;
   lastGetTimelineAt: string;
   myCheckInJson: string;
+  myCheckInJsonFile?: string;
 } | null> => {
   if (!WidgetDataModule) {
     console.warn('[WidgetSync] getWidgetDiagnostics: WidgetDataModule is null');
@@ -370,8 +385,14 @@ export const getWidgetDiagnostics = async (): Promise<{
           diag.myCheckInRawPresent ?? 'undefined-OLD-BRIDGE',
         checkin_myCheckInDecodeOk:
           diag.myCheckInDecodeOk ?? 'undefined-OLD-BRIDGE',
+        checkin_myCheckInDecodeSource:
+          diag.myCheckInDecodeSource ?? 'undefined-OLD-BRIDGE',
         checkin_myCheckInJsonLen: diag.myCheckInJson?.length ?? 0,
         checkin_myCheckInJsonPreview: diag.myCheckInJson?.slice(0, 200) ?? '',
+        checkin_myCheckInJsonFileLen: diag.myCheckInJsonFile?.length ?? 0,
+        checkin_myCheckInJsonFilePreview:
+          diag.myCheckInJsonFile?.slice(0, 200) ?? '',
+        checkin_myCheckInRawPreview: diag.myCheckInRawPreview ?? '',
         // ── AlbumCoverWidget ──
         album_lastGetTimelineAt:
           diag.albumLastGetTimelineAt ?? 'undefined-OLD-BRIDGE',
