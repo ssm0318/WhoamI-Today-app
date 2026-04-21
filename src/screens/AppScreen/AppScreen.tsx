@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BackHandler,
   NativeModules,
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   ActivityIndicator,
@@ -12,6 +11,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { APP_CONSTS, WEBVIEW_CONSTS } from '@constants';
 import {
   useFocusEffect,
@@ -41,6 +41,10 @@ import {
   syncTokensToWidget,
   triggerWidgetRefresh,
 } from '../../native/WidgetDataModule';
+import {
+  normalizeDescriptionForWidget,
+  normalizeMoodForWidget,
+} from '../../utils/widgetCheckInNormalize';
 import {
   getCachedCheckInForWidget,
   setCachedCheckInForWidget,
@@ -299,6 +303,9 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         style={{ backgroundColor: 'transparent' }}
         containerStyle={{ backgroundColor: '#FFFFFF' }}
         injectedJavaScriptBeforeContentLoaded={
+          (APP_CONSTS.MAINTENANCE_BYPASS
+            ? `(function(){if(!document.cookie.includes('maintenance_bypass=whoami2026')){document.cookie="maintenance_bypass=whoami2026; path=/; secure; max-age=31536000";location.reload();}})();`
+            : '') +
           injectCookieScript(tokens.csrftoken, tokens.access_token) +
           (isDeepLinkPath
             ? `(function(){var b=${JSON.stringify(
@@ -321,7 +328,8 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         scalesPageToFit={false}
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
-        cacheEnabled={false}
+        cacheEnabled={true}
+        cacheMode={Platform.OS === 'android' ? 'LOAD_DEFAULT' : undefined}
         domStorageEnabled
         /* Keyboard-related settings - apply platform-specific differences */
         scrollEnabled={true}
@@ -365,279 +373,309 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     postMessage('SET_APP_STATE', { value: state });
   }, []);
 
-  // Sync latest check-in to widget when leaving app. Run on 'inactive' so reload is more likely
-  // to be honored. First push cached check-in and reload immediately (no network); then fetch and sync.
-  const runWidgetSync = useCallback(() => {
-    console.log('[WidgetSync] runWidgetSync called', {
-      hasAccessToken: !!tokens.access_token,
-      hasCsrfToken: !!tokens.csrftoken,
-    });
-    if (!tokens.access_token || !tokens.csrftoken) {
-      console.log('[WidgetSync] runWidgetSync skipped: missing tokens');
-      return;
-    }
-    setWidgetDataStale(false);
+  type WidgetSyncMode = 'foreground' | 'background';
 
-    // Force-push auth tokens to App Group every sync. If the user is already logged in
-    // from a previous session, WebView reuses cached cookies and never re-fires SET_COOKIE,
-    // which means syncTokensToWidget (normally called from saveCookie) is never invoked —
-    // and the widget extension reads empty tokens and renders SignInView.
-    syncTokensToWidget(tokens.csrftoken, tokens.access_token).catch(() => {
-      /* logged inside the wrapper */
-    });
-
-    const cachedCheckIn = getCachedCheckInForWidget();
-    if (cachedCheckIn) {
-      console.log('[WidgetSync] Pushing cached check-in first', {
-        id: cachedCheckIn.id,
-        mood: cachedCheckIn.mood,
-        descriptionLen: cachedCheckIn.description?.length ?? 0,
+  // Sync latest widget data. In background mode we only do cheap/local sync because
+  // iOS may suspend JS before network-heavy shared/friend flows finish.
+  const runWidgetSync = useCallback(
+    (mode: WidgetSyncMode = 'foreground') => {
+      console.log('[WidgetSync] runWidgetSync called', {
+        mode,
+        hasAccessToken: !!tokens.access_token,
+        hasCsrfToken: !!tokens.csrftoken,
       });
-      syncMyCheckInToWidget(cachedCheckIn).then(() => triggerWidgetRefresh());
-    } else {
-      console.log('[WidgetSync] No cached check-in to push immediately');
-    }
+      if (!tokens.access_token || !tokens.csrftoken) {
+        console.log('[WidgetSync] runWidgetSync skipped: missing tokens');
+        return;
+      }
+      setWidgetDataStale(false);
 
-    (async () => {
-      try {
-        console.log('[WidgetSync] Fetching profile + song from API…');
-        const [profileResponse, songResponse] = await Promise.all([
-          ApiService.API.get('user/me/profile') as Promise<unknown>,
-          ApiService.API.get('check_in/song/').catch(
-            () => [],
-          ) as Promise<unknown>,
-        ]);
-        const res = profileResponse as {
-          check_in?: {
-            id: number;
-            is_active: boolean;
-            created_at: string;
-            mood?: string;
-            social_battery?: string | null;
-            description?: string;
-          };
-        };
-        // /check_in/song/ returns DRF-paginated shape: { count, next, previous, results: [...] }
-        // (older deployments may return a bare array — handle both)
-        type SongItem = { track_id: string; is_active: boolean };
-        const songsResRaw = songResponse as
-          | SongItem[]
-          | { results?: SongItem[] }
-          | null
-          | undefined;
-        let songsList: SongItem[] = [];
-        if (Array.isArray(songsResRaw)) {
-          songsList = songsResRaw;
-        } else if (songsResRaw && Array.isArray(songsResRaw.results)) {
-          songsList = songsResRaw.results as SongItem[];
-        }
-        console.log('[WidgetSync] API responses received', {
-          hasCheckInInProfile: !!res?.check_in,
-          checkInRaw: res?.check_in,
-          songsListLen: songsList.length,
-          songsRaw: songsResRaw,
+      // Force-push auth tokens to App Group every sync. If the user is already logged in
+      // from a previous session, WebView reuses cached cookies and never re-fires SET_COOKIE,
+      // which means syncTokensToWidget (normally called from saveCookie) is never invoked —
+      // and the widget extension reads empty tokens and renders SignInView.
+      syncTokensToWidget(tokens.csrftoken, tokens.access_token).catch(() => {
+        /* logged inside the wrapper */
+      });
+
+      const cachedCheckIn = getCachedCheckInForWidget();
+      if (cachedCheckIn) {
+        console.log('[WidgetSync] Pushing cached check-in first', {
+          id: cachedCheckIn.id,
+          mood: cachedCheckIn.mood,
+          descriptionLen: cachedCheckIn.description?.length ?? 0,
         });
-        const trackId = songsList.find((s) => s.is_active)?.track_id ?? '';
-        const checkIn = res?.check_in;
-        if (checkIn) {
-          let albumImageUrl: string | null = null;
-          if (trackId.trim()) {
-            console.log(
-              '[WidgetSync] Fetching Spotify album image for',
-              trackId,
-            );
-            albumImageUrl = await fetchSpotifyAlbumImageUrl(trackId);
-            console.log('[WidgetSync] Album image url:', albumImageUrl);
-          }
-          const payload = {
-            id: checkIn.id,
-            isActive: checkIn.is_active,
-            createdAt: checkIn.created_at,
-            mood: checkIn.mood ?? '',
-            socialBattery: checkIn.social_battery ?? null,
-            description: checkIn.description ?? '',
-            trackId,
-            albumImageUrl,
-          };
-          console.log('[WidgetSync] Final payload to sync:', payload);
-          await syncMyCheckInToWidget(payload);
-          setCachedCheckInForWidget(payload);
-        } else {
-          console.warn(
-            '[WidgetSync] API returned no check_in in profile — widget will show empty state',
-          );
-        }
+        syncMyCheckInToWidget(cachedCheckIn).then(() => triggerWidgetRefresh());
+      } else {
+        console.log('[WidgetSync] No cached check-in to push immediately');
+      }
 
-        // ── Shared playlist sync (independent from myCheckIn) ──
-        // Fetches /user/discover/?page=1 → picks a random music_track → fetches album art
-        // and sharer avatar as base64 → syncs to AlbumCoverWidget. Wrapped in its own try/catch
-        // so a discover-feed failure can't break the myCheckIn flow.
+      if (mode === 'background') {
+        console.log(
+          '[WidgetSync] Background mode: skipping network-heavy shared/friend sync',
+        );
+        triggerWidgetRefresh().catch(() => {
+          /* logged inside wrapper */
+        });
+        return;
+      }
+
+      (async () => {
         try {
-          console.log(
-            '[WidgetSync] Fetching shared playlist from /user/discover/?page=1',
-          );
-          const discoverResponse = (await ApiService.API.get('user/discover/', {
-            params: { page: 1 },
-          })) as {
-            music_tracks?: Array<{
+          console.log('[WidgetSync] Fetching profile + song from API…');
+          const [profileResponse, songResponse] = await Promise.all([
+            ApiService.API.get('user/me/profile') as Promise<unknown>,
+            ApiService.API.get('check_in/song/').catch(
+              () => [],
+            ) as Promise<unknown>,
+          ]);
+          const res = profileResponse as {
+            check_in?: {
               id: number;
-              track_id: string;
+              is_active: boolean;
               created_at: string;
-              user: {
-                id: number;
-                username: string;
-                profile_image?: string | null;
-                profile_pic?: string | null;
-              };
-            }>;
+              mood?: string | string[];
+              social_battery?: string | null;
+              description?: string;
+              thought?: string;
+            };
           };
-          const musicTracks = discoverResponse?.music_tracks ?? [];
-          console.log(
-            '[WidgetSync] Shared playlist tracks count:',
-            musicTracks.length,
-          );
-          if (musicTracks.length > 0) {
-            const randomIdx = Math.floor(Math.random() * musicTracks.length);
-            const picked = musicTracks[randomIdx];
-            console.log('[WidgetSync] Picked random shared track:', {
-              idx: randomIdx,
-              id: picked.id,
-              trackId: picked.track_id,
-              sharerUsername: picked.user.username,
-              hasProfileImage: !!picked.user.profile_image,
-            });
-            const albumImageUrl = await fetchSpotifyAlbumImageUrl(
-              picked.track_id,
-            );
-            console.log(
-              '[WidgetSync] Shared track album image url:',
+          // /check_in/song/ returns DRF-paginated shape: { count, next, previous, results: [...] }
+          // (older deployments may return a bare array — handle both)
+          type SongItem = { track_id: string; is_active: boolean };
+          const songsResRaw = songResponse as
+            | SongItem[]
+            | { results?: SongItem[] }
+            | null
+            | undefined;
+          let songsList: SongItem[] = [];
+          if (Array.isArray(songsResRaw)) {
+            songsList = songsResRaw;
+          } else if (songsResRaw && Array.isArray(songsResRaw.results)) {
+            songsList = songsResRaw.results as SongItem[];
+          }
+          console.log('[WidgetSync] API responses received', {
+            hasCheckInInProfile: !!res?.check_in,
+            checkInRaw: res?.check_in,
+            songsListLen: songsList.length,
+            songsRaw: songsResRaw,
+          });
+          const trackId = songsList.find((s) => s.is_active)?.track_id ?? '';
+          const checkIn = res?.check_in;
+          if (checkIn) {
+            let albumImageUrl: string | null = null;
+            if (trackId.trim()) {
+              console.log(
+                '[WidgetSync] Fetching Spotify album image for',
+                trackId,
+              );
+              albumImageUrl = await fetchSpotifyAlbumImageUrl(trackId);
+              console.log('[WidgetSync] Album image url:', albumImageUrl);
+            }
+            const payload = {
+              id: checkIn.id,
+              isActive: checkIn.is_active,
+              createdAt: checkIn.created_at,
+              mood: normalizeMoodForWidget(checkIn.mood),
+              socialBattery: checkIn.social_battery ?? null,
+              description: normalizeDescriptionForWidget(checkIn),
+              trackId,
               albumImageUrl,
+            };
+            console.log('[WidgetSync] Final payload to sync:', payload);
+            await syncMyCheckInToWidget(payload);
+            setCachedCheckInForWidget(payload);
+          } else {
+            console.warn(
+              '[WidgetSync] API returned no check_in in profile — widget will show empty state',
             );
-            const [albumImageBase64, avatarImageBase64] = await Promise.all([
-              fetchImageAsBase64(albumImageUrl),
-              fetchImageAsBase64(picked.user.profile_image),
-            ]);
-            console.log('[WidgetSync] Shared playlist images fetched', {
-              albumImageBase64Len: albumImageBase64.length,
-              avatarImageBase64Len: avatarImageBase64.length,
-            });
-            await syncSharedPlaylistTrackToWidget(
+          }
+
+          // ── Shared playlist sync (independent from myCheckIn) ──
+          // Fetches /user/discover/?page=1 → picks a random music_track → fetches album art
+          // and sharer avatar as base64 → syncs to AlbumCoverWidget. Wrapped in its own try/catch
+          // so a discover-feed failure can't break the myCheckIn flow.
+          try {
+            console.log(
+              '[WidgetSync] Fetching shared playlist from /user/discover/?page=1',
+            );
+            const discoverResponse = (await ApiService.API.get(
+              'user/discover/',
               {
+                params: { page: 1 },
+              },
+            )) as {
+              music_tracks?: Array<{
+                id: number;
+                track_id: string;
+                created_at: string;
+                user: {
+                  id: number;
+                  username: string;
+                  profile_image?: string | null;
+                  profile_pic?: string | null;
+                };
+              }>;
+            };
+            const musicTracks = discoverResponse?.music_tracks ?? [];
+            console.log(
+              '[WidgetSync] Shared playlist tracks count:',
+              musicTracks.length,
+            );
+            if (musicTracks.length > 0) {
+              const randomIdx = Math.floor(Math.random() * musicTracks.length);
+              const picked = musicTracks[randomIdx];
+              console.log('[WidgetSync] Picked random shared track:', {
+                idx: randomIdx,
                 id: picked.id,
                 trackId: picked.track_id,
-                albumImageUrl,
                 sharerUsername: picked.user.username,
-                sharerProfileImageUrl: picked.user.profile_image ?? null,
-              },
-              albumImageBase64,
-              avatarImageBase64,
-            );
-          } else {
-            console.warn(
-              '[WidgetSync] No music_tracks in discover feed — AlbumCoverWidget will show placeholder',
-            );
+                hasProfileImage: !!picked.user.profile_image,
+              });
+              const albumImageUrl = await fetchSpotifyAlbumImageUrl(
+                picked.track_id,
+              );
+              console.log(
+                '[WidgetSync] Shared track album image url:',
+                albumImageUrl,
+              );
+              const [albumImageBase64, avatarImageBase64] = await Promise.all([
+                fetchImageAsBase64(albumImageUrl),
+                fetchImageAsBase64(picked.user.profile_image),
+              ]);
+              console.log('[WidgetSync] Shared playlist images fetched', {
+                albumImageBase64Len: albumImageBase64.length,
+                avatarImageBase64Len: avatarImageBase64.length,
+              });
+              await syncSharedPlaylistTrackToWidget(
+                {
+                  id: picked.id,
+                  trackId: picked.track_id,
+                  albumImageUrl,
+                  sharerUsername: picked.user.username,
+                  sharerProfileImageUrl: picked.user.profile_image ?? null,
+                },
+                albumImageBase64,
+                avatarImageBase64,
+              );
+              console.log(
+                '[WidgetSync] Shared playlist synced to native; verifying App Group…',
+              );
+              void getWidgetDiagnostics();
+            } else {
+              console.warn(
+                '[WidgetSync] No music_tracks in discover feed — AlbumCoverWidget will show placeholder',
+              );
+              console.warn('[WidgetSync] discover response keys:', {
+                keys: Object.keys(discoverResponse ?? {}),
+                preview: JSON.stringify(discoverResponse ?? {}).slice(0, 800),
+              });
+            }
+          } catch (spErr) {
+            console.warn('[WidgetSync] Shared playlist sync failed:', spErr);
           }
-        } catch (spErr) {
-          console.warn('[WidgetSync] Shared playlist sync failed:', spErr);
-        }
 
-        // ── Friend post sync (independent from myCheckIn and shared playlist) ──
-        // Fetches /user/friends/ → picks a random friend with unread posts → uses
-        // latest_unread_post for content/images → syncs to PhotoWidget.
-        try {
-          console.log('[WidgetSync] Fetching friend list from /user/friends/');
-          const friendsRaw = await ApiService.API.get('user/friends/', {
-            params: { type: 'all' },
-          });
-          // Response may be paginated {results:[...]} or plain array
-          type FriendItem = {
-            id: number;
-            username: string;
-            profile_image: string | null;
-            unread_post_cnt: number;
-            latest_unread_post: {
+          // ── Friend post sync (independent from myCheckIn and shared playlist) ──
+          // Fetches /user/friends/ → picks a random friend with unread posts → uses
+          // latest_unread_post for content/images → syncs to PhotoWidget.
+          try {
+            console.log(
+              '[WidgetSync] Fetching friend list from /user/friends/',
+            );
+            const friendsRaw = await ApiService.API.get('user/friends/', {
+              params: { type: 'all' },
+            });
+            // Response may be paginated {results:[...]} or plain array
+            type FriendItem = {
               id: number;
-              type: string;
-              content: string;
-              images: string[];
-            } | null;
-          };
-          const allFriends: FriendItem[] = Array.isArray(friendsRaw)
-            ? friendsRaw
-            : (friendsRaw as any)?.results ?? [];
-          console.log('[WidgetSync] Friend list response:', {
-            isArray: Array.isArray(friendsRaw),
-            friendCount: allFriends.length,
-            sample: allFriends[0]
-              ? {
-                  username: allFriends[0].username,
-                  unread_post_cnt: allFriends[0].unread_post_cnt,
-                  hasLatestPost: !!allFriends[0].latest_unread_post,
-                }
-              : null,
-          });
-          const friendsWithPosts = allFriends.filter(
-            (f) => f.unread_post_cnt > 0 && f.latest_unread_post,
-          );
-          console.log('[WidgetSync] Friends with unread posts:', {
-            total: allFriends.length,
-            withPosts: friendsWithPosts.length,
-          });
-          if (friendsWithPosts.length > 0) {
-            const randomIdx = Math.floor(
-              Math.random() * friendsWithPosts.length,
-            );
-            const pickedFriend = friendsWithPosts[randomIdx];
-            const post = pickedFriend.latest_unread_post!;
-            console.log('[WidgetSync] Picked friend with unread post:', {
-              idx: randomIdx,
-              friendUsername: pickedFriend.username,
-              profileImage: pickedFriend.profile_image,
-              postId: post.id,
-              postType: post.type,
-              contentLen: post.content?.length ?? 0,
-              imagesCount: post.images?.length ?? 0,
+              username: string;
+              profile_image: string | null;
+              unread_post_cnt: number;
+              latest_unread_post: {
+                id: number;
+                type: string;
+                content: string;
+                images: string[];
+              } | null;
+            };
+            const allFriends: FriendItem[] = Array.isArray(friendsRaw)
+              ? friendsRaw
+              : (friendsRaw as any)?.results ?? [];
+            console.log('[WidgetSync] Friend list response:', {
+              isArray: Array.isArray(friendsRaw),
+              friendCount: allFriends.length,
+              sample: allFriends[0]
+                ? {
+                    username: allFriends[0].username,
+                    unread_post_cnt: allFriends[0].unread_post_cnt,
+                    hasLatestPost: !!allFriends[0].latest_unread_post,
+                  }
+                : null,
             });
-            const [authorImageBase64, postImageBase64] = await Promise.all([
-              fetchImageAsBase64(pickedFriend.profile_image),
-              post.images && post.images.length > 0
-                ? fetchImageAsBase64(post.images[0])
-                : Promise.resolve(''),
-            ]);
-            console.log('[WidgetSync] Friend post images fetched', {
-              authorImageBase64Len: authorImageBase64.length,
-              postImageBase64Len: postImageBase64.length,
+            const friendsWithPosts = allFriends.filter(
+              (f) => f.unread_post_cnt > 0 && f.latest_unread_post,
+            );
+            console.log('[WidgetSync] Friends with unread posts:', {
+              total: allFriends.length,
+              withPosts: friendsWithPosts.length,
             });
-            await syncFriendPostToWidget(
-              {
-                id: post.id,
-                type: post.type,
-                content: post.content,
-                images: post.images,
-                currentUserRead: false,
-                authorUsername: pickedFriend.username,
-              },
-              authorImageBase64,
-              postImageBase64,
-            );
-          } else {
-            console.warn(
-              '[WidgetSync] No friends with unread posts — clearing PhotoWidget',
-            );
-            await clearFriendPostFromWidget();
+            if (friendsWithPosts.length > 0) {
+              const randomIdx = Math.floor(
+                Math.random() * friendsWithPosts.length,
+              );
+              const pickedFriend = friendsWithPosts[randomIdx];
+              const post = pickedFriend.latest_unread_post!;
+              console.log('[WidgetSync] Picked friend with unread post:', {
+                idx: randomIdx,
+                friendUsername: pickedFriend.username,
+                profileImage: pickedFriend.profile_image,
+                postId: post.id,
+                postType: post.type,
+                contentLen: post.content?.length ?? 0,
+                imagesCount: post.images?.length ?? 0,
+              });
+              const [authorImageBase64, postImageBase64] = await Promise.all([
+                fetchImageAsBase64(pickedFriend.profile_image),
+                post.images && post.images.length > 0
+                  ? fetchImageAsBase64(post.images[0])
+                  : Promise.resolve(''),
+              ]);
+              console.log('[WidgetSync] Friend post images fetched', {
+                authorImageBase64Len: authorImageBase64.length,
+                postImageBase64Len: postImageBase64.length,
+              });
+              await syncFriendPostToWidget(
+                {
+                  id: post.id,
+                  type: post.type,
+                  content: post.content,
+                  images: post.images,
+                  currentUserRead: false,
+                  authorUsername: pickedFriend.username,
+                },
+                authorImageBase64,
+                postImageBase64,
+              );
+            } else {
+              console.warn(
+                '[WidgetSync] No friends with unread posts — clearing PhotoWidget',
+              );
+              await clearFriendPostFromWidget();
+            }
+          } catch (fpErr) {
+            console.warn('[WidgetSync] Friend post sync failed:', fpErr);
           }
-        } catch (fpErr) {
-          console.warn('[WidgetSync] Friend post sync failed:', fpErr);
-        }
 
-        await triggerWidgetRefresh();
-        console.log('[WidgetSync] triggerWidgetRefresh completed');
-      } catch (err) {
-        console.warn('[WidgetSync] runWidgetSync failed:', err);
-        await triggerWidgetRefresh();
-      }
-    })();
-  }, [tokens.access_token, tokens.csrftoken]);
+          await triggerWidgetRefresh();
+          console.log('[WidgetSync] triggerWidgetRefresh completed');
+        } catch (err) {
+          console.warn('[WidgetSync] runWidgetSync failed:', err);
+          await triggerWidgetRefresh();
+        }
+      })();
+    },
+    [tokens.access_token, tokens.csrftoken],
+  );
 
   // Run widget sync once when tokens first become available (cold start)
   const initialSyncDoneRef = useRef(false);
@@ -645,8 +683,10 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     if (!tokens.access_token || !tokens.csrftoken) return;
     if (initialSyncDoneRef.current) return;
     initialSyncDoneRef.current = true;
-    console.log('[WidgetSync] Initial token load → triggering runWidgetSync');
-    runWidgetSync();
+    console.log(
+      '[WidgetSync] Initial token load → triggering runWidgetSync(foreground)',
+    );
+    runWidgetSync('foreground');
   }, [tokens.access_token, tokens.csrftoken, runWidgetSync]);
 
   useAppStateEffect(
@@ -656,12 +696,24 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         hasCsrfToken: !!tokens.csrftoken,
       });
       if (state === 'inactive' && tokens.access_token && tokens.csrftoken) {
-        console.log('[WidgetSync] State=inactive → triggering runWidgetSync');
-        runWidgetSync();
+        console.log(
+          '[WidgetSync] State=inactive → triggering runWidgetSync(background)',
+        );
+        runWidgetSync('background');
       }
       if (state === 'active' && tokens.access_token && tokens.csrftoken) {
-        console.log('[WidgetSync] State=active → triggering runWidgetSync');
-        runWidgetSync();
+        // Delay foreground widget sync so it doesn't race the WebView for
+        // network/main-thread resources right when the user returns to the app.
+        // Widget shows the last cached check-in immediately; this just defers
+        // the network-heavy profile/discover/friends fetches.
+        console.log(
+          '[WidgetSync] State=active → scheduling delayed runWidgetSync(foreground)',
+        );
+        setTimeout(() => {
+          if (!tokens.access_token || !tokens.csrftoken) return;
+          console.log('[WidgetSync] Delayed foreground sync firing now');
+          runWidgetSync('foreground');
+        }, 1500);
         const logWidgetDiagnostics = () => {
           // getWidgetDiagnostics already logs the App Group state internally
           getWidgetDiagnostics().catch(() => {
@@ -676,7 +728,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar />
       {renderContent()}
     </SafeAreaView>
