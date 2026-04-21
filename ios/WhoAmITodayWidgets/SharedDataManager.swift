@@ -4,6 +4,19 @@ class SharedDataManager {
     static let shared = SharedDataManager()
     private let suiteName = "group.com.whoami.today.app"
 
+    private var appGroupContainerURL: URL? {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: suiteName)
+    }
+
+    private func utf8StringFromAppGroupFile(_ filename: String) -> String? {
+        guard let url = appGroupContainerURL?.appendingPathComponent(filename),
+              let data = try? Data(contentsOf: url),
+              let s = String(data: data, encoding: .utf8),
+              !s.isEmpty
+        else { return nil }
+        return s
+    }
+
     private var sharedDefaults: UserDefaults? {
         let defaults = UserDefaults(suiteName: suiteName)
         defaults?.synchronize()
@@ -30,18 +43,43 @@ class SharedDataManager {
 
     private func string(forKey key: String) -> String? {
         if let val = sharedDefaults?.string(forKey: key), !val.isEmpty { return val }
-        return plistDict?[key] as? String
+        if let obj = sharedDefaults?.object(forKey: key) {
+            if let s = obj as? String, !s.isEmpty { return s }
+            if let data = obj as? Data, let s = String(data: data, encoding: .utf8), !s.isEmpty { return s }
+        }
+        return stringFromPlistValue(plistDict?[key])
     }
 
+    /// Plist may store strings as `String`, `NSString`, or occasionally `Data` (UTF-8).
+    private func stringFromPlistValue(_ any: Any?) -> String? {
+        guard let any = any else { return nil }
+        if let s = any as? String, !s.isEmpty { return s }
+        if let data = any as? Data, let s = String(data: data, encoding: .utf8), !s.isEmpty { return s }
+        return nil
+    }
+
+    /// JSON blobs may appear as `Data`, or as UTF-8 `String` in UserDefaults / plist (CFPreferences quirk across processes).
     private func data(forKey key: String) -> Data? {
-        if let val = sharedDefaults?.data(forKey: key) { return val }
-        return plistDict?[key] as? Data
+        if let val = sharedDefaults?.data(forKey: key), !val.isEmpty { return val }
+        if let obj = sharedDefaults?.object(forKey: key) {
+            if let s = obj as? String, let d = s.data(using: .utf8), !d.isEmpty { return d }
+        }
+        if let pd = plistDict?[key] {
+            if let d = pd as? Data, !d.isEmpty { return d }
+            if let s = pd as? String, let d = s.data(using: .utf8), !d.isEmpty { return d }
+        }
+        return nil
     }
 
     // MARK: - Auth
 
-    var csrfToken: String? { string(forKey: "csrftoken") }
-    var accessToken: String? { string(forKey: "access_token") }
+    var csrfToken: String? {
+        string(forKey: "csrftoken") ?? utf8StringFromAppGroupFile("widget_auth_csrftoken.txt")
+    }
+
+    var accessToken: String? {
+        string(forKey: "access_token") ?? utf8StringFromAppGroupFile("widget_auth_access_token.txt")
+    }
 
     var isAuthenticated: Bool {
         let hasCsrf = csrfToken.map { !$0.isEmpty } ?? false
@@ -63,18 +101,51 @@ class SharedDataManager {
     }
 
     var apiBaseUrl: String? {
-        sharedDefaults?.string(forKey: "api_base_url")
+        if let s = string(forKey: "api_base_url"), !s.isEmpty { return s }
+        return utf8StringFromAppGroupFile("widget_api_base_url.txt")
     }
 
     // MARK: - Check-in
 
+    private func myCheckInJSONDataCandidatesWithSource() -> [(source: String, data: Data)] {
+        var out: [(source: String, data: Data)] = []
+        if let url = appGroupContainerURL?.appendingPathComponent("my_check_in.json"),
+           let d = try? Data(contentsOf: url), !d.isEmpty {
+            out.append((source: "file:my_check_in.json", data: d))
+        }
+        if let d = data(forKey: "my_check_in"), !d.isEmpty {
+            out.append((source: "defaults:my_check_in", data: d))
+        }
+        return out
+    }
+
+    /// Bytes the widget will try to decode (first non-empty candidate).
+    private func myCheckInJSONData() -> Data? {
+        myCheckInJSONDataCandidatesWithSource().first?.data
+    }
+
+    var myCheckInDecodeSource: String {
+        for candidate in myCheckInJSONDataCandidatesWithSource() {
+            if (try? JSONDecoder().decode(MyCheckIn.self, from: candidate.data)) != nil {
+                return candidate.source
+            }
+        }
+        return "(decode_failed)"
+    }
+
     var myCheckIn: MyCheckIn? {
-        guard let d = data(forKey: "my_check_in") else { return nil }
-        return try? JSONDecoder().decode(MyCheckIn.self, from: d)
+        for candidate in myCheckInJSONDataCandidatesWithSource() {
+            if let v = try? JSONDecoder().decode(MyCheckIn.self, from: candidate.data) { return v }
+        }
+        return nil
     }
 
     var cachedAlbumImageData: Data? {
-        get { data(forKey: "widget_album_image") }
+        get {
+            if let d = data(forKey: "widget_album_image") { return d }
+            guard let url = appGroupContainerURL?.appendingPathComponent("widget_album_image.bin") else { return nil }
+            return try? Data(contentsOf: url)
+        }
         set {
             sharedDefaults?.set(newValue, forKey: "widget_album_image")
             sharedDefaults?.synchronize()
@@ -129,7 +200,7 @@ class SharedDataManager {
 
     // MARK: - Raw bytes accessors (for diagnostics)
 
-    var rawMyCheckInBytes: Data? { data(forKey: "my_check_in") }
+    var rawMyCheckInBytes: Data? { myCheckInJSONData() }
     var rawSharedPlaylistTrackBytes: Data? { data(forKey: "shared_playlist_track") }
 
     var appGroupReachable: Bool {
@@ -169,8 +240,12 @@ class SharedDataManager {
         let checkinAlbumLen = cachedAlbumImageData?.count ?? 0
         let friendPostImgLen = cachedFriendPostImage?.count ?? 0
 
-        let csrfVal = string(forKey: "csrftoken")
-        let accessVal = string(forKey: "access_token")
+        let csrfVal = csrfToken
+        let accessVal = accessToken
+        let fileCsrf = utf8StringFromAppGroupFile("widget_auth_csrftoken.txt") != nil
+        let fileAccess = utf8StringFromAppGroupFile("widget_auth_access_token.txt") != nil
+        let fileCheckInJson = appGroupContainerURL
+            .map { FileManager.default.fileExists(atPath: $0.appendingPathComponent("my_check_in.json").path) } ?? false
         let authResult = isAuthenticated
         let defaultResult = isDefaultVersion
         let versionVal = string(forKey: "user_version_type")
@@ -185,6 +260,7 @@ class SharedDataManager {
         isDefaultVersion: \(defaultResult)
         csrfToken: \(csrfVal != nil ? "'\(csrfVal!.prefix(8))...'" : "nil")
         accessToken: \(accessVal != nil ? "'\(accessVal!.prefix(8))...'" : "nil")
+        file_auth_txt: csrf=\(fileCsrf), access=\(fileAccess), my_check_in.json=\(fileCheckInJson)
         versionType: \(versionVal ?? "nil")
         --- UserDefaults ---
         csrf: \(udCsrf), access: \(udAccess)
@@ -216,9 +292,11 @@ class SharedDataManager {
         sharedDefaults?.synchronize()
     }
 
-    func writeCheckInRawState(rawBytesPresent: Bool, decodeOk: Bool) {
+    func writeCheckInRawState(rawBytesPresent: Bool, decodeOk: Bool, decodeSource: String, rawPreview: String) {
         sharedDefaults?.set(rawBytesPresent, forKey: "widget_my_check_in_raw_present")
         sharedDefaults?.set(decodeOk, forKey: "widget_my_check_in_decode_ok")
+        sharedDefaults?.set(decodeSource, forKey: "widget_my_check_in_decode_source")
+        sharedDefaults?.set(rawPreview, forKey: "widget_my_check_in_raw_preview")
         sharedDefaults?.synchronize()
     }
 

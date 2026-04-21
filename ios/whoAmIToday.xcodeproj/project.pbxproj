@@ -40,6 +40,7 @@
 		7D8F79E82B20C5B1DEF5FB2D /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28AFCB6D58D0D286B569BAC6 /* SignInView.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		828C39216045268EAD448BAC /* CheckinWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6E58EE1A34674C60374CCBD /* CheckinWidget.swift */; };
+		F8E7D6C5B4A3129011ABCD02 /* ReloadCheckinWidgetIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E7D6C5B4A3129011ABCD01 /* ReloadCheckinWidgetIntent.swift */; };
 		9491CBBD99AC8F6D3349DFC7 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 953F5D4083B006E75D45D6AC /* PrivacyInfo.xcprivacy */; };
 		CB7BDCD0CB12EA7DBD13FA64 /* WidgetModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 217F0F0006D243026CFBB9DA /* WidgetModels.swift */; };
 		D2E5CE2394BACD76CEE08353 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 605ECE7C4119C7D60C7FCDFE /* Assets.xcassets */; };
@@ -122,6 +123,7 @@
 		C0CCC44585BDBA2B534517DD /* DefaultVersionView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DefaultVersionView.swift; path = DefaultVersionView.swift; sourceTree = "<group>"; };
 		CCC4B6840E26EC4FED138891 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		D6E58EE1A34674C60374CCBD /* CheckinWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CheckinWidget.swift; sourceTree = "<group>"; };
+		F8E7D6C5B4A3129011ABCD01 /* ReloadCheckinWidgetIntent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReloadCheckinWidgetIntent.swift; sourceTree = "<group>"; };
 		DA52B36279E8148618B96C53 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		DFF0E22749F76BAAC591073C /* WhoAmITodayWidgetsBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WhoAmITodayWidgetsBundle.swift; sourceTree = "<group>"; };
 		E12290D1AF05A1DD30E26307 /* Pods-whoAmIToday.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-whoAmIToday.debug.xcconfig"; path = "Target Support Files/Pods-whoAmIToday/Pods-whoAmIToday.debug.xcconfig"; sourceTree = "<group>"; };
@@ -188,7 +190,6 @@
 		13B07FAE1A68108700A75B9A /* whoAmIToday */ = {
 			isa = PBXGroup;
 			children = (
-				337D1D3B2F2BBD0B00884C31 /* WhoAmIWidgetBridge */,
 				335346C22A04E53100E15B67 /* app.entitlements */,
 				13B07FAF1A68108700A75B9A /* AppDelegate.h */,
 				13B07FB01A68108700A75B9A /* AppDelegate.mm */,
@@ -235,6 +236,7 @@
 				337D1D432F2BBD0C00884C31 /* InitialURLModule.h */,
 				337D1D412F2BBD0C00884C31 /* InitialURLModule.m */,
 			);
+			name = WhoAmIWidgetBridge;
 			path = WhoAmIWidgetBridge;
 			sourceTree = "<group>";
 		};
@@ -257,6 +259,7 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
+				337D1D3B2F2BBD0B00884C31 /* WhoAmIWidgetBridge */,
 				13B07FAE1A68108700A75B9A /* whoAmIToday */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				00E356EF1AD99517003FC87E /* whoAmITodayTests */,
@@ -292,6 +295,7 @@
 				3737F6133C97FDCE41EAB4BB /* PhotoWidget.swift */,
 				5412A1EDD1E2E221314FA1FB /* AlbumCoverWidget.swift */,
 				D6E58EE1A34674C60374CCBD /* CheckinWidget.swift */,
+				F8E7D6C5B4A3129011ABCD01 /* ReloadCheckinWidgetIntent.swift */,
 				A43E660C6D82539824BB52BB /* SharedDataManager.swift */,
 				A1B2C3D4E5F60718BEEFDEAD /* WidgetAPIHelper.swift */,
 				605ECE7C4119C7D60C7FCDFE /* Assets.xcassets */,
@@ -748,6 +752,7 @@
 				4B4AD669FFB5581CC078EF31 /* PhotoWidget.swift in Sources */,
 				5DE524D9B0E25B3AED8BF6C9 /* AlbumCoverWidget.swift in Sources */,
 				828C39216045268EAD448BAC /* CheckinWidget.swift in Sources */,
+				F8E7D6C5B4A3129011ABCD02 /* ReloadCheckinWidgetIntent.swift in Sources */,
 				329FFB1B35C20B75A7CE3E5C /* SharedDataManager.swift in Sources */,
 				7D8F79E82B20C5B1DEF5FB2D /* SignInView.swift in Sources */,
 				5438CDA7740D874BF54F6612 /* DefaultVersionView.swift in Sources */,
@@ -1165,7 +1170,7 @@
 				CODE_SIGN_ENTITLEMENTS = whoAmIToday/app.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 6XD5FH576F;
 				ENABLE_BITCODE = NO;
 				HEADER_SEARCH_PATHS = (
@@ -1365,7 +1370,7 @@
 				CODE_SIGN_ENTITLEMENTS = whoAmIToday/app.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 6XD5FH576F;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1563,7 +1568,7 @@
 				CODE_SIGN_ENTITLEMENTS = whoAmIToday/app.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 6XD5FH576F;
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = "\"i386 arm64\"";
@@ -1764,7 +1769,7 @@
 				CODE_SIGN_ENTITLEMENTS = whoAmIToday/app.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 6XD5FH576F;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = "\"i386 arm64\"";
 				HEADER_SEARCH_PATHS = (
@@ -1961,7 +1966,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = WhoAmITodayWidgets/WhoAmITodayWidgets.entitlements;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 6XD5FH576F;
 				GENERATE_INFOPLIST_FILE = NO;
 				HEADER_SEARCH_PATHS = (
@@ -2004,7 +2009,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.whoami.today.app.widgets;
 				PRODUCT_NAME = WhoAmITodayWidgets;
 				SDKROOT = iphoneos;
@@ -2028,7 +2033,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = WhoAmITodayWidgets/WhoAmITodayWidgets.entitlements;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 6XD5FH576F;
 				GENERATE_INFOPLIST_FILE = NO;
 				HEADER_SEARCH_PATHS = (
@@ -2071,7 +2076,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.whoami.today.app.widgets;
 				PRODUCT_NAME = WhoAmITodayWidgets;
 				SDKROOT = iphoneos;

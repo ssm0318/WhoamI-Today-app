@@ -36,6 +36,8 @@ struct SignInView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // WidgetKit may apply redacted placeholder styling to links/text; keep the real Sign-in UI visible.
+        .unredacted()
     }
 }
 

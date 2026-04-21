@@ -1,4 +1,86 @@
 #import "WidgetDataModule.h"
+#import <UIKit/UIKit.h>
+
+/// Downscale and JPEG-encode image bytes before App Group storage. Widget extensions have tight
+/// memory budgets; very large profile photos (100k+ base64) often decode fine in the app but fail
+/// or render blank in `UIImage(data:)` inside the widget process.
+static NSData *WAIWidgetImageDataForWidgetStorage(NSData *data, CGFloat maxSidePoints) {
+    if (data.length == 0) {
+        return nil;
+    }
+    UIImage *image = [UIImage imageWithData:data];
+    if (!image) {
+        return data;
+    }
+    CGFloat w = image.size.width * image.scale;
+    CGFloat h = image.size.height * image.scale;
+    CGFloat maxSide = MAX(w, h);
+    CGSize targetSize;
+    if (maxSide <= maxSidePoints) {
+        targetSize = CGSizeMake(w, h);
+    } else {
+        CGFloat ratio = maxSidePoints / maxSide;
+        targetSize = CGSizeMake(round(w * ratio), round(h * ratio));
+    }
+    if (targetSize.width < 1 || targetSize.height < 1) {
+        return data;
+    }
+    UIGraphicsBeginImageContextWithOptions(targetSize, NO, 1.0);
+    [image drawInRect:CGRectMake(0, 0, targetSize.width, targetSize.height)];
+    UIImage *scaled = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    if (!scaled) {
+        return data;
+    }
+    NSData *jpeg = UIImageJPEGRepresentation(scaled, 0.88);
+    return jpeg ?: data;
+}
+
+static NSString *const kWAIAppGroupId = @"group.com.whoami.today.app";
+
+static NSURL *WAIAppGroupRootURL(void) {
+    return [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:kWAIAppGroupId];
+}
+
+static void WAIWriteDataFile(NSString *filename, NSData *data) {
+    NSURL *root = WAIAppGroupRootURL();
+    if (!root || !data) {
+        return;
+    }
+    NSURL *fileURL = [root URLByAppendingPathComponent:filename];
+    [data writeToURL:fileURL atomically:YES];
+}
+
+static void WAIWriteUTF8File(NSString *filename, NSString *string) {
+    if (!string) {
+        return;
+    }
+    NSData *data = [string dataUsingEncoding:NSUTF8StringEncoding];
+    WAIWriteDataFile(filename, data);
+}
+
+static void WAIRemoveAppGroupFile(NSString *filename) {
+    NSURL *root = WAIAppGroupRootURL();
+    if (!root) {
+        return;
+    }
+    NSURL *fileURL = [root URLByAppendingPathComponent:filename];
+    [[NSFileManager defaultManager] removeItemAtURL:fileURL error:nil];
+}
+
+static NSString *WAIReadUTF8AppGroupFile(NSString *filename) {
+    NSURL *root = WAIAppGroupRootURL();
+    if (!root) {
+        return @"";
+    }
+    NSURL *fileURL = [root URLByAppendingPathComponent:filename];
+    NSData *data = [NSData dataWithContentsOfURL:fileURL];
+    if (!data) {
+        return @"";
+    }
+    NSString *decoded = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    return decoded ?: @"";
+}
 
 @implementation WidgetDataModule
 
@@ -13,39 +95,38 @@ static NSArray *kWidgetKinds = nil;
             @"PhotoWidget",
             // V2 kinds — old "AlbumCoverWidget" / "CheckinWidget" kinds were bumped
             // to force iOS to discard cached snapshots for stale widget instances.
-            @"AlbumCoverWidgetV2",
-            @"CheckinWidgetV2"
+            @"AlbumCoverWidgetV3",
+            @"CheckinWidgetV3"
         ];
     }
 }
 
 - (void)reloadWidgetTimelines {
     if (@available(iOS 14.0, *)) {
+        NSLog(@"[WidgetSync][iOSNative] reloadWidgetTimelines called at %@", [NSDate date]);
         Class WidgetCenterClass = NSClassFromString(@"WidgetCenter");
         if (WidgetCenterClass) {
             id sharedCenter = [WidgetCenterClass performSelector:@selector(shared)];
             if (sharedCenter) {
+                // reloadAllTimelines alone covers every widget kind; the per-kind fan-out
+                // we used to run (4×) multiplied real-device budget exhaustion and made
+                // iOS stop calling getTimeline altogether.
                 [sharedCenter performSelector:@selector(reloadAllTimelines)];
-                if (@available(iOS 15.0, *)) {
-                    SEL reloadKind = NSSelectorFromString(@"reloadTimelinesOfKind:");
-                    if ([sharedCenter respondsToSelector:reloadKind]) {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-                        for (NSString *kind in kWidgetKinds) {
-                            [sharedCenter performSelector:reloadKind withObject:kind];
-                        }
-#pragma clang diagnostic pop
-                    }
-                }
+                NSLog(@"[WidgetSync][iOSNative] reloadAllTimelines sent at %@", [NSDate date]);
             }
         }
     }
 }
 
-// Reload now and again after a short delay so the widget extension picks up App Group data after user has switched to home screen
+// Fire one reload immediately + exactly one follow-up ~2s later to catch the case
+// where the host app was still foregrounded when the first reload hit iOS's refresh
+// budget. Every additional call beyond this burnt budget without increasing the odds
+// of getTimeline actually running.
 - (void)reloadWidgetTimelinesWithFollowUp {
+    NSLog(@"[WidgetSync][iOSNative] reloadWidgetTimelinesWithFollowUp start at %@", [NSDate date]);
     [self reloadWidgetTimelines];
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        NSLog(@"[WidgetSync][iOSNative] reloadWidgetTimelinesWithFollowUp +2.0s at %@", [NSDate date]);
         [self reloadWidgetTimelines];
     });
 }
@@ -64,13 +145,11 @@ RCT_EXPORT_METHOD(syncAuthTokens:(NSString *)csrftoken
         [sharedDefaults setObject:accessToken forKey:@"access_token"];
         [sharedDefaults synchronize];
 
-        // Reload widget timelines with multiple delays to ensure the widget
-        // picks up the tokens after cfprefsd flushes across processes
+        // Mirror to files so the widget extension can read tokens (cfprefs/plist can be stale there).
+        WAIWriteUTF8File(@"widget_auth_csrftoken.txt", csrftoken);
+        WAIWriteUTF8File(@"widget_auth_access_token.txt", accessToken);
+
         [self reloadWidgetTimelinesWithFollowUp];
-        __weak typeof(self) weakSelf = self;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            [weakSelf reloadWidgetTimelines];
-        });
 
         resolve(@YES);
     } else {
@@ -91,6 +170,9 @@ RCT_EXPORT_METHOD(clearAuthTokens:(RCTPromiseResolveBlock)resolve
         [sharedDefaults removeObjectForKey:@"access_token"];
         [sharedDefaults synchronize];
 
+        WAIRemoveAppGroupFile(@"widget_auth_csrftoken.txt");
+        WAIRemoveAppGroupFile(@"widget_auth_access_token.txt");
+
         [self reloadWidgetTimelines];
 
         resolve(@YES);
@@ -104,6 +186,7 @@ RCT_EXPORT_METHOD(refreshWidgets:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 {
     if (@available(iOS 14.0, *)) {
+        NSLog(@"[WidgetSync][iOSNative] refreshWidgets invoked at %@", [NSDate date]);
         [self reloadWidgetTimelinesWithFollowUp];
         resolve(@YES);
     } else {
@@ -152,6 +235,25 @@ RCT_EXPORT_METHOD(syncMyCheckIn:(NSDictionary *)checkInData
         }
 
         [sharedDefaults setObject:jsonData forKey:@"my_check_in"];
+        WAIWriteDataFile(@"my_check_in.json", jsonData);
+
+        // Verify the file actually hit disk with the expected payload — lets us see
+        // whether Q1 (App Group file has new battery) passes without inspecting the
+        // device file system. Reads back, logs size + first 240 bytes of preview.
+        NSURL *verifyRoot = WAIAppGroupRootURL();
+        if (verifyRoot) {
+            NSURL *verifyURL = [verifyRoot URLByAppendingPathComponent:@"my_check_in.json"];
+            NSData *readBack = [NSData dataWithContentsOfURL:verifyURL];
+            NSString *preview = @"";
+            if (readBack.length > 0) {
+                NSData *sliced = readBack.length > 240
+                    ? [readBack subdataWithRange:NSMakeRange(0, 240)]
+                    : readBack;
+                preview = [[NSString alloc] initWithData:sliced encoding:NSUTF8StringEncoding] ?: @"(non-utf8)";
+            }
+            NSLog(@"[WidgetSync][iOSNative] syncMyCheckIn file write verified: size=%lu, preview=\"%@\"",
+                  (unsigned long)readBack.length, preview);
+        }
 
         // Store album image binary if provided
         if (albumImageBase64.length > 0) {
@@ -159,9 +261,11 @@ RCT_EXPORT_METHOD(syncMyCheckIn:(NSDictionary *)checkInData
                                                                    options:NSDataBase64DecodingIgnoreUnknownCharacters];
             if (imageData) {
                 [sharedDefaults setObject:imageData forKey:@"widget_album_image"];
+                WAIWriteDataFile(@"widget_album_image.bin", imageData);
             }
         } else {
             [sharedDefaults removeObjectForKey:@"widget_album_image"];
+            WAIRemoveAppGroupFile(@"widget_album_image.bin");
         }
 
         [sharedDefaults synchronize];
@@ -182,7 +286,11 @@ RCT_EXPORT_METHOD(clearMyCheckIn:(RCTPromiseResolveBlock)resolve
 
     if (sharedDefaults) {
         [sharedDefaults removeObjectForKey:@"my_check_in"];
+        [sharedDefaults removeObjectForKey:@"widget_album_image"];
         [sharedDefaults synchronize];
+
+        WAIRemoveAppGroupFile(@"my_check_in.json");
+        WAIRemoveAppGroupFile(@"widget_album_image.bin");
 
         [self reloadWidgetTimelines];
 
@@ -228,11 +336,13 @@ RCT_EXPORT_METHOD(syncSharedPlaylistTrack:(NSDictionary *)trackData
         NSData *albumData = [[NSData alloc] initWithBase64EncodedString:albumImageBase64
                                                                 options:NSDataBase64DecodingIgnoreUnknownCharacters];
         if (albumData) {
-            [sharedDefaults setObject:albumData forKey:@"widget_shared_playlist_album_image"];
-            // Also write to file for direct widget access
-            if (containerURL) {
-                [albumData writeToURL:[containerURL URLByAppendingPathComponent:@"shared_playlist_album.bin"]
-                           atomically:YES];
+            NSData *storedAlbum = WAIWidgetImageDataForWidgetStorage(albumData, 512);
+            if (storedAlbum) {
+                [sharedDefaults setObject:storedAlbum forKey:@"widget_shared_playlist_album_image"];
+                if (containerURL) {
+                    [storedAlbum writeToURL:[containerURL URLByAppendingPathComponent:@"shared_playlist_album.bin"]
+                                 atomically:YES];
+                }
             }
         }
     } else {
@@ -247,10 +357,13 @@ RCT_EXPORT_METHOD(syncSharedPlaylistTrack:(NSDictionary *)trackData
         NSData *avatarData = [[NSData alloc] initWithBase64EncodedString:avatarImageBase64
                                                                  options:NSDataBase64DecodingIgnoreUnknownCharacters];
         if (avatarData) {
-            [sharedDefaults setObject:avatarData forKey:@"widget_shared_playlist_avatar_image"];
-            if (containerURL) {
-                [avatarData writeToURL:[containerURL URLByAppendingPathComponent:@"shared_playlist_avatar.bin"]
-                            atomically:YES];
+            NSData *storedAvatar = WAIWidgetImageDataForWidgetStorage(avatarData, 160);
+            if (storedAvatar) {
+                [sharedDefaults setObject:storedAvatar forKey:@"widget_shared_playlist_avatar_image"];
+                if (containerURL) {
+                    [storedAvatar writeToURL:[containerURL URLByAppendingPathComponent:@"shared_playlist_avatar.bin"]
+                                 atomically:YES];
+                }
             }
         }
     } else {
@@ -278,6 +391,13 @@ RCT_EXPORT_METHOD(clearSharedPlaylistTrack:(RCTPromiseResolveBlock)resolve
         [sharedDefaults removeObjectForKey:@"widget_shared_playlist_album_image"];
         [sharedDefaults removeObjectForKey:@"widget_shared_playlist_avatar_image"];
         [sharedDefaults synchronize];
+
+        NSURL *containerURL = [[NSFileManager defaultManager]
+            containerURLForSecurityApplicationGroupIdentifier:@"group.com.whoami.today.app"];
+        if (containerURL) {
+            [[NSFileManager defaultManager] removeItemAtURL:[containerURL URLByAppendingPathComponent:@"shared_playlist_album.bin"] error:nil];
+            [[NSFileManager defaultManager] removeItemAtURL:[containerURL URLByAppendingPathComponent:@"shared_playlist_avatar.bin"] error:nil];
+        }
 
         [self reloadWidgetTimelines];
 
@@ -350,6 +470,9 @@ RCT_EXPORT_METHOD(getWidgetDiagnostics:(RCTPromiseResolveBlock)resolve
     // CheckinWidget raw-state flags (written from CheckinWidget.getTimeline)
     BOOL checkInRawPresent = [sharedDefaults boolForKey:@"widget_my_check_in_raw_present"];
     BOOL checkInDecodeOk   = [sharedDefaults boolForKey:@"widget_my_check_in_decode_ok"];
+    NSString *checkInDecodeSource = [sharedDefaults stringForKey:@"widget_my_check_in_decode_source"] ?: @"(never)";
+    NSString *checkInRawPreview = [sharedDefaults stringForKey:@"widget_my_check_in_raw_preview"] ?: @"";
+    NSString *checkInJsonFile = WAIReadUTF8AppGroupFile(@"my_check_in.json");
 
     // Auth token presence — if these come back 0/empty but app shows user logged in,
     // it means syncTokensToWidget was never called OR its write didn't stick.
@@ -385,8 +508,11 @@ RCT_EXPORT_METHOD(getWidgetDiagnostics:(RCTPromiseResolveBlock)resolve
         @"lastBatteryDisplay": batteryDisplay,
         @"lastGetTimelineAt": dateStr,
         @"myCheckInJson": jsonString,
+        @"myCheckInJsonFile": checkInJsonFile,
         @"myCheckInRawPresent": @(checkInRawPresent),
         @"myCheckInDecodeOk": @(checkInDecodeOk),
+        @"myCheckInDecodeSource": checkInDecodeSource,
+        @"myCheckInRawPreview": checkInRawPreview,
         @"sharedPlaylistJson": spJsonString,
         @"sharedPlaylistAlbumImageLen": @(spAlbumData.length),
         @"sharedPlaylistAvatarImageLen": @(spAvatarData.length),
@@ -415,6 +541,8 @@ RCT_EXPORT_METHOD(syncApiBaseUrl:(NSString *)url
     if (sharedDefaults) {
         [sharedDefaults setObject:url forKey:@"api_base_url"];
         [sharedDefaults synchronize];
+
+        WAIWriteUTF8File(@"widget_api_base_url.txt", url);
 
         resolve(@YES);
     } else {

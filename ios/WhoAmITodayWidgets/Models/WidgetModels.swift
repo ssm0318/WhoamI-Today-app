@@ -1,6 +1,9 @@
 import Foundation
 
-struct MyCheckIn: Codable {
+/// Decodes JSON from App Group (`syncMyCheckIn` / `fetchCheckInFromApi`). The API may send
+/// `mood` as `[String]` and `thought` instead of `description`; strict `Codable` was failing
+/// (`try? decode` → nil) so the widget showed empty state or stale UI.
+struct MyCheckIn: Decodable {
     let id: Int?
     let isActive: Bool?
     let createdAt: String?
@@ -17,8 +20,33 @@ struct MyCheckIn: Codable {
         case mood
         case socialBattery = "social_battery"
         case description
+        case thought
         case trackId = "track_id"
         case albumImageUrl = "album_image_url"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(Int.self, forKey: .id)
+        isActive = try c.decodeIfPresent(Bool.self, forKey: .isActive)
+        createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt)
+
+        if let s = try? c.decode(String.self, forKey: .mood) {
+            mood = s
+        } else if let arr = try? c.decode([String].self, forKey: .mood) {
+            mood = arr.first ?? ""
+        } else {
+            mood = ""
+        }
+
+        socialBattery = try c.decodeIfPresent(String.self, forKey: .socialBattery)
+
+        let desc = try c.decodeIfPresent(String.self, forKey: .description)
+        let thought = try c.decodeIfPresent(String.self, forKey: .thought)
+        description = desc ?? thought ?? ""
+
+        trackId = try c.decodeIfPresent(String.self, forKey: .trackId) ?? ""
+        albumImageUrl = try c.decodeIfPresent(String.self, forKey: .albumImageUrl)
     }
 
     var feelingDisplay: String? {
@@ -47,8 +75,13 @@ struct MyCheckIn: Codable {
 
     private func getBatteryEmoji(_ battery: String) -> String {
         switch battery.lowercased() {
-        case "super_social", "fully_charged", "moderately_social": return "🔋"
-        case "needs_recharge", "low", "completely_drained": return "🪫"
+        // Keep widget battery visuals aligned with frontend SocialBatteryChipAssets.
+        case "super_social": return "🤩"
+        case "fully_charged": return "🚀"
+        case "moderately_social": return "🔋"
+        case "needs_recharge": return "🔌"
+        case "low": return "🪫"
+        case "completely_drained": return "💤"
         default: return battery
         }
     }

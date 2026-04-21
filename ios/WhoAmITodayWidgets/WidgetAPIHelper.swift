@@ -61,18 +61,31 @@ struct WidgetAPIHelper {
         }
     }
 
+    private static let appGroupId = "group.com.whoami.today.app"
+
+    private static func appGroupRootURL() -> URL? {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId)
+    }
+
     /// Store a Codable-compatible dictionary as JSON Data in the App Group.
     static func storeJSON(_ dict: [String: Any], forKey key: String) {
         guard let data = try? JSONSerialization.data(withJSONObject: dict) else { return }
-        let defaults = UserDefaults(suiteName: "group.com.whoami.today.app")
+        let defaults = UserDefaults(suiteName: appGroupId)
         defaults?.set(data, forKey: key)
         defaults?.synchronize()
+        // Mirror files so the widget reads the same data when UserDefaults is stale (matches RN `syncMyCheckIn`).
+        if key == "my_check_in", let url = appGroupRootURL()?.appendingPathComponent("my_check_in.json") {
+            try? data.write(to: url, options: .atomic)
+        }
     }
 
     /// Store binary data in the App Group.
     static func storeData(_ data: Data, forKey key: String) {
-        let defaults = UserDefaults(suiteName: "group.com.whoami.today.app")
+        let defaults = UserDefaults(suiteName: appGroupId)
         defaults?.set(data, forKey: key)
         defaults?.synchronize()
+        if key == "widget_album_image", let url = appGroupRootURL()?.appendingPathComponent("widget_album_image.bin") {
+            try? data.write(to: url, options: .atomic)
+        }
     }
 }

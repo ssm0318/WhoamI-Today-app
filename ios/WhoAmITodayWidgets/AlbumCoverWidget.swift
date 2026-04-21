@@ -73,8 +73,19 @@ struct AlbumCoverWidgetProvider: TimelineProvider {
         let isAuth = mgr.isAuthenticated
         let isDefault = mgr.isDefaultVersion
         let track = mgr.sharedPlaylistTrack
-        let albumImageData = mgr.cachedSharedPlaylistAlbumImage
-        let avatarImageData = mgr.cachedSharedPlaylistAvatarImage
+        // Use file-first fallback helpers so timeline entries reflect App Group files immediately.
+        let albumImageData = albumImage()
+        let avatarImageData = avatarImage()
+
+        // Debug heartbeat — write what the widget actually sees
+        mgr.writeWidgetHeartbeat(source: "AlbumCoverWidget.getTimeline")
+        mgr.writeAlbumDiagnostics(
+            trackId: track?.trackId ?? "(nil)",
+            sharerUsername: track?.sharerUsername ?? "(nil)",
+            albumImageLen: albumImageData?.count ?? 0,
+            avatarImageLen: avatarImageData?.count ?? 0,
+            decodeError: "isAuth=\(isAuth) isDefault=\(isDefault) csrf=\(mgr.csrfToken?.prefix(8) ?? "nil") access=\(mgr.accessToken?.prefix(8) ?? "nil")"
+        )
 
         let entry = AlbumCoverWidgetEntry(
             date: Date(),
@@ -129,7 +140,7 @@ struct AlbumCoverWidgetProvider: TimelineProvider {
             WidgetAPIHelper.storeData(avatarData, forKey: "widget_shared_playlist_avatar_image")
         }
 
-        WidgetCenter.shared.reloadTimelines(ofKind: "AlbumCoverWidgetV2")
+        WidgetCenter.shared.reloadTimelines(ofKind: "AlbumCoverWidgetV3")
     }
 }
 
@@ -138,75 +149,39 @@ struct AlbumCoverWidgetView: View {
 
     private var mgr: SharedDataManager { SharedDataManager.shared }
 
-    // Read images directly from files in App Group container — bypasses UserDefaults/cfprefsd
     private var containerURL: URL? {
         FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.whoami.today.app")
     }
-    private var fileAlbumImage: Data? {
-        guard let url = containerURL?.appendingPathComponent("shared_playlist_album.bin") else { return nil }
-        return try? Data(contentsOf: url)
+
+    /// File first (App Group), then timeline entry, then UserDefaults/plist cache.
+    private func resolvedAlbumImageData() -> Data? {
+        if let url = containerURL?.appendingPathComponent("shared_playlist_album.bin"),
+           let data = try? Data(contentsOf: url), !data.isEmpty {
+            return data
+        }
+        return entry.albumImageData ?? mgr.cachedSharedPlaylistAlbumImage
     }
-    private var fileAvatarImage: Data? {
-        guard let url = containerURL?.appendingPathComponent("shared_playlist_avatar.bin") else { return nil }
-        return try? Data(contentsOf: url)
+
+    private func resolvedAvatarImageData() -> Data? {
+        if let url = containerURL?.appendingPathComponent("shared_playlist_avatar.bin"),
+           let data = try? Data(contentsOf: url), !data.isEmpty {
+            return data
+        }
+        return entry.sharerAvatarData ?? mgr.cachedSharedPlaylistAvatarImage
     }
 
     var body: some View {
-        Group {
-            if let data = fileAlbumImage, let img = UIImage(data: data) {
-                Image(uiImage: img)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } else {
-                Text("Shared Playlist")
-                    .font(.system(size: 12))
-                    .foregroundColor(.gray)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(white: 0.96))
-            }
-        }
-        .overlay(alignment: .topLeading) {
-            Image("IconPlaylist")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 18, height: 18)
-                .padding(6)
-        }
-        .overlay(alignment: .topTrailing) {
-            avatarOverlay
-        }
-        .widgetURL(URL(string: "whoami://app/discover"))
-    }
+        let albumData = resolvedAlbumImageData()
+        let albumUIImage = albumData.flatMap { UIImage(data: $0) }
+        let avatarData = resolvedAvatarImageData()
+        let avatarUIImage = avatarData.flatMap { UIImage(data: $0) }
 
-    @ViewBuilder
-    private var avatarOverlay: some View {
-        if let avData = fileAvatarImage, let avImg = UIImage(data: avData) {
-            Image(uiImage: avImg)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(width: 24, height: 24)
-                .clipShape(Circle())
-                .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                .padding(6)
-        }
-    }
-
-    @ViewBuilder
-    var albumContent: some View {
-        // Try file first, then entry, then SharedDataManager
-        let albumImage = fileAlbumImage ?? entry.albumImageData ?? mgr.cachedSharedPlaylistAlbumImage
-        let avatarImage = fileAvatarImage ?? entry.sharerAvatarData ?? mgr.cachedSharedPlaylistAvatarImage
-        let track = mgr.sharedPlaylistTrack
-
-        Link(destination: URL(string: "whoami://app/discover")!) {
-            ZStack {
-                // Album art (or placeholder)
-                if let imageData = albumImage, let uiImage = UIImage(data: imageData) {
-                    Image(uiImage: uiImage)
+        return ZStack {
+            Group {
+                if let img = albumUIImage {
+                    Image(uiImage: img)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
                 } else {
                     VStack(spacing: 8) {
                         Text("Shared Playlist")
@@ -216,47 +191,41 @@ struct AlbumCoverWidgetView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color(white: 0.96))
                 }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
 
-                // Playlist icon (top-leading) — matches Android layout
-                VStack {
-                    HStack {
-                        Image("IconPlaylist")
+            VStack {
+                HStack {
+                    Image("IconPlaylist")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 18, height: 18)
+
+                    Spacer()
+
+                    if let avImg = avatarUIImage {
+                        Image(uiImage: avImg)
                             .resizable()
-                            .scaledToFit()
-                            .frame(width: 22, height: 22)
-                            .padding(10)
-                        Spacer()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 32, height: 32)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                    } else if let username = entry.sharerUsername, let firstChar = username.first {
+                        Text(String(firstChar).uppercased())
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(width: 32, height: 32)
+                            .background(Circle().fill(Color.purple))
+                            .overlay(Circle().stroke(Color.white, lineWidth: 2))
                     }
-                    Spacer()
                 }
-
-                // Sharer profile avatar overlay (top-trailing)
-                VStack {
-                    HStack {
-                        Spacer()
-                        if let avatarData = entry.sharerAvatarData, let avatarImage = UIImage(data: avatarData) {
-                            Image(uiImage: avatarImage)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: 22, height: 22)
-                                .clipShape(Circle())
-                                .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                                .padding(6)
-                        } else if let username = entry.sharerUsername, let firstChar = username.first {
-                            Text(String(firstChar).uppercased())
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(.white)
-                                .frame(width: 22, height: 22)
-                                .background(Circle().fill(Color.purple))
-                                .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                                .padding(6)
-                        }
-                    }
-                    Spacer()
-                }
+                .padding(6)
+                Spacer()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .widgetURL(URL(string: "whoami://app/discover"))
     }
 }
 
@@ -267,10 +236,12 @@ struct AlbumCoverWidget: Widget {
         StaticConfiguration(kind: kind, provider: AlbumCoverWidgetProvider()) { entry in
             if #available(iOS 17.0, *) {
                 AlbumCoverWidgetView(entry: entry)
-                    .containerBackground(Color.white, for: .widget)
+                    .containerBackground(for: .widget) {
+                        Color.clear
+                    }
             } else {
                 AlbumCoverWidgetView(entry: entry)
-                    .background(Color.white)
+                    .background(Color.clear)
             }
         }
         .configurationDisplayName("WhoAmI Shared Playlist")

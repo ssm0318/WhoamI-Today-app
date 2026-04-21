@@ -1,17 +1,7 @@
 import WidgetKit
 import SwiftUI
 import UIKit
-
-extension View {
-    @ViewBuilder
-    func unaccentedEmoji() -> some View {
-        if #available(iOS 16.0, *) {
-            self.unaccentedEmoji()
-        } else {
-            self
-        }
-    }
-}
+import os.log
 
 struct CheckinWidgetEntry: TimelineEntry {
     let date: Date
@@ -45,10 +35,46 @@ struct CheckinWidgetProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<CheckinWidgetEntry>) -> Void) {
-        let isAuth = SharedDataManager.shared.isAuthenticated
-        let isDefault = SharedDataManager.shared.isDefaultVersion
-        let checkIn = SharedDataManager.shared.myCheckIn
-        let albumImageData: Data? = SharedDataManager.shared.cachedAlbumImageData
+        let mgr = SharedDataManager.shared
+        let isAuth = mgr.isAuthenticated
+        let isDefault = mgr.isDefaultVersion
+        let rawBytes = mgr.rawMyCheckInBytes
+        let checkIn = mgr.myCheckIn
+        let albumImageData: Data? = mgr.cachedAlbumImageData
+
+        // Record what this widget process actually sees so the host app can diff
+        // it against what it wrote (see getWidgetDiagnostics in WidgetDataModule.m).
+        let rawPreview: String
+        if let rawBytes = rawBytes, let rawString = String(data: rawBytes, encoding: .utf8) {
+            rawPreview = String(rawString.prefix(240))
+        } else {
+            rawPreview = ""
+        }
+        mgr.writeCheckInRawState(
+            rawBytesPresent: rawBytes != nil,
+            decodeOk: checkIn != nil,
+            decodeSource: mgr.myCheckInDecodeSource,
+            rawPreview: rawPreview
+        )
+        mgr.writeDiagnostics(
+            mood: checkIn?.mood ?? "(nil)",
+            battery: checkIn?.socialBattery ?? "(nil)",
+            feelingDisplay: checkIn?.feelingDisplay ?? "(nil)",
+            batteryDisplay: checkIn?.batteryDisplay ?? "(nil)"
+        )
+        mgr.writeWidgetHeartbeat(source: "CheckinWidget.getTimeline")
+
+        // Q2/Q3 diagnostic: log exactly what the widget process read this tick so we can
+        // compare against what the host app just wrote. Visible in Console.app filtered by
+        // subsystem "whoami.widget".
+        let log = OSLog(subsystem: "whoami.widget", category: "CheckinWidget")
+        os_log("getTimeline read socialBattery=%{public}@ mood=%{public}@ source=%{public}@ rawBytes=%{public}d decodeOk=%{public}d",
+               log: log, type: .info,
+               checkIn?.socialBattery ?? "(nil)",
+               checkIn?.mood ?? "(nil)",
+               mgr.myCheckInDecodeSource,
+               rawBytes?.count ?? 0,
+               checkIn != nil ? 1 : 0)
 
         let entry = CheckinWidgetEntry(
             date: Date(),
@@ -62,8 +88,10 @@ struct CheckinWidgetProvider: TimelineProvider {
         let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
         completion(timeline)
 
-        // Fire-and-forget: self-fetch check-in from API when no cached data
-        if isAuth && !isDefault && checkIn == nil {
+        // Fire-and-forget: self-fetch when no data OR when data is incomplete
+        // (e.g. App Group has stale entry with nil battery after a clean reinstall).
+        let needsApiFetch = checkIn == nil || (checkIn?.batteryDisplay == nil && checkIn?.feelingDisplay == nil)
+        if isAuth && !isDefault && needsApiFetch {
             Task.detached {
                 await Self.fetchCheckInFromApi()
             }
@@ -148,18 +176,42 @@ struct CheckinWidgetProvider: TimelineProvider {
         }
 
         WidgetAPIHelper.storeJSON(myCheckIn, forKey: "my_check_in")
-        WidgetCenter.shared.reloadTimelines(ofKind: "CheckinWidgetV2")
+        WidgetCenter.shared.reloadTimelines(ofKind: "CheckinWidgetV3")
     }
 }
 
 struct CheckinWidgetView: View {
     let entry: CheckinWidgetEntry
 
+    /// Avoid Sign-in placeholder when `my_check_in` is present but token reads fail in the widget process (cfprefs/plist quirks).
+    private var shouldShowSignIn: Bool {
+        !entry.isAuthenticated && entry.myCheckIn == nil
+    }
+
+    /// iOS 17+: AppIntent reloads timelines without opening the app. Older OS: deep link opens app to trigger refresh.
+    @ViewBuilder
+    private var checkinRefreshButton: some View {
+        if #available(iOS 17.0, *) {
+            Button(intent: ReloadCheckinWidgetIntent()) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundColor(Color.gray.opacity(0.5))
+            }
+            .buttonStyle(.plain)
+        } else {
+            Link(destination: URL(string: "whoami://widget/refresh-checkin")!) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundColor(Color.gray.opacity(0.5))
+            }
+        }
+    }
+
     var body: some View {
         Group {
-            if !entry.isAuthenticated {
+            if shouldShowSignIn {
                 SignInView(descriptionText: "Sign in to view your check-in status")
-            } else if entry.isDefaultVersion {
+            } else if entry.isAuthenticated && entry.isDefaultVersion {
                 DefaultVersionView()
             } else {
                 checkinContent
@@ -175,11 +227,7 @@ struct CheckinWidgetView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.black)
                 Spacer(minLength: 0)
-                Link(destination: URL(string: "whoami://widget/refresh-checkin")!) {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 12, weight: .regular))
-                        .foregroundColor(Color.gray.opacity(0.5))
-                }
+                checkinRefreshButton
             }
             .padding(.horizontal, 4)
             .padding(.bottom, 6)
@@ -256,7 +304,6 @@ struct CheckInButton: View {
                                 Text(emoji)
                                     .font(.system(size: min(14, boxSize * 0.32)))
                                     .foregroundColor(.primary)
-                                    .unaccentedEmoji()
                             }
                             Text(desc)
                                 .font(.system(size: 8))
@@ -272,7 +319,6 @@ struct CheckInButton: View {
                         Text(emoji)
                             .font(.system(size: min(20, boxSize * 0.45)))
                             .foregroundColor(.primary)
-                            .unaccentedEmoji()
                             .frame(width: boxSize, height: boxSize)
                     } else {
                         Text("+")
@@ -314,7 +360,6 @@ struct MusicButton: View {
                             Text("🎵")
                                 .font(.system(size: min(20, boxSize * 0.45)))
                                 .foregroundColor(.primary)
-                                .unaccentedEmoji()
                         } else {
                             Text("+")
                                 .font(.system(size: min(20, boxSize * 0.45), weight: .medium))
@@ -337,13 +382,15 @@ struct MusicButton: View {
 struct CheckinWidget: Widget {
     // Bumped from "CheckinWidget" to force iOS to treat this as a brand-new widget
     // and discard all cached snapshots / persisted timeline entries for the old kind.
-    let kind: String = "CheckinWidgetV2"
+    let kind: String = "CheckinWidgetV3"
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: CheckinWidgetProvider()) { entry in
             if #available(iOS 17.0, *) {
                 CheckinWidgetView(entry: entry)
-                    .containerBackground(Color.white, for: .widget)
+                    .containerBackground(for: .widget) {
+                        Color.clear
+                    }
             } else {
                 CheckinWidgetView(entry: entry)
                     .background(Color.white)
