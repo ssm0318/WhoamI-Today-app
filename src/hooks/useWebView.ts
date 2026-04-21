@@ -16,9 +16,19 @@ import { WebViewProgressEvent } from 'react-native-webview/lib/WebViewTypes';
 import { ScreenRouteParamList } from '@screens';
 import ImagePicker from 'react-native-image-crop-picker';
 import {
+  clearFriendPostFromWidget,
+  clearMyCheckInFromWidget,
+  clearSharedPlaylistTrackFromWidget,
+  clearWidgetTokens,
+  getWidgetDiagnostics,
   syncMyCheckInToWidget,
+  syncTokensToWidget,
   triggerWidgetRefresh,
 } from '../native/WidgetDataModule';
+import {
+  normalizeDescriptionForWidget,
+  normalizeMoodForWidget,
+} from '../utils/widgetCheckInNormalize';
 import { setWidgetDataStale } from '../utils/widgetDataStale';
 import { setCachedCheckInForWidget } from '../utils/widgetCheckInCache';
 import { fetchSpotifyAlbumImageUrl } from '../utils/spotifyAlbumImage';
@@ -64,6 +74,18 @@ const useWebView = () => {
     const fetchTokens = async () => {
       const { access_token, csrftoken } = await getCookie();
       setTokens({ access_token, csrftoken });
+      // Push tokens to the App Group before WebView mounts so home-screen widgets
+      // (Check-in reads csrftoken/access_token) see auth even if runWidgetSync runs later.
+      if (access_token && csrftoken) {
+        try {
+          await syncTokensToWidget(csrftoken, access_token);
+          console.log(
+            '[WidgetSync] Tokens synced to widget storage after AsyncStorage load',
+          );
+        } catch (e) {
+          console.warn('[WidgetSync] Early syncTokensToWidget failed:', e);
+        }
+      }
       setTokenLoadComplete(true);
     };
 
@@ -151,9 +173,17 @@ const useWebView = () => {
       console.log('[useWebView] Web action received:', data.actionType);
 
       switch (data.actionType) {
-        case 'CONSOLE':
-          console.log('[WEBVIEW CONSOLE]', data.data);
+        case 'CONSOLE': {
+          const logFn =
+            data.type && typeof (console as any)[data.type] === 'function'
+              ? (console as any)[data.type]
+              : console.log;
+          logFn(
+            `[WEBVIEW ${String(data.type || 'log').toUpperCase()}]`,
+            data.data,
+          );
           return;
+        }
         case 'OPEN_BROWSER':
           // Consider using openBrowserAsync in future updates
           await Linking.openURL(data.url);
@@ -185,6 +215,17 @@ const useWebView = () => {
 
           await CookieStorage.removeCookie();
           setTokens({ csrftoken: '', access_token: '' });
+          setCachedCheckInForWidget(null);
+          setWidgetDataStale(true);
+
+          // Prevent stale widget state after account switch/logout.
+          await Promise.allSettled([
+            clearWidgetTokens(),
+            clearMyCheckInFromWidget(),
+            clearSharedPlaylistTrackFromWidget(),
+            clearFriendPostFromWidget(),
+          ]);
+          await triggerWidgetRefresh();
 
           // Improved WebView cookie and storage cleanup
           ref.current?.injectJavaScript(`
@@ -241,9 +282,10 @@ const useWebView = () => {
                     id?: number;
                     is_active?: boolean;
                     created_at?: string;
-                    mood?: string;
+                    mood?: string | string[];
                     social_battery?: string | null;
                     description?: string;
+                    thought?: string;
                     track_id?: string;
                     album_image_url?: string | null;
                   }
@@ -262,21 +304,63 @@ const useWebView = () => {
                   id: raw.id,
                   isActive: raw.is_active ?? true,
                   createdAt: raw.created_at ?? '',
-                  mood: raw.mood ?? '',
+                  mood: normalizeMoodForWidget(raw.mood),
                   socialBattery: raw.social_battery ?? null,
-                  description: raw.description ?? '',
+                  description: normalizeDescriptionForWidget(raw),
                   trackId: raw.track_id ?? '',
                   albumImageUrl,
                 };
                 await syncMyCheckInToWidget(payload);
                 setCachedCheckInForWidget(payload);
+
+                // Q1 verification: before firing reloads, read back what's actually in
+                // the App Group so we can distinguish a failed write from a failed reload.
+                try {
+                  const diag = await getWidgetDiagnostics();
+                  let persistedBattery: unknown = '(no-diag)';
+                  if (diag?.myCheckInJsonFile) {
+                    try {
+                      persistedBattery = JSON.parse(
+                        diag.myCheckInJsonFile,
+                      ).social_battery;
+                    } catch {
+                      persistedBattery = '(parse-failed)';
+                    }
+                  }
+                  console.log(
+                    '[WidgetSync] WIDGET_DATA_UPDATED: post-write verification',
+                    {
+                      expectedBattery: payload.socialBattery,
+                      persistedBattery,
+                      fileLen: diag?.myCheckInJsonFile?.length ?? 0,
+                      defaultsLen: diag?.myCheckInJson?.length ?? 0,
+                    },
+                  );
+                } catch (diagErr) {
+                  console.warn(
+                    '[WidgetSync] post-write verification failed',
+                    diagErr,
+                  );
+                }
+
+                const refreshRequestedAt = new Date().toISOString();
+                console.log(
+                  '[WidgetSync] WIDGET_DATA_UPDATED: requesting refresh',
+                  {
+                    refreshRequestedAt,
+                    path: 'inline-payload',
+                  },
+                );
                 await triggerWidgetRefresh();
-                // Trigger another refresh after a short delay to ensure widget updates
-                setTimeout(() => {
-                  triggerWidgetRefresh().catch(() => {
-                    // Ignore errors on delayed refresh
-                  });
-                }, 500);
+                const refreshResolvedAt = new Date().toISOString();
+                console.log(
+                  '[WidgetSync] WIDGET_DATA_UPDATED: refresh resolved',
+                  {
+                    refreshRequestedAt,
+                    refreshResolvedAt,
+                    path: 'inline-payload',
+                  },
+                );
                 return;
               }
               console.log(
@@ -293,9 +377,10 @@ const useWebView = () => {
                   id: number;
                   is_active: boolean;
                   created_at: string;
-                  mood?: string;
+                  mood?: string | string[];
                   social_battery?: string | null;
                   description?: string;
+                  thought?: string;
                 };
               };
               // /check_in/song/ returns DRF-paginated shape: { count, next, previous, results: [...] }
@@ -329,22 +414,34 @@ const useWebView = () => {
                   id: checkIn.id,
                   isActive: checkIn.is_active,
                   createdAt: checkIn.created_at,
-                  mood: checkIn.mood ?? '',
+                  mood: normalizeMoodForWidget(checkIn.mood),
                   socialBattery: checkIn.social_battery ?? null,
-                  description: checkIn.description ?? '',
+                  description: normalizeDescriptionForWidget(checkIn),
                   trackId,
                   albumImageUrl,
                 };
                 await syncMyCheckInToWidget(payload);
                 setCachedCheckInForWidget(payload);
               }
+              const refreshRequestedAt = new Date().toISOString();
+              console.log(
+                '[WidgetSync] WIDGET_DATA_UPDATED: requesting refresh',
+                {
+                  refreshRequestedAt,
+                  path: 'api-fallback',
+                },
+              );
               await triggerWidgetRefresh();
-              // Trigger another refresh after a short delay to ensure widget updates
-              setTimeout(() => {
-                triggerWidgetRefresh().catch(() => {
-                  // Ignore errors on delayed refresh
-                });
-              }, 500);
+              const refreshResolvedAt = new Date().toISOString();
+              console.log(
+                '[WidgetSync] WIDGET_DATA_UPDATED: refresh resolved',
+                {
+                  refreshRequestedAt,
+                  refreshResolvedAt,
+                  path: 'api-fallback',
+                },
+              );
+              void getWidgetDiagnostics();
             } catch (err) {
               console.warn('[WidgetSync] WIDGET_DATA_UPDATED failed:', err);
               await triggerWidgetRefresh();
