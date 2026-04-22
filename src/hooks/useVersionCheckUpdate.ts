@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { DeviceEventEmitter } from 'react-native';
 import { useAppStateActiveEffect } from '@hooks';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { userApis } from '@apis';
@@ -6,7 +7,19 @@ import { VersionType } from '../types/user.type';
 import { syncVersionTypeToWidget } from '../native/WidgetDataModule';
 
 // Constants
-const USER_VERSION_KEY = '@user_version';
+export const USER_VERSION_KEY = '@user_version';
+export const VERSION_CHECK_EVENT = 'version:check-requested';
+
+/**
+ * Trigger a version check from outside the React tree (e.g. Firebase
+ * background message handler). The hook's internal listener will pick
+ * this up and call checkAndUpdateVersion if a mounted consumer exists.
+ * If no consumer is mounted, it's a no-op — the mount-time check will
+ * catch up when the app is re-opened.
+ */
+export const triggerVersionCheck = (): void => {
+  DeviceEventEmitter.emit(VERSION_CHECK_EVENT);
+};
 
 /**
  * Hook that automatically handles version check and update
@@ -138,6 +151,32 @@ const useVersionCheckUpdate = (tokens: {
       );
     });
   });
+
+  // Subscribe to external trigger events (e.g. from FCM silent push handler)
+  // so the foreground app immediately re-verifies the current version. The
+  // isChecking ref collapses overlap with any concurrent check in flight.
+  useEffect(() => {
+    if (!tokens.access_token || !tokens.csrftoken) return;
+
+    const subscription = DeviceEventEmitter.addListener(
+      VERSION_CHECK_EVENT,
+      () => {
+        console.log(
+          '[useVersionCheckUpdate] External trigger received - checking version',
+        );
+        checkAndUpdateVersion().catch((error) => {
+          console.error(
+            '[useVersionCheckUpdate] Error in externally triggered check:',
+            error,
+          );
+        });
+      },
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, [tokens.access_token, tokens.csrftoken, checkAndUpdateVersion]);
 
   // Return version change status
   return versionChanged;

@@ -7,6 +7,7 @@ import { notificationApis, pushNotificationApis } from '@apis';
 import { APP_CONSTS } from '@constants';
 import { FcmTokenStorage } from '@tools';
 import { displayNotification } from '../tools/pushNotiHelper';
+import { handleSilentVersionChange } from '../tools/silentVersionHandler';
 import notifee, { EventType } from '@notifee/react-native';
 import NavigationService from '@libs/NavigationService';
 import { PermissionsAndroid, Platform } from 'react-native';
@@ -16,6 +17,10 @@ const useFirebaseMessage = () => {
   const handleOnMessage = useCallback(
     (message: FirebaseMessagingTypes.RemoteMessage) => {
       console.log('[Firebase Remote Message] : ', message);
+      if (message?.data?.type === 'version_change') {
+        handleSilentVersionChange(message.data);
+        return;
+      }
       displayNotification(message);
     },
     [],

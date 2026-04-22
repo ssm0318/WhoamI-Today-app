@@ -12,6 +12,12 @@ import messaging from '@react-native-firebase/messaging';
 // Background handling with Firebase messaging
 messaging().setBackgroundMessageHandler(async (remoteMessage) => {
   console.log('[Firebase remote message on background] : ', remoteMessage);
+  if (remoteMessage?.data?.type === 'version_change') {
+    const { handleSilentVersionChange } = await import(
+      './src/tools/silentVersionHandler'
+    );
+    await handleSilentVersionChange(remoteMessage.data);
+  }
 });
 
 function HeadlessCheck({ isHeadless }) {
