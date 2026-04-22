@@ -21,7 +21,5 @@
     <!-- Body (rounded rectangle extending down, clipped by mask) -->
     <path
         android:fillColor="#FFFFFF"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="0.73832"
-        android:pathData="M54.9929,100.216 L108.278,100.216 C117.077,100.216 124.209,107.349 124.209,116.147 L124.209,167.478 L39.0621,167.478 L39.0621,116.147 C39.0621,107.349 46.1946,100.216 54.9929,100.216 Z"/>
+        android:pathData="M54.993,100.216H108.278C117.077,100.216 124.209,107.349 124.209,116.147V160H39.062V116.147C39.062,107.349 46.195,100.216 54.993,100.216Z"/>
 </vector>

@@ -98,6 +98,8 @@ static NSArray *kWidgetKinds = nil;
             @"AlbumCoverWidgetV3",
             @"CheckinWidgetV3"
         ];
+        _waiLastFireTimesByKind = [NSMutableDictionary dictionary];
+        _waiFollowUpGensByKind = [NSMutableDictionary dictionary];
     }
 }
 
@@ -118,16 +120,115 @@ static NSArray *kWidgetKinds = nil;
     }
 }
 
-// Fire one reload immediately + exactly one follow-up ~2s later to catch the case
-// where the host app was still foregrounded when the first reload hit iOS's refresh
-// budget. Every additional call beyond this burnt budget without increasing the odds
-// of getTimeline actually running.
-- (void)reloadWidgetTimelinesWithFollowUp {
-    NSLog(@"[WidgetSync][iOSNative] reloadWidgetTimelinesWithFollowUp start at %@", [NSDate date]);
+// Debounce + coalesce. Multiple JS paths (WIDGET_DATA_UPDATED,
+// app-state-inactive auto sync, refreshWidgets) fan into this method in
+// quick succession, and the previous implementation fired every call
+// verbatim — logs showed 20+ reload requests in 5s, tripping iOS's widget
+// refresh budget so getTimeline never ran. Now: at most one immediate
+// reload per cooldown window, plus one follow-up scheduled from the MOST
+// RECENT call (generation counter invalidates older pending follow-ups).
+static NSTimeInterval const kWAIImmediateReloadCooldown = 1.5;
+static NSTimeInterval const kWAIFollowUpDelay = 2.0;
+static NSDate *_waiLastImmediateFireTime = nil;
+static NSUInteger _waiFollowUpGeneration = 0;
+
+// Per-kind reload state. iOS budgets widget reloads per-kind, so reloading
+// only the affected kind (e.g. CheckinWidgetV3 on a check-in save) leaves
+// the other widgets' budgets untouched. Keyed by widget kind string.
+static NSMutableDictionary<NSString *, NSDate *> *_waiLastFireTimesByKind = nil;
+static NSMutableDictionary<NSString *, NSNumber *> *_waiFollowUpGensByKind = nil;
+
+- (void)reloadTimelinesOfKind:(NSString *)kind {
+    if (@available(iOS 14.0, *)) {
+        Class WidgetCenterClass = NSClassFromString(@"WidgetCenter");
+        if (WidgetCenterClass) {
+            id sharedCenter = [WidgetCenterClass performSelector:@selector(shared)];
+            if (sharedCenter) {
+                [sharedCenter performSelector:@selector(reloadTimelinesOfKind:) withObject:kind];
+                NSLog(@"[WidgetSync][iOSNative] reloadTimelinesOfKind:%@ sent", kind);
+            }
+        }
+    }
+}
+
+- (void)reloadTimelinesWithFollowUpForKind:(NSString *)kind {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSDate *now = [NSDate date];
+        NSDate *lastFire = _waiLastFireTimesByKind[kind];
+        NSTimeInterval elapsed = lastFire
+            ? [now timeIntervalSinceDate:lastFire]
+            : INFINITY;
+
+        if (elapsed >= kWAIImmediateReloadCooldown) {
+            NSLog(@"[WidgetSync][iOSNative] reloadWithFollowUp[%@] fire (elapsed=%.2fs)", kind, elapsed);
+            _waiLastFireTimesByKind[kind] = now;
+            [self reloadTimelinesOfKind:kind];
+        } else {
+            NSLog(@"[WidgetSync][iOSNative] reloadWithFollowUp[%@] coalesced (elapsed=%.2fs)", kind, elapsed);
+        }
+
+        NSUInteger gen = [(_waiFollowUpGensByKind[kind] ?: @0) unsignedIntegerValue] + 1;
+        _waiFollowUpGensByKind[kind] = @(gen);
+
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kWAIFollowUpDelay * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            NSUInteger currentGen = [_waiFollowUpGensByKind[kind] unsignedIntegerValue];
+            if (gen != currentGen) {
+                return;
+            }
+            NSLog(@"[WidgetSync][iOSNative] reloadWithFollowUp[%@] follow-up fires (gen=%lu)",
+                  kind, (unsigned long)gen);
+            _waiLastFireTimesByKind[kind] = [NSDate date];
+            [self reloadTimelinesOfKind:kind];
+        });
+    });
+}
+
+- (void)forceReloadAllWidgetKindsWithRetries {
     [self reloadWidgetTimelines];
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        NSLog(@"[WidgetSync][iOSNative] reloadWidgetTimelinesWithFollowUp +2.0s at %@", [NSDate date]);
-        [self reloadWidgetTimelines];
+    [self reloadTimelinesOfKind:@"CheckinWidgetV3"];
+    [self reloadTimelinesOfKind:@"AlbumCoverWidgetV3"];
+    [self reloadTimelinesOfKind:@"PhotoWidget"];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        [self reloadTimelinesOfKind:@"CheckinWidgetV3"];
+        [self reloadTimelinesOfKind:@"AlbumCoverWidgetV3"];
+        [self reloadTimelinesOfKind:@"PhotoWidget"];
+    });
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(6.0 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        [self reloadTimelinesOfKind:@"CheckinWidgetV3"];
+        [self reloadTimelinesOfKind:@"AlbumCoverWidgetV3"];
+        [self reloadTimelinesOfKind:@"PhotoWidget"];
+    });
+}
+
+- (void)reloadWidgetTimelinesWithFollowUp {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSDate *now = [NSDate date];
+        NSTimeInterval elapsed = _waiLastImmediateFireTime
+            ? [now timeIntervalSinceDate:_waiLastImmediateFireTime]
+            : INFINITY;
+
+        if (elapsed >= kWAIImmediateReloadCooldown) {
+            NSLog(@"[WidgetSync][iOSNative] reloadWithFollowUp fire (elapsed=%.2fs)", elapsed);
+            _waiLastImmediateFireTime = now;
+            [self reloadWidgetTimelines];
+        } else {
+            NSLog(@"[WidgetSync][iOSNative] reloadWithFollowUp coalesced (elapsed=%.2fs)", elapsed);
+        }
+
+        NSUInteger gen = ++_waiFollowUpGeneration;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kWAIFollowUpDelay * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            if (gen != _waiFollowUpGeneration) {
+                return; // superseded by a newer call
+            }
+            NSLog(@"[WidgetSync][iOSNative] reloadWithFollowUp follow-up fires (gen=%lu)",
+                  (unsigned long)gen);
+            _waiLastImmediateFireTime = [NSDate date];
+            [self reloadWidgetTimelines];
+        });
     });
 }
 
@@ -149,7 +250,7 @@ RCT_EXPORT_METHOD(syncAuthTokens:(NSString *)csrftoken
         WAIWriteUTF8File(@"widget_auth_csrftoken.txt", csrftoken);
         WAIWriteUTF8File(@"widget_auth_access_token.txt", accessToken);
 
-        [self reloadWidgetTimelinesWithFollowUp];
+        [self forceReloadAllWidgetKindsWithRetries];
 
         resolve(@YES);
     } else {
@@ -270,7 +371,9 @@ RCT_EXPORT_METHOD(syncMyCheckIn:(NSDictionary *)checkInData
 
         [sharedDefaults synchronize];
 
-        [self reloadWidgetTimelinesWithFollowUp];
+        // Kind-specific: only reload CheckinWidgetV3 so check-in saves don't
+        // burn album/photo widgets' reload budgets.
+        [self reloadTimelinesWithFollowUpForKind:@"CheckinWidgetV3"];
         resolve(@YES);
     } else {
         reject(@"ERROR", @"Failed to access shared UserDefaults", nil);
@@ -489,8 +592,8 @@ RCT_EXPORT_METHOD(getWidgetDiagnostics:(RCTPromiseResolveBlock)resolve
     NSInteger albumAvatarLen = [sharedDefaults integerForKey:@"album_widget_last_avatar_image_len"];
     NSString *albumDecodeErr = [sharedDefaults stringForKey:@"album_widget_last_decode_error"] ?: @"";
 
-    // Friend post diagnostics
-    NSData *fpJsonData = [sharedDefaults dataForKey:@"friend_post"];
+    // Friend update diagnostics
+    NSData *fpJsonData = [sharedDefaults dataForKey:@"friend_update"];
     NSString *fpJsonString = @"";
     if (fpJsonData) {
         NSString *decoded = [[NSString alloc] initWithData:fpJsonData encoding:NSUTF8StringEncoding];
@@ -498,8 +601,12 @@ RCT_EXPORT_METHOD(getWidgetDiagnostics:(RCTPromiseResolveBlock)resolve
             fpJsonString = decoded;
         }
     }
-    NSData *fpImageData = [sharedDefaults dataForKey:@"widget_friend_post_image"];
-    NSData *fpAuthorData = [sharedDefaults dataForKey:@"widget_friend_post_author_image"];
+    NSData *fpImageData = [sharedDefaults dataForKey:@"widget_friend_update_content_image"];
+    NSData *fpAuthorData = [sharedDefaults dataForKey:@"widget_friend_update_profile_image"];
+
+    // Widget-side render diagnostics (written from PhotoWidgetProvider.currentEntry)
+    NSString *photoRenderDiag = [sharedDefaults stringForKey:@"photo_widget_last_render_diag"] ?: @"(never)";
+    NSString *photoRenderAt = [sharedDefaults stringForKey:@"photo_widget_last_render_at"] ?: @"(never)";
 
     resolve(@{
         @"lastSeenMood": mood,
@@ -522,9 +629,11 @@ RCT_EXPORT_METHOD(getWidgetDiagnostics:(RCTPromiseResolveBlock)resolve
         @"albumLastAlbumImageLen": @(albumImgLen),
         @"albumLastAvatarImageLen": @(albumAvatarLen),
         @"albumLastDecodeError": albumDecodeErr,
-        @"friendPostJson": fpJsonString,
-        @"friendPostImageLen": @(fpImageData.length),
-        @"friendPostAuthorImageLen": @(fpAuthorData.length),
+        @"friendUpdateJson": fpJsonString,
+        @"friendUpdateContentImageLen": @(fpImageData.length),
+        @"friendUpdateProfileImageLen": @(fpAuthorData.length),
+        @"photoWidgetLastRenderDiag": photoRenderDiag,
+        @"photoWidgetLastRenderAt": photoRenderAt,
         @"csrftokenLen": @(csrfLen),
         @"accessTokenLen": @(accessLen)
     });
@@ -550,12 +659,12 @@ RCT_EXPORT_METHOD(syncApiBaseUrl:(NSString *)url
     }
 }
 
-// Sync a friend post to App Group UserDefaults.
-// Stores the post metadata as JSON, plus base64-decoded author avatar and post image binaries.
+// Sync a friend update (post OR check-in) to App Group UserDefaults.
+// Stores the union payload as JSON, plus base64-decoded profile and content image binaries.
 // PhotoWidget reads these directly without making network calls.
-RCT_EXPORT_METHOD(syncFriendPost:(NSDictionary *)postData
-                  authorImageBase64:(NSString *)authorImageBase64
-                  postImageBase64:(NSString *)postImageBase64
+RCT_EXPORT_METHOD(syncFriendUpdate:(NSDictionary *)payload
+                  profileImageBase64:(NSString *)profileImageBase64
+                  contentImageBase64:(NSString *)contentImageBase64
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 {
@@ -567,38 +676,40 @@ RCT_EXPORT_METHOD(syncFriendPost:(NSDictionary *)postData
         return;
     }
 
-    // Post metadata → JSON
     NSError *error;
-    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:postData
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:payload
                                                        options:0
                                                          error:&error];
     if (error) {
-        reject(@"ERROR", @"Failed to serialize friend post data", error);
+        reject(@"ERROR", @"Failed to serialize friend update payload", error);
         return;
     }
-    [sharedDefaults setObject:jsonData forKey:@"friend_post"];
+    [sharedDefaults setObject:jsonData forKey:@"friend_update"];
+    // Clean up legacy keys
+    [sharedDefaults removeObjectForKey:@"friend_post"];
 
-    // Author avatar binary (optional — empty string clears it)
-    if (authorImageBase64.length > 0) {
-        NSData *authorData = [[NSData alloc] initWithBase64EncodedString:authorImageBase64
-                                                                options:NSDataBase64DecodingIgnoreUnknownCharacters];
-        if (authorData) {
-            [sharedDefaults setObject:authorData forKey:@"widget_friend_post_author_image"];
-        }
-    } else {
-        [sharedDefaults removeObjectForKey:@"widget_friend_post_author_image"];
-    }
-
-    // Post image binary (optional)
-    if (postImageBase64.length > 0) {
-        NSData *postImgData = [[NSData alloc] initWithBase64EncodedString:postImageBase64
+    if (profileImageBase64.length > 0) {
+        NSData *profileData = [[NSData alloc] initWithBase64EncodedString:profileImageBase64
                                                                   options:NSDataBase64DecodingIgnoreUnknownCharacters];
-        if (postImgData) {
-            [sharedDefaults setObject:postImgData forKey:@"widget_friend_post_image"];
+        if (profileData) {
+            [sharedDefaults setObject:profileData forKey:@"widget_friend_update_profile_image"];
         }
     } else {
-        [sharedDefaults removeObjectForKey:@"widget_friend_post_image"];
+        [sharedDefaults removeObjectForKey:@"widget_friend_update_profile_image"];
     }
+
+    if (contentImageBase64.length > 0) {
+        NSData *contentData = [[NSData alloc] initWithBase64EncodedString:contentImageBase64
+                                                                  options:NSDataBase64DecodingIgnoreUnknownCharacters];
+        if (contentData) {
+            [sharedDefaults setObject:contentData forKey:@"widget_friend_update_content_image"];
+        }
+    } else {
+        [sharedDefaults removeObjectForKey:@"widget_friend_update_content_image"];
+    }
+    // Clean up legacy image keys
+    [sharedDefaults removeObjectForKey:@"widget_friend_post_image"];
+    [sharedDefaults removeObjectForKey:@"widget_friend_post_author_image"];
 
     [sharedDefaults synchronize];
 
@@ -606,14 +717,18 @@ RCT_EXPORT_METHOD(syncFriendPost:(NSDictionary *)postData
     resolve(@YES);
 }
 
-// Clear friend post data (used on logout)
-RCT_EXPORT_METHOD(clearFriendPost:(RCTPromiseResolveBlock)resolve
+// Clear friend update data (used on logout)
+RCT_EXPORT_METHOD(clearFriendUpdate:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 {
     NSUserDefaults *sharedDefaults = [[NSUserDefaults alloc]
         initWithSuiteName:@"group.com.whoami.today.app"];
 
     if (sharedDefaults) {
+        [sharedDefaults removeObjectForKey:@"friend_update"];
+        [sharedDefaults removeObjectForKey:@"widget_friend_update_content_image"];
+        [sharedDefaults removeObjectForKey:@"widget_friend_update_profile_image"];
+        // Legacy cleanup
         [sharedDefaults removeObjectForKey:@"friend_post"];
         [sharedDefaults removeObjectForKey:@"widget_friend_post_image"];
         [sharedDefaults removeObjectForKey:@"widget_friend_post_author_image"];
@@ -625,6 +740,54 @@ RCT_EXPORT_METHOD(clearFriendPost:(RCTPromiseResolveBlock)resolve
     } else {
         reject(@"ERROR", @"Failed to access shared UserDefaults", nil);
     }
+}
+
+// Clear all widget-related auth/data in one native transaction (used on logout).
+// This reduces the chance of stale widget snapshots when JS is suspended quickly
+// after signout/backgrounding.
+RCT_EXPORT_METHOD(clearAllWidgetData:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+    NSUserDefaults *sharedDefaults = [[NSUserDefaults alloc]
+        initWithSuiteName:@"group.com.whoami.today.app"];
+
+    if (!sharedDefaults) {
+        reject(@"ERROR", @"Failed to access shared UserDefaults", nil);
+        return;
+    }
+
+    // Auth
+    [sharedDefaults removeObjectForKey:@"csrftoken"];
+    [sharedDefaults removeObjectForKey:@"access_token"];
+    WAIRemoveAppGroupFile(@"widget_auth_csrftoken.txt");
+    WAIRemoveAppGroupFile(@"widget_auth_access_token.txt");
+
+    // Check-in
+    [sharedDefaults removeObjectForKey:@"my_check_in"];
+    [sharedDefaults removeObjectForKey:@"widget_album_image"];
+    WAIRemoveAppGroupFile(@"my_check_in.json");
+    WAIRemoveAppGroupFile(@"widget_album_image.bin");
+
+    // Shared playlist
+    [sharedDefaults removeObjectForKey:@"shared_playlist_track"];
+    [sharedDefaults removeObjectForKey:@"widget_shared_playlist_album_image"];
+    [sharedDefaults removeObjectForKey:@"widget_shared_playlist_avatar_image"];
+    WAIRemoveAppGroupFile(@"shared_playlist_album.bin");
+    WAIRemoveAppGroupFile(@"shared_playlist_avatar.bin");
+
+    // Friend update + legacy keys
+    [sharedDefaults removeObjectForKey:@"friend_update"];
+    [sharedDefaults removeObjectForKey:@"widget_friend_update_content_image"];
+    [sharedDefaults removeObjectForKey:@"widget_friend_update_profile_image"];
+    [sharedDefaults removeObjectForKey:@"friend_post"];
+    [sharedDefaults removeObjectForKey:@"widget_friend_post_image"];
+    [sharedDefaults removeObjectForKey:@"widget_friend_post_author_image"];
+
+    [sharedDefaults synchronize];
+
+    // Logout path: deterministic multi-shot refresh per widget kind.
+    [self forceReloadAllWidgetKindsWithRetries];
+    resolve(@YES);
 }
 
 // Sync user version type to App Group UserDefaults

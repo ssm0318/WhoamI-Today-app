@@ -7,6 +7,7 @@ struct CheckinWidgetEntry: TimelineEntry {
     let date: Date
     let isAuthenticated: Bool
     let isDefaultVersion: Bool
+    let isVersionQ: Bool
     let myCheckIn: MyCheckIn?
     let albumImageData: Data?
 }
@@ -14,12 +15,13 @@ struct CheckinWidgetEntry: TimelineEntry {
 struct CheckinWidgetProvider: TimelineProvider {
     // Build an entry synchronously from whatever is currently in the App Group.
     // Used by placeholder, getSnapshot, and getTimeline so they all reflect real data.
-    private func currentEntry(forceAuth: Bool = false) -> CheckinWidgetEntry {
+    private func currentEntry() -> CheckinWidgetEntry {
         let mgr = SharedDataManager.shared
         return CheckinWidgetEntry(
             date: Date(),
-            isAuthenticated: forceAuth ? true : mgr.isAuthenticated,
-            isDefaultVersion: forceAuth ? false : mgr.isDefaultVersion,
+            isAuthenticated: mgr.isAuthenticated,
+            isDefaultVersion: mgr.isDefaultVersion,
+            isVersionQ: mgr.isVersionQ,
             myCheckIn: mgr.myCheckIn,
             albumImageData: mgr.cachedAlbumImageData
         )
@@ -30,20 +32,37 @@ struct CheckinWidgetProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (CheckinWidgetEntry) -> Void) {
-        // Show content in snapshot; real auth checked in getTimeline
-        completion(currentEntry(forceAuth: true))
+        completion(currentEntry())
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<CheckinWidgetEntry>) -> Void) {
         let mgr = SharedDataManager.shared
         let isAuth = mgr.isAuthenticated
         let isDefault = mgr.isDefaultVersion
-        let rawBytes = mgr.rawMyCheckInBytes
+        let isVersionQ = mgr.isVersionQ
         let checkIn = mgr.myCheckIn
         let albumImageData: Data? = mgr.cachedAlbumImageData
 
-        // Record what this widget process actually sees so the host app can diff
-        // it against what it wrote (see getWidgetDiagnostics in WidgetDataModule.m).
+        // Hand the fresh entry back to iOS FIRST — every ms of extra work here
+        // delays the moment iOS replaces the cached snapshot it shows right after
+        // the widget is added. Diagnostics get written after completion.
+        let entry = CheckinWidgetEntry(
+            date: Date(),
+            isAuthenticated: isAuth,
+            isDefaultVersion: isDefault,
+            isVersionQ: isVersionQ,
+            myCheckIn: checkIn,
+            albumImageData: albumImageData
+        )
+        // `.atEnd` tells iOS to ask for the next timeline as soon as this entry
+        // finishes displaying, instead of locking us out for 15 min. Combined
+        // with the host app's reloadAllTimelines, this lets fresh data overtake
+        // the OS-cached snapshot faster on widget add / account switch.
+        let timeline = Timeline(entries: [entry], policy: .atEnd)
+        completion(timeline)
+
+        // Diagnostics (post-completion so they don't gate iOS rendering).
+        let rawBytes = mgr.rawMyCheckInBytes
         let rawPreview: String
         if let rawBytes = rawBytes, let rawString = String(data: rawBytes, encoding: .utf8) {
             rawPreview = String(rawString.prefix(240))
@@ -64,9 +83,6 @@ struct CheckinWidgetProvider: TimelineProvider {
         )
         mgr.writeWidgetHeartbeat(source: "CheckinWidget.getTimeline")
 
-        // Q2/Q3 diagnostic: log exactly what the widget process read this tick so we can
-        // compare against what the host app just wrote. Visible in Console.app filtered by
-        // subsystem "whoami.widget".
         let log = OSLog(subsystem: "whoami.widget", category: "CheckinWidget")
         os_log("getTimeline read socialBattery=%{public}@ mood=%{public}@ source=%{public}@ rawBytes=%{public}d decodeOk=%{public}d",
                log: log, type: .info,
@@ -76,29 +92,17 @@ struct CheckinWidgetProvider: TimelineProvider {
                rawBytes?.count ?? 0,
                checkIn != nil ? 1 : 0)
 
-        let entry = CheckinWidgetEntry(
-            date: Date(),
-            isAuthenticated: isAuth,
-            isDefaultVersion: isDefault,
-            myCheckIn: checkIn,
-            albumImageData: albumImageData
-        )
-
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: Date())!
-        let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
-        completion(timeline)
-
         // Fire-and-forget: self-fetch when no data OR when data is incomplete
         // (e.g. App Group has stale entry with nil battery after a clean reinstall).
         let needsApiFetch = checkIn == nil || (checkIn?.batteryDisplay == nil && checkIn?.feelingDisplay == nil)
-        if isAuth && !isDefault && needsApiFetch {
+        if isAuth && !isDefault && !isVersionQ && needsApiFetch {
             Task.detached {
                 await Self.fetchCheckInFromApi()
             }
         }
 
         // Fire-and-forget: refresh the album image cache for the NEXT getTimeline call.
-        if isAuth && !isDefault, let checkIn = checkIn {
+        if isAuth && !isDefault && !isVersionQ, let checkIn = checkIn {
             Task.detached {
                 var imageUrl: URL? = nil
                 if let urlString = checkIn.albumImageUrl, let url = URL(string: urlString) {
@@ -128,9 +132,9 @@ struct CheckinWidgetProvider: TimelineProvider {
         myCheckIn["is_active"] = apiCheckIn["is_active"] as? Bool ?? false
         myCheckIn["created_at"] = apiCheckIn["created_at"] as? String ?? ""
 
-        // mood: API may return array of emoji strings — take first
+        // mood: API may return an array of up to 5 emoji strings — pick one at random
         if let moodArray = apiCheckIn["mood"] as? [String] {
-            myCheckIn["mood"] = moodArray.first ?? ""
+            myCheckIn["mood"] = moodArray.randomElement() ?? ""
         } else {
             myCheckIn["mood"] = apiCheckIn["mood"] as? String ?? ""
         }
@@ -183,36 +187,45 @@ struct CheckinWidgetProvider: TimelineProvider {
 struct CheckinWidgetView: View {
     let entry: CheckinWidgetEntry
 
-    /// Avoid Sign-in placeholder when `my_check_in` is present but token reads fail in the widget process (cfprefs/plist quirks).
-    private var shouldShowSignIn: Bool {
-        !entry.isAuthenticated && entry.myCheckIn == nil
-    }
-
     /// iOS 17+: AppIntent reloads timelines without opening the app. Older OS: deep link opens app to trigger refresh.
     @ViewBuilder
     private var checkinRefreshButton: some View {
         if #available(iOS 17.0, *) {
             Button(intent: ReloadCheckinWidgetIntent()) {
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundColor(Color.gray.opacity(0.5))
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundColor(Color.gray.opacity(0.7))
+                    .frame(width: 24, height: 24)
+                    .background(
+                        Circle().fill(Color.gray.opacity(0.08))
+                    )
             }
             .buttonStyle(.plain)
         } else {
             Link(destination: URL(string: "whoami://widget/refresh-checkin")!) {
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundColor(Color.gray.opacity(0.5))
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundColor(Color.gray.opacity(0.7))
+                    .frame(width: 24, height: 24)
+                    .background(
+                        Circle().fill(Color.gray.opacity(0.08))
+                    )
             }
         }
     }
 
     var body: some View {
         Group {
-            if shouldShowSignIn {
-                SignInView(descriptionText: "Sign in to view your check-in status")
+            if !entry.isAuthenticated {
+                SignInView(
+                    widgetKind: "CheckinWidgetV3",
+                    descriptionText: "Sign in to view your check-in status",
+                    layoutStyle: .horizontal
+                )
             } else if entry.isAuthenticated && entry.isDefaultVersion {
                 DefaultVersionView()
+            } else if entry.isVersionQ {
+                Color.clear
             } else {
                 checkinContent
             }

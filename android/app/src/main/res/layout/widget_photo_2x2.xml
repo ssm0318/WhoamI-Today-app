@@ -60,6 +60,15 @@
                     android:lineSpacingMultiplier="1.1" />
             </LinearLayout>
 
+            <!-- Single emoji (mood or battery) centered for check-in updates -->
+            <TextView
+                android:id="@+id/checkin_single_emoji"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:textSize="64sp"
+                android:visibility="gone" />
+
             <!-- Empty state (no updates from friends) -->
             <TextView
                 android:id="@+id/friend_post_empty"
@@ -76,11 +85,11 @@
             <!-- Friend profile image top-right, circular -->
             <ImageView
                 android:id="@+id/friend_post_author_image"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
                 android:layout_gravity="top|end"
-                android:layout_marginEnd="8dp"
-                android:layout_marginTop="8dp"
+                android:layout_marginEnd="10dp"
+                android:layout_marginTop="10dp"
                 android:scaleType="centerCrop"
                 android:visibility="gone"
                 android:contentDescription="Friend Profile" />

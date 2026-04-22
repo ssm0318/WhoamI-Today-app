@@ -33,6 +33,7 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
     private static final String TAG = "CheckinWidget";
     private static final String PREFS_NAME = "WhoAmIWidgetPrefs";
     private static final String VERSION_TYPE_DEFAULT = "default";
+    private static final String VERSION_TYPE_Q = "version_q";
     private static final ExecutorService executor = Executors.newSingleThreadExecutor();
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -56,7 +57,7 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
             } catch (Exception e) {
                 Log.e(TAG, "Failed to update widget " + appWidgetId, e);
                 try {
-                    RemoteViews fallback = new RemoteViews(context.getPackageName(), R.layout.widget_signin);
+                    RemoteViews fallback = new RemoteViews(context.getPackageName(), R.layout.widget_signin_horizontal);
                     Intent loginIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("whoami://app/login"));
                     PendingIntent pendingIntent = PendingIntent.getActivity(
                         context, 0, loginIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
@@ -94,16 +95,18 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
         String versionType = prefs.getString("user_version_type", VERSION_TYPE_DEFAULT);
         boolean isAuthenticated = accessToken != null && !accessToken.isEmpty();
         boolean isDefaultVersion = VERSION_TYPE_DEFAULT.equals(versionType);
+        boolean isVersionQ = VERSION_TYPE_Q.equals(versionType);
 
-        Log.d(TAG, "[updateAppWidget] Auth state - isAuthenticated: " + isAuthenticated + 
+        Log.d(TAG, "[updateAppWidget] Auth state - isAuthenticated: " + isAuthenticated +
                    ", accessTokenLen: " + (accessToken != null ? accessToken.length() : 0) +
-                   ", versionType: " + versionType + 
-                   ", isDefaultVersion: " + isDefaultVersion);
+                   ", versionType: " + versionType +
+                   ", isDefaultVersion: " + isDefaultVersion +
+                   ", isVersionQ: " + isVersionQ);
 
         RemoteViews views;
 
         if (!isAuthenticated) {
-            views = new RemoteViews(context.getPackageName(), R.layout.widget_signin);
+            views = new RemoteViews(context.getPackageName(), R.layout.widget_signin_horizontal);
             Intent loginIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("whoami://app/login"));
             PendingIntent pendingIntent = PendingIntent.getActivity(
                 context, 0, loginIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
@@ -119,6 +122,17 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
             views.setViewVisibility(R.id.btn_my_battery, View.INVISIBLE);
             views.setViewVisibility(R.id.btn_my_music, View.INVISIBLE);
             views.setViewVisibility(R.id.btn_my_thought, View.INVISIBLE);
+            appWidgetManager.updateAppWidget(appWidgetId, views);
+            return;
+        }
+
+        if (isVersionQ) {
+            views = new RemoteViews(context.getPackageName(), R.layout.widget_checkin_4x1);
+            views.setViewVisibility(R.id.btn_i_feel, View.INVISIBLE);
+            views.setViewVisibility(R.id.btn_my_battery, View.INVISIBLE);
+            views.setViewVisibility(R.id.btn_my_music, View.INVISIBLE);
+            views.setViewVisibility(R.id.btn_my_thought, View.INVISIBLE);
+            views.setOnClickPendingIntent(R.id.widget_checkin_container, buildAppLauncherPendingIntent(context));
             appWidgetManager.updateAppWidget(appWidgetId, views);
             return;
         }
@@ -185,7 +199,7 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
         applyCheckinClickIntents(context, views);
 
         if (mood != null && !mood.isEmpty()) {
-            views.setTextViewText(R.id.i_feel_emoji, getMoodEmoji(mood));
+            views.setTextViewText(R.id.i_feel_emoji, mood);
         } else {
             views.setTextViewText(R.id.i_feel_emoji, "+");
         }
@@ -218,7 +232,7 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
                     mainHandler.post(() -> {
                         RemoteViews fallbackViews = new RemoteViews(context.getPackageName(), R.layout.widget_checkin_4x1);
                         applyCheckinClickIntents(context, fallbackViews);
-                        fallbackViews.setTextViewText(R.id.i_feel_emoji, finalMood != null && !finalMood.isEmpty() ? getMoodEmoji(finalMood) : "+");
+                        fallbackViews.setTextViewText(R.id.i_feel_emoji, finalMood != null && !finalMood.isEmpty() ? finalMood : "+");
                         fallbackViews.setTextViewText(R.id.my_battery_emoji, finalSocialBattery != null && !finalSocialBattery.isEmpty() ? getBatteryEmoji(finalSocialBattery) : "+");
                         applyThoughtContent(fallbackViews, finalDescription);
                         fallbackViews.setViewVisibility(R.id.my_music_album, View.GONE);
@@ -235,7 +249,7 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
 
                     applyCheckinClickIntents(context, updatedViews);
 
-                    updatedViews.setTextViewText(R.id.i_feel_emoji, finalMood != null && !finalMood.isEmpty() ? getMoodEmoji(finalMood) : "+");
+                    updatedViews.setTextViewText(R.id.i_feel_emoji, finalMood != null && !finalMood.isEmpty() ? finalMood : "+");
                     updatedViews.setTextViewText(R.id.my_battery_emoji, finalSocialBattery != null && !finalSocialBattery.isEmpty() ? getBatteryEmoji(finalSocialBattery) : "+");
                     applyThoughtContent(updatedViews, finalDescription);
 
@@ -318,12 +332,17 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
                 if (apiCheckIn.has("is_active")) myCheckIn.put("is_active", apiCheckIn.getBoolean("is_active"));
                 if (apiCheckIn.has("created_at")) myCheckIn.put("created_at", apiCheckIn.getString("created_at"));
 
-                // mood: API returns array of emoji strings — take first
+                // mood: API returns array of up to 5 emoji strings — pick one at random
                 if (apiCheckIn.has("mood") && !apiCheckIn.isNull("mood")) {
                     Object moodObj = apiCheckIn.get("mood");
                     if (moodObj instanceof org.json.JSONArray) {
                         org.json.JSONArray arr = (org.json.JSONArray) moodObj;
-                        myCheckIn.put("mood", arr.length() > 0 ? arr.getString(0) : "");
+                        if (arr.length() > 0) {
+                            int idx = (int) (Math.random() * arr.length());
+                            myCheckIn.put("mood", arr.getString(idx));
+                        } else {
+                            myCheckIn.put("mood", "");
+                        }
                     } else {
                         myCheckIn.put("mood", moodObj.toString());
                     }
@@ -409,6 +428,22 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
         });
     }
 
+    /** Build a PendingIntent that launches the app with no deep link (for version_q). */
+    private static PendingIntent buildAppLauncherPendingIntent(Context context) {
+        Intent launcher = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+        if (launcher == null) {
+            launcher = new Intent(context, MainActivity.class);
+            launcher.setAction(Intent.ACTION_MAIN);
+            launcher.addCategory(Intent.CATEGORY_LAUNCHER);
+        }
+        launcher.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        return PendingIntent.getActivity(
+            context,
+            0,
+            launcher,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
     /** Build a PendingIntent that opens the app via a deep link with a unique requestCode. */
     private static PendingIntent buildDeepLinkPendingIntent(Context context, String uri, int requestCode) {
         Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
@@ -444,30 +479,17 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
         }
     }
 
-    private static String getMoodEmoji(String mood) {
-        if (mood == null || mood.isEmpty()) return "+";
-        switch (mood.toLowerCase()) {
-            case "happy": return "😊";
-            case "sad": return "😢";
-            case "angry": return "😠";
-            case "anxious": return "😰";
-            case "excited": return "🤩";
-            case "tired": return "😴";
-            case "calm": return "😌";
-            case "confused": return "😕";
-            default: return mood;
-        }
-    }
-
     private static String getBatteryEmoji(String battery) {
         if (battery == null || battery.isEmpty()) return "+";
         switch (battery.toLowerCase()) {
             case "super_social": return "🔋";
             case "fully_charged": return "🔋";
             case "moderately_social": return "🔋";
-            case "needs_recharge": return "🪫";
-            case "low": return "🪫";
-            case "completely_drained": return "🪫";
+            // Use widely supported glyph for Android widget text rendering.
+            // The low-battery emoji (🪫) can render as tofu/x on some devices.
+            case "needs_recharge": return "🔋";
+            case "low": return "🔋";
+            case "completely_drained": return "🔋";
             default: return battery;
         }
     }

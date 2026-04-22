@@ -1,4 +1,4 @@
-import { useAnalytics, useFirebaseMessage, useNavigationService } from '@hooks';
+import { useFirebaseMessage, useNavigationService } from '@hooks';
 import {
   CookieStorage,
   parseCookie,
@@ -16,7 +16,8 @@ import { WebViewProgressEvent } from 'react-native-webview/lib/WebViewTypes';
 import { ScreenRouteParamList } from '@screens';
 import ImagePicker from 'react-native-image-crop-picker';
 import {
-  clearFriendPostFromWidget,
+  clearAllWidgetDataForLogout,
+  clearFriendUpdateFromWidget,
   clearMyCheckInFromWidget,
   clearSharedPlaylistTrackFromWidget,
   clearWidgetTokens,
@@ -50,7 +51,6 @@ const useWebView = () => {
   const { getCookie } = CookieStorage;
   const { registerOrUpdatePushToken } = useFirebaseMessage();
   const [isCanGoBack, setIsCanGoBack] = useState(false);
-  const { handleLogout } = useAnalytics(tokens);
 
   const onNavigationStateChange = useCallback((navState: WebViewNavigation) => {
     setIsCanGoBack(navState.canGoBack ?? false);
@@ -201,29 +201,71 @@ const useWebView = () => {
           return redirectSetting();
         case 'SET_COOKIE': {
           const parsedCookie = parseCookie(data.value);
-          setTokens(parsedCookie);
-          return saveCookie(parsedCookie);
+          const prevTokens = await CookieStorage.getCookie();
+          const mergedCookie = {
+            csrftoken: parsedCookie.csrftoken || prevTokens.csrftoken || '',
+            access_token:
+              parsedCookie.access_token || prevTokens.access_token || '',
+          };
+          // Persist to AsyncStorage/CookieManager BEFORE updating React state.
+          // The axios interceptor (apis/API.ts) reads tokens from CookieStorage
+          // asynchronously; if setTokens ran first, the token-driven useEffect
+          // would fire runWidgetSync → profile API call before AsyncStorage had
+          // the new tokens, and the interceptor would reject with "Missing
+          // authentication tokens" — leaving the widget on the previous
+          // account's data after account switch.
+          if (mergedCookie.csrftoken && mergedCookie.access_token) {
+            await saveCookie(mergedCookie);
+            await syncTokensToWidget(
+              mergedCookie.csrftoken,
+              mergedCookie.access_token,
+            );
+            await triggerWidgetRefresh();
+          } else {
+            console.log(
+              '[WidgetSync] SET_COOKIE skipped: incomplete token pair',
+              {
+                parsed: {
+                  hasCsrf: !!parsedCookie.csrftoken,
+                  hasAccess: !!parsedCookie.access_token,
+                },
+                merged: {
+                  hasCsrf: !!mergedCookie.csrftoken,
+                  hasAccess: !!mergedCookie.access_token,
+                },
+              },
+            );
+          }
+          setTokens(mergedCookie);
+          return;
         }
         case 'LOGOUT': {
           console.log('LOGOUT');
 
-          // End session
-          await handleLogout();
+          // Prioritize widget sign-out UX first. If app lifecycle changes quickly
+          // (e.g. user goes home immediately), widget storage is already cleared.
+          await clearAllWidgetDataForLogout();
+          await triggerWidgetRefresh();
 
-          // Unregister firebase push token
-          await registerOrUpdatePushToken(tokens, false);
+          // Unregister push token in best-effort mode; never block logout cleanup.
+          await registerOrUpdatePushToken(tokens, false).catch((e) => {
+            console.warn(
+              '[WidgetSync] Push token unregister failed during logout',
+              e,
+            );
+          });
 
           await CookieStorage.removeCookie();
           setTokens({ csrftoken: '', access_token: '' });
           setCachedCheckInForWidget(null);
           setWidgetDataStale(true);
 
-          // Prevent stale widget state after account switch/logout.
+          // Fallback clear calls keep compatibility if older native bridge is loaded.
           await Promise.allSettled([
             clearWidgetTokens(),
             clearMyCheckInFromWidget(),
             clearSharedPlaylistTrackFromWidget(),
-            clearFriendPostFromWidget(),
+            clearFriendUpdateFromWidget(),
           ]);
           await triggerWidgetRefresh();
 
@@ -343,24 +385,9 @@ const useWebView = () => {
                   );
                 }
 
-                const refreshRequestedAt = new Date().toISOString();
-                console.log(
-                  '[WidgetSync] WIDGET_DATA_UPDATED: requesting refresh',
-                  {
-                    refreshRequestedAt,
-                    path: 'inline-payload',
-                  },
-                );
-                await triggerWidgetRefresh();
-                const refreshResolvedAt = new Date().toISOString();
-                console.log(
-                  '[WidgetSync] WIDGET_DATA_UPDATED: refresh resolved',
-                  {
-                    refreshRequestedAt,
-                    refreshResolvedAt,
-                    path: 'inline-payload',
-                  },
-                );
+                // syncMyCheckInToWidget now triggers a kind-specific reload
+                // (CheckinWidgetV3) internally, so calling triggerWidgetRefresh
+                // here would burn album/photo widget reload budgets unnecessarily.
                 return;
               }
               console.log(
@@ -423,24 +450,8 @@ const useWebView = () => {
                 await syncMyCheckInToWidget(payload);
                 setCachedCheckInForWidget(payload);
               }
-              const refreshRequestedAt = new Date().toISOString();
-              console.log(
-                '[WidgetSync] WIDGET_DATA_UPDATED: requesting refresh',
-                {
-                  refreshRequestedAt,
-                  path: 'api-fallback',
-                },
-              );
-              await triggerWidgetRefresh();
-              const refreshResolvedAt = new Date().toISOString();
-              console.log(
-                '[WidgetSync] WIDGET_DATA_UPDATED: refresh resolved',
-                {
-                  refreshRequestedAt,
-                  refreshResolvedAt,
-                  path: 'api-fallback',
-                },
-              );
+              // syncMyCheckInToWidget above triggers a kind-specific reload
+              // internally — no all-kinds triggerWidgetRefresh needed.
               void getWidgetDiagnostics();
             } catch (err) {
               console.warn('[WidgetSync] WIDGET_DATA_UPDATED failed:', err);

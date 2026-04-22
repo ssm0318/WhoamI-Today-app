@@ -16,6 +16,7 @@ struct AlbumCoverWidgetEntry: TimelineEntry {
     let date: Date
     let isAuthenticated: Bool
     let isDefaultVersion: Bool
+    let isVersionQ: Bool
     let albumImageData: Data?
     let sharerAvatarData: Data?
     let sharerUsername: String?
@@ -46,8 +47,9 @@ struct AlbumCoverWidgetProvider: TimelineProvider {
         let track = mgr.sharedPlaylistTrack
         return AlbumCoverWidgetEntry(
             date: Date(),
-            isAuthenticated: true,
-            isDefaultVersion: false,
+            isAuthenticated: mgr.isAuthenticated,
+            isDefaultVersion: mgr.isDefaultVersion,
+            isVersionQ: mgr.isVersionQ,
             albumImageData: albumImage(),
             sharerAvatarData: avatarImage(),
             sharerUsername: track?.sharerUsername
@@ -59,8 +61,9 @@ struct AlbumCoverWidgetProvider: TimelineProvider {
         let track = mgr.sharedPlaylistTrack
         let entry = AlbumCoverWidgetEntry(
             date: Date(),
-            isAuthenticated: true,
-            isDefaultVersion: false,
+            isAuthenticated: mgr.isAuthenticated,
+            isDefaultVersion: mgr.isDefaultVersion,
+            isVersionQ: mgr.isVersionQ,
             albumImageData: albumImage(),
             sharerAvatarData: avatarImage(),
             sharerUsername: track?.sharerUsername
@@ -72,6 +75,7 @@ struct AlbumCoverWidgetProvider: TimelineProvider {
         let mgr = SharedDataManager.shared
         let isAuth = mgr.isAuthenticated
         let isDefault = mgr.isDefaultVersion
+        let isVersionQ = mgr.isVersionQ
         let track = mgr.sharedPlaylistTrack
         // Use file-first fallback helpers so timeline entries reflect App Group files immediately.
         let albumImageData = albumImage()
@@ -91,6 +95,7 @@ struct AlbumCoverWidgetProvider: TimelineProvider {
             date: Date(),
             isAuthenticated: isAuth,
             isDefaultVersion: isDefault,
+            isVersionQ: isVersionQ,
             albumImageData: albumImageData,
             sharerAvatarData: avatarImageData,
             sharerUsername: track?.sharerUsername
@@ -101,7 +106,7 @@ struct AlbumCoverWidgetProvider: TimelineProvider {
         completion(timeline)
 
         // Fire-and-forget: self-fetch when no cached data
-        if isAuth && !isDefault && albumImageData == nil && avatarImageData == nil {
+        if isAuth && !isDefault && !isVersionQ && albumImageData == nil && avatarImageData == nil {
             Task.detached {
                 await Self.fetchSharedPlaylistFromApi()
             }
@@ -113,12 +118,13 @@ struct AlbumCoverWidgetProvider: TimelineProvider {
     private static func fetchSharedPlaylistFromApi() async {
         guard let json = await WidgetAPIHelper.fetchJSON(endpoint: "user/discover/?page=1") else { return }
         guard let musicTracks = json["music_tracks"] as? [[String: Any]],
-              let picked = musicTracks.first else { return }
+              !musicTracks.isEmpty,
+              let picked = musicTracks.randomElement() else { return }
 
         let trackId = picked["track_id"] as? String ?? ""
         let user = picked["user"] as? [String: Any]
         let sharerUsername = user?["username"] as? String ?? ""
-        let profileImageUrl = user?["profile_image"] as? String ?? user?["profile_pic"] as? String ?? ""
+        let profileImageUrl = user?["profile_image"] as? String ?? ""
 
         // Build shared_playlist_track JSON
         let trackDict: [String: Any] = [
@@ -170,62 +176,85 @@ struct AlbumCoverWidgetView: View {
         return entry.sharerAvatarData ?? mgr.cachedSharedPlaylistAvatarImage
     }
 
+    @ViewBuilder
     var body: some View {
+        if entry.isVersionQ {
+            Color.clear
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            mainContent
+                .widgetURL(URL(string: "whoami://app/discover"))
+        }
+    }
+
+    private var mainContent: some View {
         let albumData = resolvedAlbumImageData()
         let albumUIImage = albumData.flatMap { UIImage(data: $0) }
         let avatarData = resolvedAvatarImageData()
         let avatarUIImage = avatarData.flatMap { UIImage(data: $0) }
 
         return ZStack {
-            Group {
-                if let img = albumUIImage {
-                    Image(uiImage: img)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } else {
-                    VStack(spacing: 8) {
-                        Text("Shared Playlist")
-                            .font(.system(size: 12))
-                            .foregroundColor(.gray)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(white: 0.96))
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipped()
-
-            VStack {
-                HStack {
-                    Image("IconPlaylist")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 18, height: 18)
-
-                    Spacer()
-
-                    if let avImg = avatarUIImage {
-                        Image(uiImage: avImg)
+            if !entry.isAuthenticated {
+                SignInView(widgetKind: "AlbumCoverWidgetV3", descriptionText: "Sign in to view shared playlist")
+            } else if entry.isDefaultVersion {
+                DefaultVersionView()
+            } else {
+                Group {
+                    if let img = albumUIImage {
+                        Image(uiImage: img)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
-                            .frame(width: 32, height: 32)
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                    } else if let username = entry.sharerUsername, let firstChar = username.first {
-                        Text(String(firstChar).uppercased())
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(width: 32, height: 32)
-                            .background(Circle().fill(Color.purple))
-                            .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                    } else {
+                        VStack(spacing: 8) {
+                            Text("Shared Playlist")
+                                .font(.system(size: 12))
+                                .foregroundColor(.gray)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color(white: 0.96))
                     }
                 }
-                .padding(6)
-                Spacer()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+
+                VStack {
+                    HStack {
+                        Image("IconPlaylist")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 18, height: 18)
+
+                        Spacer()
+
+                        if let avImg = avatarUIImage {
+                            Image(uiImage: avImg)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 32, height: 32)
+                                .clipShape(Circle())
+                                .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                        } else if UIImage(named: "DefaultProfile") != nil {
+                            Image("DefaultProfile")
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 32, height: 32)
+                                .clipShape(Circle())
+                                .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                        } else if let username = entry.sharerUsername, let firstChar = username.first {
+                            Text(String(firstChar).uppercased())
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(width: 32, height: 32)
+                                .background(Circle().fill(Color.purple))
+                                .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                        }
+                    }
+                    .padding(6)
+                    Spacer()
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .widgetURL(URL(string: "whoami://app/discover"))
     }
 }
 

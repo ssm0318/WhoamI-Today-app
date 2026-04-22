@@ -26,7 +26,6 @@ import {
   useFirebaseMessage,
   useWebView,
   useVersionCheckUpdate,
-  useAnalytics,
   useAppStateEffect,
 } from '@hooks';
 import RNFetchBlob from 'rn-fetch-blob';
@@ -36,8 +35,9 @@ import {
   syncSpotifyCredentialsToWidget,
   syncMyCheckInToWidget,
   syncSharedPlaylistTrackToWidget,
-  syncFriendPostToWidget,
-  clearFriendPostFromWidget,
+  syncFriendUpdateToWidget,
+  clearFriendUpdateFromWidget,
+  FriendUpdatePayload,
   syncTokensToWidget,
   triggerWidgetRefresh,
 } from '../../native/WidgetDataModule';
@@ -90,11 +90,12 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
 
   const [isWebViewLoaded, setWebViewLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const latestTokensRef = useRef(tokens);
+  useEffect(() => {
+    latestTokensRef.current = tokens;
+  }, [tokens]);
   const { registerOrUpdatePushToken, hasPermission, requestPermissionIfNot } =
     useFirebaseMessage();
-
-  // GA tracking
-  useAnalytics(tokens);
 
   // Automatically perform version check and update
   // Detect version changes
@@ -379,6 +380,20 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   // iOS may suspend JS before network-heavy shared/friend flows finish.
   const runWidgetSync = useCallback(
     (mode: WidgetSyncMode = 'foreground') => {
+      const startedWith = {
+        accessToken: tokens.access_token,
+        csrfToken: tokens.csrftoken,
+      };
+      const isSyncStillValid = () => {
+        const current = latestTokensRef.current;
+        return (
+          !!startedWith.accessToken &&
+          !!startedWith.csrfToken &&
+          current.access_token === startedWith.accessToken &&
+          current.csrftoken === startedWith.csrfToken
+        );
+      };
+
       console.log('[WidgetSync] runWidgetSync called', {
         mode,
         hasAccessToken: !!tokens.access_token,
@@ -405,7 +420,11 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
           mood: cachedCheckIn.mood,
           descriptionLen: cachedCheckIn.description?.length ?? 0,
         });
-        syncMyCheckInToWidget(cachedCheckIn).then(() => triggerWidgetRefresh());
+        // syncMyCheckInToWidget triggers a kind-specific CheckinWidgetV3 reload
+        // internally — no all-kinds triggerWidgetRefresh needed here.
+        syncMyCheckInToWidget(cachedCheckIn).catch(() => {
+          /* logged inside the wrapper */
+        });
       } else {
         console.log('[WidgetSync] No cached check-in to push immediately');
       }
@@ -429,6 +448,12 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
               () => [],
             ) as Promise<unknown>,
           ]);
+          if (!isSyncStillValid()) {
+            console.log(
+              '[WidgetSync] Aborting stale sync: token context changed',
+            );
+            return;
+          }
           const res = profileResponse as {
             check_in?: {
               id: number;
@@ -525,12 +550,13 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
             if (musicTracks.length > 0) {
               const randomIdx = Math.floor(Math.random() * musicTracks.length);
               const picked = musicTracks[randomIdx];
+              const sharerProfileImageUrl = picked.user.profile_image ?? null;
               console.log('[WidgetSync] Picked random shared track:', {
                 idx: randomIdx,
                 id: picked.id,
                 trackId: picked.track_id,
                 sharerUsername: picked.user.username,
-                hasProfileImage: !!picked.user.profile_image,
+                hasProfileImage: !!sharerProfileImageUrl,
               });
               const albumImageUrl = await fetchSpotifyAlbumImageUrl(
                 picked.track_id,
@@ -541,7 +567,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
               );
               const [albumImageBase64, avatarImageBase64] = await Promise.all([
                 fetchImageAsBase64(albumImageUrl),
-                fetchImageAsBase64(picked.user.profile_image),
+                fetchImageAsBase64(sharerProfileImageUrl),
               ]);
               console.log('[WidgetSync] Shared playlist images fetched', {
                 albumImageBase64Len: albumImageBase64.length,
@@ -553,11 +579,17 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
                   trackId: picked.track_id,
                   albumImageUrl,
                   sharerUsername: picked.user.username,
-                  sharerProfileImageUrl: picked.user.profile_image ?? null,
+                  sharerProfileImageUrl,
                 },
                 albumImageBase64,
                 avatarImageBase64,
               );
+              if (!isSyncStillValid()) {
+                console.log(
+                  '[WidgetSync] Aborting stale sync after shared playlist write',
+                );
+                return;
+              }
               console.log(
                 '[WidgetSync] Shared playlist synced to native; verifying App Group…',
               );
@@ -575,21 +607,70 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
             console.warn('[WidgetSync] Shared playlist sync failed:', spErr);
           }
 
-          // ── Friend post sync (independent from myCheckIn and shared playlist) ──
-          // Fetches /user/friends/ → picks a random friend with unread posts → uses
-          // latest_unread_post for content/images → syncs to PhotoWidget.
+          // ── Friend update sync ──
+          // Picks a random friend with a check-in or post update and syncs one
+          // representative update (post prioritized over check-in) to the
+          // Friend Update Widget. Check-in variation follows last_updated_field.
           try {
             console.log(
               '[WidgetSync] Fetching friend list from /user/friends/',
             );
-            const friendsRaw = await ApiService.API.get('user/friends/', {
-              params: { type: 'all' },
-            });
-            // Response may be paginated {results:[...]} or plain array
+            // Raw fetch to compare with axios path
+            try {
+              const CookieManagerModule = require('@react-native-cookies/cookies');
+              const CM = CookieManagerModule?.default ?? CookieManagerModule;
+              const cookies = await CM.get(
+                'https://whoami-test-group.gina-park.site',
+                true,
+              );
+              console.log('[WidgetSync] Raw cookies from CookieManager:', {
+                keys: Object.keys(cookies || {}),
+                csrftoken: cookies?.csrftoken?.value?.slice(0, 10),
+                accessTokenStart: cookies?.access_token?.value?.slice(0, 10),
+              });
+              const csrf = cookies?.csrftoken?.value ?? '';
+              const accessToken = cookies?.access_token?.value ?? '';
+              const rawUrl =
+                'https://whoami-test-group.gina-park.site/api/user/friends/?type=all';
+              const rawRes = await fetch(rawUrl, {
+                method: 'GET',
+                headers: {
+                  'X-CSRFToken': csrf,
+                  Cookie: `csrftoken=${csrf}; access_token=${accessToken}`,
+                  'Content-Type': 'application/json',
+                },
+              });
+              const rawText = await rawRes.text();
+              console.log('[WidgetSync] Raw fetch /user/friends/:', {
+                status: rawRes.status,
+                bodyPreview: rawText.slice(0, 300),
+              });
+            } catch (rawErr) {
+              console.warn('[WidgetSync] Raw fetch failed:', rawErr);
+            }
+
+            let friendsRaw: any;
+            try {
+              friendsRaw = await ApiService.API.get('user/friends/', {
+                params: { type: 'all' },
+              });
+            } catch (e: any) {
+              console.warn('[WidgetSync] /user/friends/ threw:', {
+                message: e?.message,
+                status: e?.response?.status,
+                data: e?.response?.data,
+              });
+              throw e;
+            }
+            console.log(
+              '[WidgetSync] /user/friends/ preview:',
+              JSON.stringify(friendsRaw).slice(0, 400),
+            );
             type FriendItem = {
               id: number;
               username: string;
               profile_image: string | null;
+              current_user_read: boolean;
               unread_post_cnt: number;
               latest_unread_post: {
                 id: number;
@@ -597,75 +678,181 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
                 content: string;
                 images: string[];
               } | null;
+              last_updated_field:
+                | 'mood'
+                | 'social_battery'
+                | 'song'
+                | 'thought'
+                | null;
+              mood: string[] | string | null;
+              social_battery: string | null;
+              thought: string | null;
+              track_id: string | null;
             };
             const allFriends: FriendItem[] = Array.isArray(friendsRaw)
               ? friendsRaw
               : (friendsRaw as any)?.results ?? [];
-            console.log('[WidgetSync] Friend list response:', {
+
+            const rawObj = (friendsRaw as any) ?? {};
+            console.log('[WidgetSync] Friend list raw shape:', {
               isArray: Array.isArray(friendsRaw),
-              friendCount: allFriends.length,
-              sample: allFriends[0]
+              topLevelKeys:
+                typeof friendsRaw === 'object' && friendsRaw
+                  ? Object.keys(rawObj).slice(0, 10)
+                  : [],
+              count: rawObj.count,
+              resultsLen: Array.isArray(rawObj.results)
+                ? rawObj.results.length
+                : 'not-array',
+              next: rawObj.next,
+              firstFriendKeys: allFriends[0]
+                ? Object.keys(allFriends[0]).slice(0, 30)
+                : [],
+              firstFriendSample: allFriends[0]
                 ? {
                     username: allFriends[0].username,
+                    current_user_read: allFriends[0].current_user_read,
                     unread_post_cnt: allFriends[0].unread_post_cnt,
-                    hasLatestPost: !!allFriends[0].latest_unread_post,
+                    has_latest_unread_post: !!allFriends[0].latest_unread_post,
+                    last_updated_field: allFriends[0].last_updated_field,
                   }
                 : null,
             });
-            const friendsWithPosts = allFriends.filter(
-              (f) => f.unread_post_cnt > 0 && f.latest_unread_post,
+
+            const hasPostUpdate = (f: FriendItem) =>
+              (f.unread_post_cnt ?? 0) > 0 || !!f.latest_unread_post;
+            const hasCheckinUpdate = (f: FriendItem) =>
+              f.current_user_read === false && !!f.last_updated_field;
+
+            const candidates = allFriends.filter(
+              (f) => hasPostUpdate(f) || hasCheckinUpdate(f),
             );
-            console.log('[WidgetSync] Friends with unread posts:', {
+            console.log('[WidgetSync] Friend update candidates:', {
               total: allFriends.length,
-              withPosts: friendsWithPosts.length,
+              candidates: candidates.length,
             });
-            if (friendsWithPosts.length > 0) {
-              const randomIdx = Math.floor(
-                Math.random() * friendsWithPosts.length,
-              );
-              const pickedFriend = friendsWithPosts[randomIdx];
-              const post = pickedFriend.latest_unread_post!;
-              console.log('[WidgetSync] Picked friend with unread post:', {
-                idx: randomIdx,
-                friendUsername: pickedFriend.username,
-                profileImage: pickedFriend.profile_image,
-                postId: post.id,
-                postType: post.type,
-                contentLen: post.content?.length ?? 0,
-                imagesCount: post.images?.length ?? 0,
-              });
-              const [authorImageBase64, postImageBase64] = await Promise.all([
-                fetchImageAsBase64(pickedFriend.profile_image),
-                post.images && post.images.length > 0
-                  ? fetchImageAsBase64(post.images[0])
-                  : Promise.resolve(''),
-              ]);
-              console.log('[WidgetSync] Friend post images fetched', {
-                authorImageBase64Len: authorImageBase64.length,
-                postImageBase64Len: postImageBase64.length,
-              });
-              await syncFriendPostToWidget(
-                {
-                  id: post.id,
-                  type: post.type,
-                  content: post.content,
-                  images: post.images,
-                  currentUserRead: false,
-                  authorUsername: pickedFriend.username,
-                },
-                authorImageBase64,
-                postImageBase64,
-              );
-            } else {
+            if (candidates.length === 0) {
               console.warn(
-                '[WidgetSync] No friends with unread posts — clearing PhotoWidget',
+                '[WidgetSync] No friends with updates — clearing Friend Update Widget',
               );
-              await clearFriendPostFromWidget();
+              await clearFriendUpdateFromWidget();
+            } else {
+              const picked =
+                candidates[Math.floor(Math.random() * candidates.length)];
+              const preferPost = hasPostUpdate(picked);
+              console.log('[WidgetSync] Picked friend:', {
+                username: picked.username,
+                kind: preferPost ? 'post' : 'checkin',
+                lastUpdatedField: picked.last_updated_field,
+              });
+
+              let payload: FriendUpdatePayload | null = null;
+              let contentImageBase64 = '';
+
+              if (preferPost && picked.latest_unread_post) {
+                const post = picked.latest_unread_post;
+                const hasImage = (post.images?.length ?? 0) > 0;
+                if (hasImage) {
+                  contentImageBase64 = await fetchImageAsBase64(post.images[0]);
+                }
+                payload = {
+                  kind: 'post',
+                  friend: { username: picked.username },
+                  post: {
+                    id: post.id,
+                    content: post.content ?? '',
+                    has_image: hasImage,
+                  },
+                };
+              } else if (picked.last_updated_field) {
+                const field = picked.last_updated_field;
+                if (field === 'mood') {
+                  const mood = normalizeMoodForWidget(picked.mood);
+                  if (mood) {
+                    payload = {
+                      kind: 'checkin',
+                      friend: { username: picked.username },
+                      checkin: { variation: 'mood', mood },
+                    };
+                  }
+                } else if (field === 'social_battery') {
+                  if (picked.social_battery) {
+                    payload = {
+                      kind: 'checkin',
+                      friend: { username: picked.username },
+                      checkin: {
+                        variation: 'social_battery',
+                        social_battery: picked.social_battery,
+                      },
+                    };
+                  }
+                } else if (field === 'thought') {
+                  if (picked.thought) {
+                    payload = {
+                      kind: 'checkin',
+                      friend: { username: picked.username },
+                      checkin: {
+                        variation: 'thought',
+                        description: picked.thought,
+                      },
+                    };
+                  }
+                } else if (field === 'song' && picked.track_id) {
+                  const albumUrl = await fetchSpotifyAlbumImageUrl(
+                    picked.track_id,
+                  );
+                  if (albumUrl) {
+                    contentImageBase64 = await fetchImageAsBase64(albumUrl);
+                  }
+                  payload = {
+                    kind: 'checkin',
+                    friend: { username: picked.username },
+                    checkin: {
+                      variation: 'album',
+                      track_id: picked.track_id,
+                    },
+                  };
+                }
+              }
+
+              if (payload) {
+                if (!isSyncStillValid()) {
+                  console.log(
+                    '[WidgetSync] Aborting stale sync before friend update write',
+                  );
+                  return;
+                }
+                const profileImageBase64 = await fetchImageAsBase64(
+                  picked.profile_image,
+                );
+                await syncFriendUpdateToWidget(
+                  payload,
+                  profileImageBase64,
+                  contentImageBase64,
+                );
+                if (!isSyncStillValid()) {
+                  console.log(
+                    '[WidgetSync] Aborting stale sync after friend update write',
+                  );
+                  return;
+                }
+              } else {
+                console.warn(
+                  '[WidgetSync] Picked friend had no renderable update — clearing widget',
+                );
+                await clearFriendUpdateFromWidget();
+              }
             }
           } catch (fpErr) {
-            console.warn('[WidgetSync] Friend post sync failed:', fpErr);
+            console.warn('[WidgetSync] Friend update sync failed:', fpErr);
           }
 
+          if (!isSyncStillValid()) {
+            console.log(
+              '[WidgetSync] Aborting stale sync before final refresh',
+            );
+            return;
+          }
           await triggerWidgetRefresh();
           console.log('[WidgetSync] triggerWidgetRefresh completed');
         } catch (err) {
@@ -677,10 +864,16 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     [tokens.access_token, tokens.csrftoken],
   );
 
-  // Run widget sync once when tokens first become available (cold start)
+  // Run widget sync once when tokens first become available (cold start). The ref is
+  // reset on logout (tokens → empty) so the next login — including a different
+  // account in the same session — gets a fresh sync that pushes the new user's
+  // tokens/check-in to the widget instead of leaving the previous user's data.
   const initialSyncDoneRef = useRef(false);
   useEffect(() => {
-    if (!tokens.access_token || !tokens.csrftoken) return;
+    if (!tokens.access_token || !tokens.csrftoken) {
+      initialSyncDoneRef.current = false;
+      return;
+    }
     if (initialSyncDoneRef.current) return;
     initialSyncDoneRef.current = true;
     console.log(

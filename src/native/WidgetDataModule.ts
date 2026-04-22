@@ -1,5 +1,6 @@
 import { NativeModules } from 'react-native';
 import { API_URL } from '../constants/app';
+import { normalizeMoodForWidget } from '../utils/widgetCheckInNormalize';
 
 interface MyCheckInData {
   id: number;
@@ -20,14 +21,23 @@ interface SharedPlaylistTrackData {
   sharer_profile_image_url: string | null;
 }
 
-interface FriendPostData {
-  id: number;
-  type: string;
-  content: string;
-  images: string[];
-  current_user_read: boolean;
-  author_username: string;
-}
+export type FriendUpdatePayload =
+  | {
+      kind: 'post';
+      friend: { username: string };
+      post: { id: number; content: string; has_image: boolean };
+    }
+  | {
+      kind: 'checkin';
+      friend: { username: string };
+      checkin: {
+        variation: 'album' | 'mood' | 'social_battery' | 'thought';
+        mood?: string;
+        social_battery?: string | null;
+        description?: string;
+        track_id?: string;
+      };
+    };
 
 interface WidgetDataModuleInterface {
   syncAuthTokens(csrftoken: string, accessToken: string): Promise<boolean>;
@@ -45,16 +55,17 @@ interface WidgetDataModuleInterface {
     avatarImageBase64: string,
   ): Promise<boolean>;
   clearSharedPlaylistTrack(): Promise<boolean>;
-  syncFriendPost(
-    postData: FriendPostData,
-    authorImageBase64: string,
-    postImageBase64: string,
+  syncFriendUpdate(
+    payload: FriendUpdatePayload,
+    profileImageBase64: string,
+    contentImageBase64: string,
   ): Promise<boolean>;
-  clearFriendPost(): Promise<boolean>;
+  clearFriendUpdate(): Promise<boolean>;
   syncApiBaseUrl(url: string): Promise<boolean>;
   syncVersionType(versionType: string): Promise<boolean>;
   clearAuthTokens(): Promise<boolean>;
   clearMyCheckIn(): Promise<boolean>;
+  clearAllWidgetData(): Promise<boolean>;
   refreshWidgets(): Promise<boolean>;
   getWidgetDiagnostics(): Promise<{
     lastSeenMood: string;
@@ -69,9 +80,9 @@ interface WidgetDataModuleInterface {
     sharedPlaylistJson: string;
     sharedPlaylistAlbumImageLen: number;
     sharedPlaylistAvatarImageLen: number;
-    friendPostJson: string;
-    friendPostImageLen: number;
-    friendPostAuthorImageLen: number;
+    friendUpdateJson: string;
+    friendUpdateContentImageLen: number;
+    friendUpdateProfileImageLen: number;
     albumLastGetTimelineAt: string;
     albumLastSawTrackId: string;
     albumLastSharerUsername: string;
@@ -179,10 +190,7 @@ export const syncMyCheckInToWidget = async (checkIn: {
   });
 
   try {
-    // Normalize mood: API may return an array of emojis — widget expects a single string
-    const normalizedMood = Array.isArray(checkIn.mood)
-      ? checkIn.mood[0] ?? ''
-      : checkIn.mood;
+    const normalizedMood = normalizeMoodForWidget(checkIn.mood);
 
     // Convert to snake_case for iOS native module
     const checkInData: MyCheckInData = {
@@ -244,6 +252,16 @@ export const clearMyCheckInFromWidget = async (): Promise<void> => {
     await (WidgetDataModule as WidgetDataModuleInterface).clearMyCheckIn();
   } catch (error) {
     console.error('Failed to clear MyCheckIn from widget:', error);
+  }
+};
+
+export const clearAllWidgetDataForLogout = async (): Promise<void> => {
+  if (!WidgetDataModule) return;
+
+  try {
+    await (WidgetDataModule as WidgetDataModuleInterface).clearAllWidgetData();
+  } catch (error) {
+    console.error('Failed to clear all widget data for logout:', error);
   }
 };
 
@@ -411,6 +429,14 @@ export const getWidgetDiagnostics = async (): Promise<{
           diag.sharedPlaylistAlbumImageLen ?? 'undefined',
         sharedPlaylistAvatarImageLen:
           diag.sharedPlaylistAvatarImageLen ?? 'undefined',
+        friendUpdate_jsonLen: diag.friendUpdateJson?.length ?? 0,
+        friendUpdate_jsonPreview: diag.friendUpdateJson?.slice(0, 200) ?? '',
+        friendUpdate_contentImageLen:
+          diag.friendUpdateContentImageLen ?? 'undefined',
+        friendUpdate_profileImageLen:
+          diag.friendUpdateProfileImageLen ?? 'undefined',
+        photoWidget_lastRenderAt: diag.photoWidgetLastRenderAt ?? '(never)',
+        photoWidget_lastRenderDiag: diag.photoWidgetLastRenderDiag ?? '(never)',
       });
     }
     return diag;
@@ -438,63 +464,45 @@ export const syncVersionTypeToWidget = async (
   }
 };
 
-export const syncFriendPostToWidget = async (
-  post: {
-    id: number;
-    type: string;
-    content: string;
-    images: string[];
-    currentUserRead: boolean;
-    authorUsername: string;
-  },
-  authorImageBase64: string,
-  postImageBase64: string,
+export const syncFriendUpdateToWidget = async (
+  payload: FriendUpdatePayload,
+  profileImageBase64: string,
+  contentImageBase64: string,
 ): Promise<void> => {
   if (!WidgetDataModule) {
     console.warn('[WidgetSync] WidgetDataModule native module not available');
     return;
   }
 
-  console.log('[WidgetSync] syncFriendPostToWidget called with:', {
-    id: post.id,
-    type: post.type,
-    contentLen: post.content?.length ?? 0,
-    imagesCount: post.images?.length ?? 0,
-    currentUserRead: post.currentUserRead,
-    authorUsername: post.authorUsername,
-    authorImageBase64Len: authorImageBase64.length,
-    postImageBase64Len: postImageBase64.length,
+  console.log('[WidgetSync] syncFriendUpdateToWidget called with:', {
+    kind: payload.kind,
+    username: payload.friend.username,
+    variation:
+      payload.kind === 'checkin' ? payload.checkin.variation : undefined,
+    hasProfileImage: !!profileImageBase64,
+    hasContentImage: !!contentImageBase64,
   });
 
   try {
-    const postData: FriendPostData = {
-      id: post.id,
-      type: post.type,
-      content: post.content,
-      images: post.images,
-      current_user_read: post.currentUserRead,
-      author_username: post.authorUsername,
-    };
-
-    await (WidgetDataModule as WidgetDataModuleInterface).syncFriendPost(
-      postData,
-      authorImageBase64,
-      postImageBase64,
+    await (WidgetDataModule as WidgetDataModuleInterface).syncFriendUpdate(
+      payload,
+      profileImageBase64,
+      contentImageBase64,
     );
     console.log(
-      `[WidgetSync] syncFriendPost native call succeeded (author='${post.authorUsername}')`,
+      `[WidgetSync] syncFriendUpdate native call succeeded (kind='${payload.kind}', user='${payload.friend.username}')`,
     );
   } catch (error) {
-    console.error('[WidgetSync] syncFriendPost native call FAILED:', error);
+    console.error('[WidgetSync] syncFriendUpdate native call FAILED:', error);
   }
 };
 
-export const clearFriendPostFromWidget = async (): Promise<void> => {
+export const clearFriendUpdateFromWidget = async (): Promise<void> => {
   if (!WidgetDataModule) return;
 
   try {
-    await (WidgetDataModule as WidgetDataModuleInterface).clearFriendPost();
+    await (WidgetDataModule as WidgetDataModuleInterface).clearFriendUpdate();
   } catch (error) {
-    console.error('Failed to clear friend post from widget:', error);
+    console.error('Failed to clear friend update from widget:', error);
   }
 };

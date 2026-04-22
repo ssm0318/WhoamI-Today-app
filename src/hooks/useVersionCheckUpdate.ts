@@ -7,7 +7,6 @@ import { syncVersionTypeToWidget } from '../native/WidgetDataModule';
 
 // Constants
 const USER_VERSION_KEY = '@user_version';
-const FOREGROUND_CHECK_MIN_INTERVAL_MS = 5 * 60 * 1000;
 
 /**
  * Hook that automatically handles version check and update
@@ -25,10 +24,6 @@ const useVersionCheckUpdate = (tokens: {
 
   // Ref for tracking check state
   const isChecking = useRef<boolean>(false);
-
-  // Timestamp of last successful foreground check; used to throttle repeated
-  // checks when the user rapidly toggles background/foreground.
-  const lastForegroundCheckAtRef = useRef<number>(0);
 
   // Version check and update logic
   const checkAndUpdateVersion = useCallback(async (): Promise<{
@@ -129,37 +124,19 @@ const useVersionCheckUpdate = (tokens: {
     }
   }, [tokens.access_token, tokens.csrftoken, checkAndUpdateVersion]);
 
-  // Check version each time the app becomes active (throttled)
+  // Check version every time the app becomes active. No throttling — the
+  // isChecking ref inside checkAndUpdateVersion already collapses overlapping
+  // calls, so rapid background/foreground toggles can't stack requests.
   useAppStateActiveEffect(() => {
     if (!tokens.access_token || !tokens.csrftoken) return;
 
-    const now = Date.now();
-    if (
-      now - lastForegroundCheckAtRef.current <
-      FOREGROUND_CHECK_MIN_INTERVAL_MS
-    ) {
-      console.log(
-        '[useVersionCheckUpdate] Skip foreground check - within throttle window',
-      );
-      return;
-    }
-
     console.log('[useVersionCheckUpdate] Checking version on app activation');
-    (async () => {
-      try {
-        const result = await checkAndUpdateVersion();
-        // Only stamp the throttle clock on successful checks so transient
-        // errors don't suppress the next foreground attempt.
-        if (result && !result.error) {
-          lastForegroundCheckAtRef.current = Date.now();
-        }
-      } catch (error) {
-        console.error(
-          '[useVersionCheckUpdate] Error in version check on active:',
-          error,
-        );
-      }
-    })();
+    checkAndUpdateVersion().catch((error) => {
+      console.error(
+        '[useVersionCheckUpdate] Error in version check on active:',
+        error,
+      );
+    });
   });
 
   // Return version change status

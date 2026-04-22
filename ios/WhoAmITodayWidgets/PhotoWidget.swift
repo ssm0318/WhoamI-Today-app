@@ -6,105 +6,155 @@ struct PhotoWidgetEntry: TimelineEntry {
     let date: Date
     let isAuthenticated: Bool
     let isDefaultVersion: Bool
-    let friendPost: FriendPost?
-    let postImageData: Data?
-    let authorImageData: Data?
+    let isVersionQ: Bool
+    let friendUpdate: FriendUpdate?
+    let contentImageData: Data?
+    let profileImageData: Data?
 }
 
 struct PhotoWidgetProvider: TimelineProvider {
-    private func currentEntry() -> PhotoWidgetEntry {
+    private func currentEntry(source: String = "unknown") -> PhotoWidgetEntry {
         let mgr = SharedDataManager.shared
+        let friendUpdate = mgr.friendUpdate
+        let rawData = mgr.rawFriendUpdateBytes
+        let rawString = rawData.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+        let diagnostic = """
+        source=\(source)
+        isAuthenticated=\(mgr.isAuthenticated)
+        isDefaultVersion=\(mgr.isDefaultVersion)
+        isVersionQ=\(mgr.isVersionQ)
+        friendUpdateDecoded=\(friendUpdate != nil)
+        friendUpdateKind=\(friendUpdate?.kind.rawValue ?? "nil")
+        rawJsonLen=\(rawString.count)
+        rawJsonPreview=\(String(rawString.prefix(200)))
+        """
+        let d = UserDefaults(suiteName: "group.com.whoami.today.app")
+        d?.set(diagnostic, forKey: "photo_widget_last_render_diag")
+        d?.set(ISO8601DateFormatter().string(from: Date()), forKey: "photo_widget_last_render_at")
         return PhotoWidgetEntry(
             date: Date(),
             isAuthenticated: mgr.isAuthenticated,
             isDefaultVersion: mgr.isDefaultVersion,
-            friendPost: mgr.friendPost,
-            postImageData: mgr.cachedFriendPostImage,
-            authorImageData: mgr.cachedFriendPostAuthorImage
+            isVersionQ: mgr.isVersionQ,
+            friendUpdate: friendUpdate,
+            contentImageData: mgr.cachedFriendUpdateContentImage,
+            profileImageData: mgr.cachedFriendUpdateProfileImage
         )
     }
 
     func placeholder(in context: Context) -> PhotoWidgetEntry {
-        currentEntry()
+        currentEntry(source: "placeholder")
     }
 
     func getSnapshot(in context: Context, completion: @escaping (PhotoWidgetEntry) -> Void) {
-        completion(currentEntry())
+        completion(currentEntry(source: "snapshot"))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<PhotoWidgetEntry>) -> Void) {
-        let mgr = SharedDataManager.shared
-        let isAuth = mgr.isAuthenticated
-        let isDefault = mgr.isDefaultVersion
-        let friendPost = mgr.friendPost
-        let postImageData = mgr.cachedFriendPostImage
-        let authorImageData = mgr.cachedFriendPostAuthorImage
-
-        let entry = PhotoWidgetEntry(
-            date: Date(),
-            isAuthenticated: isAuth,
-            isDefaultVersion: isDefault,
-            friendPost: friendPost,
-            postImageData: postImageData,
-            authorImageData: authorImageData
-        )
-
+        let entry = currentEntry(source: "timeline")
         let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: Date())!
         let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
         completion(timeline)
 
-        // Fire-and-forget: self-fetch from API when no cached data
-        if isAuth && !isDefault && friendPost == nil {
+        if entry.isAuthenticated && !entry.isDefaultVersion && !entry.isVersionQ && entry.friendUpdate == nil {
             Task.detached {
-                await Self.fetchFriendPostFromApi()
+                await Self.fetchFriendUpdateFromApi()
             }
         }
     }
 
-    /// Fetch friend post from API, save to App Group, then reload timeline.
-    /// Matches Android PhotoWidgetProvider.fetchFriendPostFromApi logic.
-    private static func fetchFriendPostFromApi() async {
+    /// Fetch friend update from API, save to App Group, then reload timeline.
+    /// Mirrors Android PhotoWidgetProvider.fetchFriendUpdateFromApi.
+    private static func fetchFriendUpdateFromApi() async {
         guard let json = await WidgetAPIHelper.fetchJSON(endpoint: "user/friends/?type=all") else { return }
         guard let results = json["results"] as? [[String: Any]] else { return }
 
-        // Filter friends with unread posts
-        let friendsWithPosts = results.filter { friend in
-            let unreadCount = friend["unread_post_cnt"] as? Int ?? 0
-            let hasPost = friend["latest_unread_post"] != nil && !(friend["latest_unread_post"] is NSNull)
-            return unreadCount > 0 && hasPost
+        let candidates: [[String: Any]] = results.filter { friend in
+            let hasPost = (friend["unread_post_cnt"] as? Int ?? 0) > 0
+                || !(friend["latest_unread_post"] is NSNull || friend["latest_unread_post"] == nil)
+            let currentUserRead = friend["current_user_read"] as? Bool ?? true
+            let lastUpdatedField = friend["last_updated_field"] as? String
+            let hasCheckin = !currentUserRead && (lastUpdatedField != nil)
+            return hasPost || hasCheckin
         }
 
-        guard !friendsWithPosts.isEmpty else { return }
-
-        // Pick random friend
-        let picked = friendsWithPosts[Int.random(in: 0..<friendsWithPosts.count)]
-        guard let post = picked["latest_unread_post"] as? [String: Any] else { return }
-        let authorUsername = picked["username"] as? String ?? ""
+        guard !candidates.isEmpty, let picked = candidates.randomElement() else { return }
+        let username = picked["username"] as? String ?? ""
         let profileImageUrl = picked["profile_image"] as? String ?? ""
 
-        // Build friend_post JSON
-        let friendPostDict: [String: Any] = [
-            "id": post["id"] as? Int ?? 0,
-            "type": post["type"] as? String ?? "",
-            "content": post["content"] as? String ?? "",
-            "images": post["images"] as? [String] ?? [],
-            "current_user_read": false,
-            "author_username": authorUsername
-        ]
+        let preferPost = (picked["unread_post_cnt"] as? Int ?? 0) > 0
+            || !(picked["latest_unread_post"] is NSNull || picked["latest_unread_post"] == nil)
 
-        WidgetAPIHelper.storeJSON(friendPostDict, forKey: "friend_post")
+        var payload: [String: Any] = ["friend": ["username": username]]
+        var contentImageUrl: URL? = nil
 
-        // Download images
-        if !profileImageUrl.isEmpty, let url = URL(string: profileImageUrl),
-           let data = await WidgetAPIHelper.downloadImageData(from: url) {
-            WidgetAPIHelper.storeData(data, forKey: "widget_friend_post_author_image")
+        if preferPost, let post = picked["latest_unread_post"] as? [String: Any] {
+            let images = post["images"] as? [String] ?? []
+            let hasImage = !images.isEmpty
+            payload["kind"] = "post"
+            payload["post"] = [
+                "id": post["id"] as? Int ?? 0,
+                "content": post["content"] as? String ?? "",
+                "has_image": hasImage
+            ]
+            if hasImage, let first = images.first, let url = URL(string: first) {
+                contentImageUrl = url
+            }
+        } else if let field = picked["last_updated_field"] as? String {
+            var checkin: [String: Any] = [:]
+            var ok = false
+            switch field {
+            case "mood":
+                if let arr = picked["mood"] as? [String], let m = arr.randomElement(), !m.isEmpty {
+                    checkin["variation"] = "mood"
+                    checkin["mood"] = m
+                    ok = true
+                } else if let m = picked["mood"] as? String, !m.isEmpty {
+                    checkin["variation"] = "mood"
+                    checkin["mood"] = m
+                    ok = true
+                }
+            case "social_battery":
+                if let b = picked["social_battery"] as? String, !b.isEmpty {
+                    checkin["variation"] = "social_battery"
+                    checkin["social_battery"] = b
+                    ok = true
+                }
+            case "thought":
+                if let t = picked["thought"] as? String, !t.isEmpty {
+                    checkin["variation"] = "thought"
+                    checkin["description"] = t
+                    ok = true
+                }
+            case "song":
+                if let trackId = picked["track_id"] as? String, !trackId.isEmpty {
+                    checkin["variation"] = "album"
+                    checkin["track_id"] = trackId
+                    ok = true
+                    if let albumUrl = await WidgetAPIHelper.fetchSpotifyAlbumImageUrl(trackId: trackId) {
+                        contentImageUrl = albumUrl
+                    }
+                }
+            default:
+                break
+            }
+            guard ok else { return }
+            payload["kind"] = "checkin"
+            payload["checkin"] = checkin
+        } else {
+            return
         }
 
-        let images = post["images"] as? [String] ?? []
-        if let firstImageUrl = images.first, !firstImageUrl.isEmpty,
-           let url = URL(string: firstImageUrl),
+        WidgetAPIHelper.storeJSON(payload, forKey: "friend_update")
+
+        if !profileImageUrl.isEmpty, let url = URL(string: profileImageUrl),
            let data = await WidgetAPIHelper.downloadImageData(from: url) {
-            WidgetAPIHelper.storeData(data, forKey: "widget_friend_post_image")
+            WidgetAPIHelper.storeData(data, forKey: "widget_friend_update_profile_image")
+        }
+
+        if let url = contentImageUrl,
+           let data = await WidgetAPIHelper.downloadImageData(from: url) {
+            WidgetAPIHelper.storeData(data, forKey: "widget_friend_update_content_image")
         }
 
         WidgetCenter.shared.reloadTimelines(ofKind: "PhotoWidget")
@@ -117,9 +167,11 @@ struct PhotoWidgetView: View {
     var body: some View {
         Group {
             if !entry.isAuthenticated {
-                SignInView(descriptionText: "Sign in to see the latest updates from your friends")
+                SignInView(widgetKind: "PhotoWidget", descriptionText: "Sign in to see the latest updates from your friends")
             } else if entry.isDefaultVersion {
                 DefaultVersionView()
+            } else if entry.isVersionQ {
+                Color.clear
             } else {
                 photoContent
             }
@@ -128,61 +180,127 @@ struct PhotoWidgetView: View {
 
     @ViewBuilder
     var photoContent: some View {
-        Link(destination: URL(string: "whoami://app/friends/feed")!) {
+        Link(destination: URL(string: "whoami://app/friends")!) {
             ZStack(alignment: .topTrailing) {
-                // Post content (image, text, or empty state)
-                if let imageData = entry.postImageData, let uiImage = UIImage(data: imageData) {
-                    // Image post
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
-                } else if let post = entry.friendPost {
-                    let trimmedContent = post.content.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !trimmedContent.isEmpty {
-                        // Text post
-                        VStack {
-                            Spacer()
-                            Text(trimmedContent)
-                                .font(.system(size: 11))
-                                .foregroundColor(Color(white: 0.2))
-                                .lineLimit(5)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 10)
-                            Spacer()
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color.white)
-                    } else {
-                        emptyState
-                    }
-                } else {
-                    emptyState
-                }
-
-                // Author avatar overlay (top-trailing)
-                authorAvatar
+                contentView
+                profileAvatar
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder
-    var authorAvatar: some View {
-        if let avatarData = entry.authorImageData, let avatarImage = UIImage(data: avatarData) {
+    var contentView: some View {
+        if let update = entry.friendUpdate {
+            switch update.kind {
+            case .post:
+                postContent(update.post)
+            case .checkin:
+                checkinContent(update.checkin)
+            }
+        } else {
+            emptyState
+        }
+    }
+
+    @ViewBuilder
+    private func postContent(_ post: FriendUpdate.Post?) -> some View {
+        if let post = post, post.hasImage,
+           let imageData = entry.contentImageData,
+           let uiImage = UIImage(data: imageData) {
+            Image(uiImage: uiImage)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+        } else if let post = post {
+            let trimmed = post.content.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                textContent(trimmed)
+            } else {
+                emptyState
+            }
+        } else {
+            emptyState
+        }
+    }
+
+    @ViewBuilder
+    private func checkinContent(_ checkin: FriendUpdate.Checkin?) -> some View {
+        if let checkin = checkin {
+            switch checkin.variation {
+            case .album:
+                if let imageData = entry.contentImageData, let uiImage = UIImage(data: imageData) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
+                } else {
+                    emojiCenter("🎵")
+                }
+            case .mood:
+                emojiCenter(checkin.mood ?? "")
+            case .socialBattery:
+                emojiCenter(batteryEmoji(checkin.socialBattery ?? ""))
+            case .thought:
+                textContent((checkin.description ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+        } else {
+            emptyState
+        }
+    }
+
+    private func textContent(_ text: String) -> some View {
+        VStack {
+            Spacer()
+            Text(text)
+                .font(.system(size: 11))
+                .foregroundColor(Color(white: 0.2))
+                .lineLimit(4)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 10)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.white)
+    }
+
+    private func emojiCenter(_ emoji: String) -> some View {
+        ZStack {
+            Color.white
+            Text(emoji).font(.system(size: 48))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func batteryEmoji(_ battery: String) -> String {
+        switch battery.lowercased() {
+        case "super_social": return "🤩"
+        case "fully_charged": return "🚀"
+        case "moderately_social": return "🔋"
+        case "needs_recharge": return "🔌"
+        case "low": return "🪫"
+        case "completely_drained": return "💤"
+        default: return battery
+        }
+    }
+
+    @ViewBuilder
+    var profileAvatar: some View {
+        if let avatarData = entry.profileImageData, let avatarImage = UIImage(data: avatarData) {
             Image(uiImage: avatarImage)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
-                .frame(width: 24, height: 24)
+                .frame(width: 32, height: 32)
                 .clipShape(Circle())
                 .overlay(Circle().stroke(Color.white, lineWidth: 2))
                 .padding(6)
-        } else if let post = entry.friendPost, let firstChar = post.authorUsername.first {
+        } else if let update = entry.friendUpdate, let firstChar = update.friend.username.first {
             Text(String(firstChar).uppercased())
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(.white)
-                .frame(width: 24, height: 24)
+                .frame(width: 32, height: 32)
                 .background(Circle().fill(Color.purple))
                 .overlay(Circle().stroke(Color.white, lineWidth: 2))
                 .padding(6)
@@ -214,8 +332,8 @@ struct PhotoWidget: Widget {
                     .background(Color.white)
             }
         }
-        .configurationDisplayName("WhoAmI Friend Post")
-        .description("See the latest updates from your friends.")
+        .configurationDisplayName("Friend Update Widget")
+        .description("See the latest post or check-in from your friends.")
         .supportedFamilies([.systemSmall])
         .contentMarginsDisabledIfAvailable()
     }

@@ -38,9 +38,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class PhotoWidgetProvider extends AppWidgetProvider {
-    private static final String TAG = "FriendPostWidget";
+    private static final String TAG = "FriendUpdateWidget";
     private static final String PREFS_NAME = "WhoAmIWidgetPrefs";
     private static final String VERSION_TYPE_DEFAULT = "default";
+    private static final String VERSION_TYPE_Q = "version_q";
     private static final ExecutorService executor = Executors.newSingleThreadExecutor();
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -52,7 +53,7 @@ public class PhotoWidgetProvider extends AppWidgetProvider {
             } catch (Exception e) {
                 Log.e(TAG, "Failed to update widget " + appWidgetId, e);
                 try {
-                    RemoteViews fallback = new RemoteViews(context.getPackageName(), R.layout.widget_signin);
+                    RemoteViews fallback = new RemoteViews(context.getPackageName(), R.layout.widget_signin_vertical);
                     Intent loginIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("whoami://app/login"));
                     PendingIntent pendingIntent = PendingIntent.getActivity(
                         context, 0, loginIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
@@ -72,11 +73,9 @@ public class PhotoWidgetProvider extends AppWidgetProvider {
         String action = intent.getAction();
         Log.d(TAG, "[onReceive] Received broadcast: " + action);
         if ("com.whoami.today.app.WIDGET_UPDATE".equals(action)) {
-            Log.d(TAG, "[onReceive] WIDGET_UPDATE broadcast received, triggering widget update");
             AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
             int[] appWidgetIds = appWidgetManager.getAppWidgetIds(
                 new android.content.ComponentName(context, PhotoWidgetProvider.class));
-            Log.d(TAG, "[onReceive] Found " + appWidgetIds.length + " widget(s) to update");
             onUpdate(context, appWidgetManager, appWidgetIds);
         }
     }
@@ -84,192 +83,233 @@ public class PhotoWidgetProvider extends AppWidgetProvider {
     static void updateAppWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId) {
         long startTime = System.currentTimeMillis();
         Log.d(TAG, "[updateAppWidget] START - Widget ID: " + appWidgetId);
-        
+
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String accessToken = prefs.getString("access_token", "");
         String versionType = prefs.getString("user_version_type", VERSION_TYPE_DEFAULT);
         boolean isAuthenticated = accessToken != null && !accessToken.isEmpty();
         boolean isDefaultVersion = VERSION_TYPE_DEFAULT.equals(versionType);
-
-        Log.d(TAG, "[updateAppWidget] Auth state - isAuthenticated: " + isAuthenticated + 
-                   ", versionType: " + versionType);
-
-        RemoteViews views;
+        boolean isVersionQ = VERSION_TYPE_Q.equals(versionType);
 
         if (!isAuthenticated) {
-            views = new RemoteViews(context.getPackageName(), R.layout.widget_signin);
+            RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_signin_vertical);
             Intent loginIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("whoami://app/login"));
             PendingIntent pendingIntent = PendingIntent.getActivity(
                 context, 0, loginIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             views.setOnClickPendingIntent(R.id.signin_button, pendingIntent);
             views.setTextViewText(R.id.signin_description, "Sign in to see the latest updates from your friends");
             appWidgetManager.updateAppWidget(appWidgetId, views);
-            Log.d(TAG, "[updateAppWidget] Showing sign-in view");
             return;
         }
-        
+
         if (isDefaultVersion) {
-            views = new RemoteViews(context.getPackageName(), R.layout.widget_photo_2x2);
-            views.setViewVisibility(R.id.friend_post_image, View.GONE);
-            views.setViewVisibility(R.id.friend_post_text_container, View.GONE);
-            views.setViewVisibility(R.id.friend_post_empty, View.GONE);
-            views.setViewVisibility(R.id.friend_post_author_image, View.GONE);
+            RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_photo_2x2);
+            hideAllContent(views);
             appWidgetManager.updateAppWidget(appWidgetId, views);
-            Log.d(TAG, "[updateAppWidget] Default version - empty widget");
             return;
         }
 
-        // Read friend post data
+        if (isVersionQ) {
+            RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_photo_2x2);
+            hideAllContent(views);
+            views.setOnClickPendingIntent(R.id.widget_friend_post_container, buildAppLauncherPendingIntent(context));
+            appWidgetManager.updateAppWidget(appWidgetId, views);
+            return;
+        }
+
         String widgetDataJson = prefs.getString("widget_data", "{}");
-        String postImageBase64 = prefs.getString("widget_friend_post_image_base64", "");
-        String authorImageBase64 = prefs.getString("widget_friend_post_author_image_base64", "");
-
-        String postContent = null;
-        boolean hasImage = false;
-        boolean hasFriendPost = false;
-
+        JSONObject friendUpdate = null;
         try {
             JSONObject widgetData = new JSONObject(widgetDataJson);
-            if (widgetData.has("friend_post")) {
-                JSONObject friendPost = widgetData.getJSONObject("friend_post");
-                Log.d(TAG, "[updateAppWidget] friend_post object: " + friendPost.toString());
-                hasFriendPost = true;
-
-                postContent = friendPost.optString("content", null);
-
-                if (friendPost.has("images") && !friendPost.isNull("images")) {
-                    JSONArray images = friendPost.getJSONArray("images");
-                    hasImage = images.length() > 0 && !postImageBase64.isEmpty();
-                }
-
-                Log.d(TAG, "[updateAppWidget] Post content length: " + (postContent != null ? postContent.length() : 0) +
-                           ", hasImage: " + hasImage);
-            } else {
-                Log.w(TAG, "[updateAppWidget] No friend_post in widget_data - will try API fetch");
-                fetchFriendPostFromApi(context, appWidgetManager, appWidgetId, prefs);
+            if (widgetData.has("friend_update")) {
+                friendUpdate = widgetData.getJSONObject("friend_update");
             }
         } catch (Exception e) {
-            Log.e(TAG, "[updateAppWidget] Error parsing widget data", e);
+            Log.e(TAG, "[updateAppWidget] Failed to parse widget_data", e);
         }
 
-        views = new RemoteViews(context.getPackageName(), R.layout.widget_photo_2x2);
+        if (friendUpdate == null) {
+            Log.w(TAG, "[updateAppWidget] No friend_update cached — trying API fetch");
+            fetchFriendUpdateFromApi(context, appWidgetManager, appWidgetId, prefs);
+            // Render empty while fetching
+            RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_photo_2x2);
+            hideAllContent(views);
+            views.setViewVisibility(R.id.friend_post_empty, View.VISIBLE);
+            appWidgetManager.updateAppWidget(appWidgetId, views);
+            return;
+        }
+
+        String contentImageBase64 = prefs.getString("widget_friend_update_content_image", "");
+        String profileImageBase64 = prefs.getString("widget_friend_update_profile_image", "");
+
+        renderFriendUpdate(context, appWidgetManager, appWidgetId, friendUpdate,
+                contentImageBase64, profileImageBase64, startTime);
+    }
+
+    private static void hideAllContent(RemoteViews views) {
+        views.setViewVisibility(R.id.friend_post_image, View.GONE);
+        views.setViewVisibility(R.id.friend_post_text_container, View.GONE);
+        views.setViewVisibility(R.id.friend_post_empty, View.GONE);
+        views.setViewVisibility(R.id.friend_post_author_image, View.GONE);
+        views.setViewVisibility(R.id.checkin_single_emoji, View.GONE);
+    }
+
+    /** Build a PendingIntent that launches the app with no deep link (for version_q). */
+    private static PendingIntent buildAppLauncherPendingIntent(Context context) {
+        Intent launcher = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+        if (launcher == null) {
+            launcher = new Intent(context, MainActivity.class);
+            launcher.setAction(Intent.ACTION_MAIN);
+            launcher.addCategory(Intent.CATEGORY_LAUNCHER);
+        }
+        launcher.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        return PendingIntent.getActivity(
+            context,
+            0,
+            launcher,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    private static void renderFriendUpdate(Context context, AppWidgetManager appWidgetManager,
+            int appWidgetId, JSONObject friendUpdate, String contentImageBase64,
+            String profileImageBase64, long startTime) {
+        String kind = friendUpdate.optString("kind", "");
         Intent feedIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("whoami://app/friends/feed"));
         PendingIntent pendingIntent = PendingIntent.getActivity(
             context, 0, feedIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        views.setOnClickPendingIntent(R.id.widget_friend_post_container, pendingIntent);
 
-        // Show empty state if no post data, or post has neither content nor image
-        boolean hasContent = postContent != null && !postContent.trim().isEmpty();
-        if (!hasFriendPost || (!hasContent && !hasImage)) {
-            views.setViewVisibility(R.id.friend_post_image, View.GONE);
-            views.setViewVisibility(R.id.friend_post_text_container, View.GONE);
-            views.setViewVisibility(R.id.friend_post_empty, View.VISIBLE);
-            views.setViewVisibility(R.id.friend_post_author_image, View.GONE);
-            appWidgetManager.updateAppWidget(appWidgetId, views);
-            Log.d(TAG, "[updateAppWidget] No post content/image - showing empty state");
-            return;
-        }
+        // Decode images off the main thread
+        final String finalContentImageBase64 = contentImageBase64 != null ? contentImageBase64 : "";
+        final String finalProfileImageBase64 = profileImageBase64 != null ? profileImageBase64 : "";
+        final JSONObject finalFriendUpdate = friendUpdate;
+        final String finalKind = kind;
 
-        final String finalContent = postContent;
-        final String finalPostImageBase64 = postImageBase64;
-        final String finalAuthorImageBase64 = authorImageBase64;
-        final boolean finalHasImage = hasImage;
-        
         executor.execute(() -> {
-            Bitmap postImageBitmap = null;
-            Bitmap authorImageBitmap = null;
-            
-            if (finalHasImage && !finalPostImageBase64.isEmpty()) {
+            Bitmap contentBitmap = null;
+            if (!finalContentImageBase64.isEmpty()) {
                 try {
-                    byte[] decodedBytes = Base64.decode(finalPostImageBase64, Base64.DEFAULT);
-                    Bitmap raw = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
+                    byte[] bytes = Base64.decode(finalContentImageBase64, Base64.DEFAULT);
+                    Bitmap raw = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
                     if (raw != null) {
-                        // Crop to square (center crop) + rounded corners
                         int w = raw.getWidth();
                         int h = raw.getHeight();
                         int side = Math.min(w, h);
                         int x = (w - side) / 2;
                         int y = (h - side) / 2;
                         Bitmap square = Bitmap.createBitmap(raw, x, y, side, side);
-                        postImageBitmap = getRoundedCornerBitmap(square, 32);
+                        contentBitmap = getRoundedCornerBitmap(square, 32);
                     }
-                    Log.d(TAG, "[updateAppWidget] Post image decoded + cropped to square: " + (postImageBitmap != null));
                 } catch (Exception e) {
-                    Log.e(TAG, "[updateAppWidget] Failed to decode post image", e);
-                }
-            }
-            
-            if (!finalAuthorImageBase64.isEmpty()) {
-                try {
-                    byte[] decodedBytes = Base64.decode(finalAuthorImageBase64, Base64.DEFAULT);
-                    Bitmap rawAvatar = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
-                    if (rawAvatar != null) {
-                        authorImageBitmap = getCircularBitmap(rawAvatar);
-                    }
-                    Log.d(TAG, "[updateAppWidget] Author image decoded: " + (authorImageBitmap != null));
-                } catch (Exception e) {
-                    Log.e(TAG, "[updateAppWidget] Failed to decode author image", e);
+                    Log.e(TAG, "[renderFriendUpdate] content image decode failed", e);
                 }
             }
 
-            final Bitmap finalPostImage = postImageBitmap;
-            final Bitmap finalAuthorImage = authorImageBitmap;
-            
+            Bitmap profileBitmap = null;
+            if (!finalProfileImageBase64.isEmpty()) {
+                try {
+                    byte[] bytes = Base64.decode(finalProfileImageBase64, Base64.DEFAULT);
+                    Bitmap raw = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                    if (raw != null) {
+                        profileBitmap = getCircularBitmap(raw);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "[renderFriendUpdate] profile image decode failed", e);
+                }
+            }
+
+            final Bitmap finalContentBitmap = contentBitmap;
+            final Bitmap finalProfileBitmap = profileBitmap;
+
             mainHandler.post(() -> {
-                RemoteViews updatedViews = new RemoteViews(context.getPackageName(), R.layout.widget_photo_2x2);
-                updatedViews.setOnClickPendingIntent(R.id.widget_friend_post_container, pendingIntent);
-                
-                if (finalPostImage != null) {
-                    // Show image — make container transparent so only the rounded image is visible
-                    updatedViews.setInt(R.id.widget_friend_post_container, "setBackgroundResource", 0);
-                    updatedViews.setImageViewBitmap(R.id.friend_post_image, finalPostImage);
-                    updatedViews.setViewVisibility(R.id.friend_post_image, View.VISIBLE);
-                    updatedViews.setViewVisibility(R.id.friend_post_text_container, View.GONE);
-                    updatedViews.setViewVisibility(R.id.friend_post_empty, View.GONE);
+                RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_photo_2x2);
+                views.setOnClickPendingIntent(R.id.widget_friend_post_container, pendingIntent);
+                hideAllContent(views);
+
+                if ("post".equals(finalKind)) {
+                    JSONObject post = finalFriendUpdate.optJSONObject("post");
+                    boolean hasImage = post != null && post.optBoolean("has_image", false) && finalContentBitmap != null;
+                    if (hasImage) {
+                        views.setInt(R.id.widget_friend_post_container, "setBackgroundResource", 0);
+                        views.setImageViewBitmap(R.id.friend_post_image, finalContentBitmap);
+                        views.setViewVisibility(R.id.friend_post_image, View.VISIBLE);
+                    } else {
+                        String content = post != null ? post.optString("content", "") : "";
+                        views.setTextViewText(R.id.friend_post_content, content);
+                        views.setViewVisibility(R.id.friend_post_text_container, View.VISIBLE);
+                    }
+                } else if ("checkin".equals(finalKind)) {
+                    JSONObject checkin = finalFriendUpdate.optJSONObject("checkin");
+                    String variation = checkin != null ? checkin.optString("variation", "") : "";
+                    switch (variation) {
+                        case "album":
+                            if (finalContentBitmap != null) {
+                                views.setInt(R.id.widget_friend_post_container, "setBackgroundResource", 0);
+                                views.setImageViewBitmap(R.id.friend_post_image, finalContentBitmap);
+                                views.setViewVisibility(R.id.friend_post_image, View.VISIBLE);
+                            } else {
+                                // No album art → show music emoji
+                                views.setTextViewText(R.id.checkin_single_emoji, "\uD83C\uDFB5");
+                                views.setViewVisibility(R.id.checkin_single_emoji, View.VISIBLE);
+                            }
+                            break;
+                        case "mood": {
+                            String mood = checkin.optString("mood", "");
+                            views.setTextViewText(R.id.checkin_single_emoji, mood);
+                            views.setViewVisibility(R.id.checkin_single_emoji, View.VISIBLE);
+                            break;
+                        }
+                        case "social_battery": {
+                            String battery = checkin.optString("social_battery", "");
+                            views.setTextViewText(R.id.checkin_single_emoji, getBatteryEmoji(battery));
+                            views.setViewVisibility(R.id.checkin_single_emoji, View.VISIBLE);
+                            break;
+                        }
+                        case "thought": {
+                            String description = checkin.optString("description", "");
+                            views.setTextViewText(R.id.friend_post_content, description);
+                            views.setViewVisibility(R.id.friend_post_text_container, View.VISIBLE);
+                            break;
+                        }
+                        default:
+                            views.setViewVisibility(R.id.friend_post_empty, View.VISIBLE);
+                            break;
+                    }
                 } else {
-                    // Show text
-                    updatedViews.setTextViewText(R.id.friend_post_content, finalContent);
-                    updatedViews.setViewVisibility(R.id.friend_post_image, View.GONE);
-                    updatedViews.setViewVisibility(R.id.friend_post_text_container, View.VISIBLE);
-                    updatedViews.setViewVisibility(R.id.friend_post_empty, View.GONE);
+                    views.setViewVisibility(R.id.friend_post_empty, View.VISIBLE);
                 }
-                
-                if (finalAuthorImage != null) {
-                    updatedViews.setImageViewBitmap(R.id.friend_post_author_image, finalAuthorImage);
+
+                if (finalProfileBitmap != null) {
+                    views.setImageViewBitmap(R.id.friend_post_author_image, finalProfileBitmap);
                 } else {
-                    // Fallback to default profile icon
-                    updatedViews.setImageViewResource(R.id.friend_post_author_image, R.drawable.ic_default_profile);
+                    views.setImageViewBitmap(
+                            R.id.friend_post_author_image,
+                            getCircularBitmap(BitmapFactory.decodeResource(context.getResources(), R.drawable.ic_default_profile))
+                    );
                 }
-                updatedViews.setViewVisibility(R.id.friend_post_author_image, View.VISIBLE);
-                
-                appWidgetManager.updateAppWidget(appWidgetId, updatedViews);
-                
+                views.setViewVisibility(R.id.friend_post_author_image, View.VISIBLE);
+
+                appWidgetManager.updateAppWidget(appWidgetId, views);
                 long elapsed = System.currentTimeMillis() - startTime;
-                Log.d(TAG, "[updateAppWidget] COMPLETE - Elapsed: " + elapsed + "ms");
+                Log.d(TAG, "[renderFriendUpdate] COMPLETE kind=" + finalKind + " elapsed=" + elapsed + "ms");
             });
         });
     }
 
-    /**
-     * When widget has no friend post data, fetch from /user/friends/ API.
-     * Picks a random friend with unread posts and saves their latest post.
-     */
-    private static void fetchFriendPostFromApi(Context context, AppWidgetManager appWidgetManager,
+    /** When widget has no cached friend_update, fetch from /user/friends/. */
+    private static void fetchFriendUpdateFromApi(Context context, AppWidgetManager appWidgetManager,
             int appWidgetId, SharedPreferences prefs) {
         String apiBaseUrl = prefs.getString("api_base_url", "https://whoami-test-group.gina-park.site/api/");
         String accessToken = prefs.getString("access_token", "");
         String csrftoken = prefs.getString("csrftoken", "");
 
         if (apiBaseUrl.isEmpty() || accessToken.isEmpty()) {
-            Log.w(TAG, "[fetchFriendPost] Missing api_base_url or access_token, skipping");
+            Log.w(TAG, "[fetchFriendUpdate] Missing api_base_url or access_token, skipping");
             return;
         }
 
         executor.execute(() -> {
             try {
                 String endpoint = apiBaseUrl + "user/friends/?type=all";
-                Log.d(TAG, "[fetchFriendPost] Fetching: " + endpoint);
-
                 URL url = new URL(endpoint);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
@@ -281,7 +321,7 @@ public class PhotoWidgetProvider extends AppWidgetProvider {
                 conn.connect();
 
                 if (conn.getResponseCode() != 200) {
-                    Log.w(TAG, "[fetchFriendPost] API returned " + conn.getResponseCode());
+                    Log.w(TAG, "[fetchFriendUpdate] API returned " + conn.getResponseCode());
                     return;
                 }
 
@@ -295,84 +335,186 @@ public class PhotoWidgetProvider extends AppWidgetProvider {
                 JSONObject response = new JSONObject(sb.toString());
                 JSONArray results = response.optJSONArray("results");
                 if (results == null || results.length() == 0) {
-                    Log.w(TAG, "[fetchFriendPost] No friends in response");
+                    Log.w(TAG, "[fetchFriendUpdate] No friends in response");
                     return;
                 }
 
-                // Filter friends with unread posts
-                java.util.List<JSONObject> friendsWithPosts = new java.util.ArrayList<>();
+                // Collect candidates (post OR checkin update)
+                java.util.List<JSONObject> candidates = new java.util.ArrayList<>();
                 for (int i = 0; i < results.length(); i++) {
                     JSONObject friend = results.getJSONObject(i);
-                    if (friend.optInt("unread_post_cnt", 0) > 0
-                            && friend.has("latest_unread_post") && !friend.isNull("latest_unread_post")) {
-                        friendsWithPosts.add(friend);
+                    boolean hasPost = friend.optInt("unread_post_cnt", 0) > 0
+                            || (friend.has("latest_unread_post") && !friend.isNull("latest_unread_post"));
+                    boolean hasCheckin = !friend.optBoolean("current_user_read", true)
+                            && friend.has("last_updated_field") && !friend.isNull("last_updated_field");
+                    if (hasPost || hasCheckin) {
+                        candidates.add(friend);
                     }
                 }
 
-                if (friendsWithPosts.isEmpty()) {
-                    Log.d(TAG, "[fetchFriendPost] No friends with unread posts");
+                if (candidates.isEmpty()) {
+                    Log.d(TAG, "[fetchFriendUpdate] No candidate friends");
                     return;
                 }
 
-                // Pick random friend
-                int idx = (int) (Math.random() * friendsWithPosts.size());
-                JSONObject pickedFriend = friendsWithPosts.get(idx);
-                JSONObject post = pickedFriend.getJSONObject("latest_unread_post");
-                String authorUsername = pickedFriend.optString("username", "");
-                String profileImageUrl = pickedFriend.optString("profile_image", "");
+                JSONObject picked = candidates.get((int) (Math.random() * candidates.size()));
+                String username = picked.optString("username", "");
+                String profileImageUrl = picked.optString("profile_image", "");
 
-                Log.d(TAG, "[fetchFriendPost] Picked friend: " + authorUsername +
-                        ", postId: " + post.optInt("id"));
+                boolean preferPost = picked.optInt("unread_post_cnt", 0) > 0
+                        || (picked.has("latest_unread_post") && !picked.isNull("latest_unread_post"));
 
-                // Build friend_post JSON
-                JSONObject friendPost = new JSONObject();
-                friendPost.put("id", post.optInt("id"));
-                friendPost.put("type", post.optString("type", ""));
-                friendPost.put("content", post.optString("content", ""));
-                friendPost.put("images", post.optJSONArray("images") != null
-                        ? post.getJSONArray("images") : new JSONArray());
-                friendPost.put("current_user_read", false);
-                friendPost.put("author_username", authorUsername);
+                JSONObject friendUpdate = new JSONObject();
+                JSONObject friendJson = new JSONObject();
+                friendJson.put("username", username);
+                friendUpdate.put("friend", friendJson);
 
-                // Download images
-                String authorBase64 = "";
-                String postImageBase64 = "";
+                String contentImageBase64 = "";
 
-                if (!profileImageUrl.isEmpty()) {
-                    authorBase64 = downloadAsBase64(profileImageUrl);
-                }
+                if (preferPost && picked.has("latest_unread_post") && !picked.isNull("latest_unread_post")) {
+                    JSONObject post = picked.getJSONObject("latest_unread_post");
+                    JSONArray images = post.optJSONArray("images");
+                    boolean hasImage = images != null && images.length() > 0;
 
-                JSONArray images = friendPost.optJSONArray("images");
-                if (images != null && images.length() > 0) {
-                    String firstImageUrl = images.optString(0, "");
-                    if (!firstImageUrl.isEmpty()) {
-                        postImageBase64 = downloadAsBase64(firstImageUrl);
+                    JSONObject postJson = new JSONObject();
+                    postJson.put("id", post.optInt("id"));
+                    postJson.put("content", post.optString("content", ""));
+                    postJson.put("has_image", hasImage);
+                    friendUpdate.put("kind", "post");
+                    friendUpdate.put("post", postJson);
+
+                    if (hasImage) {
+                        String firstImageUrl = images.optString(0, "");
+                        if (!firstImageUrl.isEmpty()) {
+                            contentImageBase64 = downloadAsBase64(firstImageUrl);
+                        }
                     }
+                } else {
+                    String field = picked.optString("last_updated_field", "");
+                    JSONObject checkinJson = new JSONObject();
+                    boolean ok = false;
+                    if ("mood".equals(field)) {
+                        Object moodObj = picked.opt("mood");
+                        String mood = "";
+                        if (moodObj instanceof JSONArray) {
+                            JSONArray arr = (JSONArray) moodObj;
+                            if (arr.length() > 0) {
+                                int idx = (int) (Math.random() * arr.length());
+                                mood = arr.optString(idx, "");
+                            }
+                        } else if (moodObj != null) {
+                            mood = moodObj.toString();
+                        }
+                        if (!mood.isEmpty()) {
+                            checkinJson.put("variation", "mood");
+                            checkinJson.put("mood", mood);
+                            ok = true;
+                        }
+                    } else if ("social_battery".equals(field)) {
+                        String battery = picked.optString("social_battery", "");
+                        if (!battery.isEmpty() && !"null".equals(battery)) {
+                            checkinJson.put("variation", "social_battery");
+                            checkinJson.put("social_battery", battery);
+                            ok = true;
+                        }
+                    } else if ("thought".equals(field)) {
+                        String thought = picked.optString("thought", "");
+                        if (!thought.isEmpty() && !"null".equals(thought)) {
+                            checkinJson.put("variation", "thought");
+                            checkinJson.put("description", thought);
+                            ok = true;
+                        }
+                    } else if ("song".equals(field)) {
+                        String trackId = picked.optString("track_id", "");
+                        if (!trackId.isEmpty() && !"null".equals(trackId)) {
+                            checkinJson.put("variation", "album");
+                            checkinJson.put("track_id", trackId);
+                            String albumUrl = fetchAlbumImageUrl(trackId);
+                            if (albumUrl != null && !albumUrl.isEmpty()) {
+                                contentImageBase64 = downloadAsBase64(albumUrl);
+                            }
+                            ok = true;
+                        }
+                    }
+                    if (!ok) {
+                        Log.w(TAG, "[fetchFriendUpdate] Checkin variation had no value, skipping");
+                        return;
+                    }
+                    friendUpdate.put("kind", "checkin");
+                    friendUpdate.put("checkin", checkinJson);
                 }
 
-                // Save to SharedPreferences
+                String profileImageBase64 = "";
+                if (!profileImageUrl.isEmpty()) {
+                    profileImageBase64 = downloadAsBase64(profileImageUrl);
+                }
+
                 String existingJson = prefs.getString("widget_data", "{}");
                 JSONObject root = new JSONObject(existingJson);
-                root.put("friend_post", friendPost);
+                root.put("friend_update", friendUpdate);
+                root.remove("friend_post");
 
                 SharedPreferences.Editor editor = prefs.edit();
                 editor.putString("widget_data", root.toString());
-                if (!authorBase64.isEmpty()) {
-                    editor.putString("widget_friend_post_author_image_base64", authorBase64);
+                if (!contentImageBase64.isEmpty()) {
+                    editor.putString("widget_friend_update_content_image", contentImageBase64);
+                } else {
+                    editor.remove("widget_friend_update_content_image");
                 }
-                if (!postImageBase64.isEmpty()) {
-                    editor.putString("widget_friend_post_image_base64", postImageBase64);
+                if (!profileImageBase64.isEmpty()) {
+                    editor.putString("widget_friend_update_profile_image", profileImageBase64);
+                } else {
+                    editor.remove("widget_friend_update_profile_image");
                 }
                 editor.commit();
 
-                Log.d(TAG, "[fetchFriendPost] Saved friend post from API, author=" + authorUsername);
+                Log.d(TAG, "[fetchFriendUpdate] Saved " + friendUpdate.optString("kind") + " for " + username);
 
                 mainHandler.post(() -> updateAppWidget(context, appWidgetManager, appWidgetId));
 
             } catch (Exception e) {
-                Log.e(TAG, "[fetchFriendPost] Failed", e);
+                Log.e(TAG, "[fetchFriendUpdate] Failed", e);
             }
         });
+    }
+
+    /** Fetch album image URL from Spotify oEmbed. */
+    private static String fetchAlbumImageUrl(String trackId) {
+        try {
+            String trackUrl = "https://open.spotify.com/track/" + Uri.encode(trackId);
+            URL url = new URL("https://open.spotify.com/oembed?url=" + Uri.encode(trackUrl));
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+            conn.connect();
+            if (conn.getResponseCode() != 200) return null;
+            StringBuilder sb = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) sb.append(line);
+            }
+            JSONObject json = new JSONObject(sb.toString());
+            return json.optString("thumbnail_url", null);
+        } catch (Exception e) {
+            Log.w(TAG, "[fetchAlbumImageUrl] Failed for " + trackId, e);
+            return null;
+        }
+    }
+
+    /** social_battery enum string → emoji. */
+    private static String getBatteryEmoji(String battery) {
+        if (battery == null || battery.isEmpty()) return "";
+        switch (battery.toLowerCase()) {
+            case "super_social": return "\uD83E\uDD29";
+            case "fully_charged": return "\uD83D\uDE80";
+            case "moderately_social": return "\uD83D\uDD0B";
+            case "needs_recharge": return "\uD83D\uDD0C";
+            case "low": return "\uD83E\uDEAB";
+            case "completely_drained": return "\uD83D\uDCA4";
+            default: return battery;
+        }
     }
 
     /** Download an image URL and return as base64. */
@@ -414,19 +556,27 @@ public class PhotoWidgetProvider extends AppWidgetProvider {
     }
 
     private static Bitmap getCircularBitmap(Bitmap bitmap) {
+        if (bitmap == null) return null;
         int size = Math.min(bitmap.getWidth(), bitmap.getHeight());
         Bitmap output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(output);
 
-        final Paint paint = new Paint();
+        final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         final Rect rect = new Rect(0, 0, size, size);
 
-        paint.setAntiAlias(true);
         canvas.drawARGB(0, 0, 0, 0);
         canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint);
 
         paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
         canvas.drawBitmap(bitmap, null, rect, paint);
+        paint.setXfermode(null);
+
+        Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        borderPaint.setStyle(Paint.Style.STROKE);
+        borderPaint.setColor(0xFFFFFFFF);
+        borderPaint.setStrokeWidth(Math.max(2f, size * 0.08f));
+        float radius = (size / 2f) - (borderPaint.getStrokeWidth() / 2f);
+        canvas.drawCircle(size / 2f, size / 2f, radius, borderPaint);
 
         return output;
     }

@@ -40,6 +40,7 @@ public class AlbumCoverWidgetProvider extends AppWidgetProvider {
     private static final String TAG = "AlbumCoverWidget";
     private static final String PREFS_NAME = "WhoAmIWidgetPrefs";
     private static final String VERSION_TYPE_DEFAULT = "default";
+    private static final String VERSION_TYPE_Q = "version_q";
     private static final ExecutorService executor = Executors.newSingleThreadExecutor();
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -51,12 +52,12 @@ public class AlbumCoverWidgetProvider extends AppWidgetProvider {
             } catch (Exception e) {
                 Log.e(TAG, "Failed to update widget " + appWidgetId, e);
                 try {
-                    RemoteViews fallback = new RemoteViews(context.getPackageName(), R.layout.widget_signin);
+                    RemoteViews fallback = new RemoteViews(context.getPackageName(), R.layout.widget_signin_vertical);
                     Intent loginIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("whoami://app/login"));
                     PendingIntent pendingIntent = PendingIntent.getActivity(
                         context, 0, loginIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
                     fallback.setOnClickPendingIntent(R.id.signin_button, pendingIntent);
-                    fallback.setTextViewText(R.id.signin_description, "Sign in to see what music your friends are sharing");
+                    fallback.setTextViewText(R.id.signin_description, "Sign in to see what music others are sharing");
                     appWidgetManager.updateAppWidget(appWidgetId, fallback);
                 } catch (Exception e2) {
                     Log.e(TAG, "Fallback update failed", e2);
@@ -86,19 +87,20 @@ public class AlbumCoverWidgetProvider extends AppWidgetProvider {
         String versionType = prefs.getString("user_version_type", VERSION_TYPE_DEFAULT);
         boolean isAuthenticated = accessToken != null && !accessToken.isEmpty();
         boolean isDefaultVersion = VERSION_TYPE_DEFAULT.equals(versionType);
+        boolean isVersionQ = VERSION_TYPE_Q.equals(versionType);
 
-        Log.d(TAG, "[updateAppWidget] Auth state - isAuthenticated: " + isAuthenticated + 
+        Log.d(TAG, "[updateAppWidget] Auth state - isAuthenticated: " + isAuthenticated +
                    ", versionType: " + versionType);
 
         RemoteViews views;
 
         if (!isAuthenticated) {
-            views = new RemoteViews(context.getPackageName(), R.layout.widget_signin);
+            views = new RemoteViews(context.getPackageName(), R.layout.widget_signin_vertical);
             Intent loginIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("whoami://app/login"));
             PendingIntent pendingIntent = PendingIntent.getActivity(
                 context, 0, loginIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             views.setOnClickPendingIntent(R.id.signin_button, pendingIntent);
-            views.setTextViewText(R.id.signin_description, "Sign in to see what music your friends are sharing");
+            views.setTextViewText(R.id.signin_description, "Sign in to see what music others are sharing");
             appWidgetManager.updateAppWidget(appWidgetId, views);
             Log.d(TAG, "[updateAppWidget] Showing sign-in view");
             return;
@@ -114,8 +116,18 @@ public class AlbumCoverWidgetProvider extends AppWidgetProvider {
             return;
         }
 
+        if (isVersionQ) {
+            views = new RemoteViews(context.getPackageName(), R.layout.widget_album_2x2);
+            views.setViewVisibility(R.id.album_image, View.GONE);
+            views.setViewVisibility(R.id.album_placeholder, View.GONE);
+            views.setViewVisibility(R.id.friend_profile_image, View.GONE);
+            views.setOnClickPendingIntent(R.id.widget_album_container, buildAppLauncherPendingIntent(context));
+            appWidgetManager.updateAppWidget(appWidgetId, views);
+            Log.d(TAG, "[updateAppWidget] version_q - empty widget with launcher tap");
+            return;
+        }
+
         // Read shared playlist track data
-        String widgetDataJson = prefs.getString("widget_data", "{}");
         String albumImageBase64 = prefs.getString("widget_shared_playlist_album_image_base64", "");
         String avatarImageBase64 = prefs.getString("widget_shared_playlist_avatar_image_base64", "");
         
@@ -131,7 +143,8 @@ public class AlbumCoverWidgetProvider extends AppWidgetProvider {
         if (albumImageBase64.isEmpty() && avatarImageBase64.isEmpty()) {
             views.setViewVisibility(R.id.album_image, View.GONE);
             views.setViewVisibility(R.id.album_placeholder, View.VISIBLE);
-            views.setViewVisibility(R.id.friend_profile_image, View.GONE);
+            views.setImageViewResource(R.id.friend_profile_image, R.drawable.ic_default_profile);
+            views.setViewVisibility(R.id.friend_profile_image, View.VISIBLE);
             appWidgetManager.updateAppWidget(appWidgetId, views);
             Log.d(TAG, "[updateAppWidget] No images - showing placeholder, trying API fetch");
             fetchSharedPlaylistFromApi(context, appWidgetManager, appWidgetId, prefs);
@@ -191,7 +204,8 @@ public class AlbumCoverWidgetProvider extends AppWidgetProvider {
                     updatedViews.setImageViewBitmap(R.id.friend_profile_image, finalAvatar);
                     updatedViews.setViewVisibility(R.id.friend_profile_image, View.VISIBLE);
                 } else {
-                    updatedViews.setViewVisibility(R.id.friend_profile_image, View.GONE);
+                    updatedViews.setImageViewResource(R.id.friend_profile_image, R.drawable.ic_default_profile);
+                    updatedViews.setViewVisibility(R.id.friend_profile_image, View.VISIBLE);
                 }
                 
                 appWidgetManager.updateAppWidget(appWidgetId, updatedViews);
@@ -200,6 +214,22 @@ public class AlbumCoverWidgetProvider extends AppWidgetProvider {
                 Log.d(TAG, "[updateAppWidget] COMPLETE - Elapsed: " + elapsed + "ms");
             });
         });
+    }
+
+    /** Build a PendingIntent that launches the app with no deep link (for version_q). */
+    private static PendingIntent buildAppLauncherPendingIntent(Context context) {
+        Intent launcher = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+        if (launcher == null) {
+            launcher = new Intent(context, MainActivity.class);
+            launcher.setAction(Intent.ACTION_MAIN);
+            launcher.addCategory(Intent.CATEGORY_LAUNCHER);
+        }
+        launcher.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        return PendingIntent.getActivity(
+            context,
+            0,
+            launcher,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
     /**
@@ -251,13 +281,14 @@ public class AlbumCoverWidgetProvider extends AppWidgetProvider {
                     return;
                 }
 
-                // Pick first track
-                JSONObject picked = musicTracks.getJSONObject(0);
+                // Pick a random track to mirror the RN sync behavior
+                int pickedIdx = (int) (Math.random() * musicTracks.length());
+                JSONObject picked = musicTracks.getJSONObject(pickedIdx);
                 String trackId = picked.optString("track_id", "");
                 JSONObject user = picked.optJSONObject("user");
                 String sharerUsername = user != null ? user.optString("username", "") : "";
                 String profileImageUrl = user != null
-                        ? (user.optString("profile_image", user.optString("profile_pic", "")))
+                        ? user.optString("profile_image", "")
                         : "";
 
                 Log.d(TAG, "[fetchSharedPlaylist] Picked track: " + trackId + " from " + sharerUsername);
@@ -384,19 +415,27 @@ public class AlbumCoverWidgetProvider extends AppWidgetProvider {
     }
 
     private static Bitmap getCircularBitmap(Bitmap bitmap) {
+        if (bitmap == null) return null;
         int size = Math.min(bitmap.getWidth(), bitmap.getHeight());
         Bitmap output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(output);
 
-        final Paint paint = new Paint();
+        final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         final Rect rect = new Rect(0, 0, size, size);
 
-        paint.setAntiAlias(true);
         canvas.drawARGB(0, 0, 0, 0);
         canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint);
 
         paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
         canvas.drawBitmap(bitmap, null, rect, paint);
+        paint.setXfermode(null);
+
+        Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        borderPaint.setStyle(Paint.Style.STROKE);
+        borderPaint.setColor(0xFFFFFFFF);
+        borderPaint.setStrokeWidth(Math.max(2f, size * 0.08f));
+        float radius = (size / 2f) - (borderPaint.getStrokeWidth() / 2f);
+        canvas.drawCircle(size / 2f, size / 2f, radius, borderPaint);
 
         return output;
     }

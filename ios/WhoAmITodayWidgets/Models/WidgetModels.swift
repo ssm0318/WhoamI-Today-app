@@ -34,7 +34,7 @@ struct MyCheckIn: Decodable {
         if let s = try? c.decode(String.self, forKey: .mood) {
             mood = s
         } else if let arr = try? c.decode([String].self, forKey: .mood) {
-            mood = arr.first ?? ""
+            mood = arr.randomElement() ?? ""
         } else {
             mood = ""
         }
@@ -51,26 +51,12 @@ struct MyCheckIn: Decodable {
 
     var feelingDisplay: String? {
         guard !mood.isEmpty else { return nil }
-        return getMoodEmoji(mood)
+        return mood
     }
 
     var batteryDisplay: String? {
         guard let battery = socialBattery, !battery.isEmpty else { return nil }
         return getBatteryEmoji(battery)
-    }
-
-    private func getMoodEmoji(_ mood: String) -> String {
-        switch mood.lowercased() {
-        case "happy": return "😊"
-        case "sad": return "😢"
-        case "angry": return "😠"
-        case "anxious": return "😰"
-        case "excited": return "🤩"
-        case "tired": return "😴"
-        case "calm": return "😌"
-        case "confused": return "😕"
-        default: return mood
-        }
     }
 
     private func getBatteryEmoji(_ battery: String) -> String {
@@ -87,25 +73,58 @@ struct MyCheckIn: Decodable {
     }
 }
 
-// A friend's post displayed in the PhotoWidget.
-// Synced from the RN app via syncFriendPost — widget reads the cached binary
-// images directly from SharedDataManager.
-struct FriendPost: Codable {
-    let id: Int
-    let type: String
-    let content: String
-    let images: [String]
-    let currentUserRead: Bool
-    let authorUsername: String
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case type
-        case content
-        case images
-        case currentUserRead = "current_user_read"
-        case authorUsername = "author_username"
+// Friend update (post OR check-in) displayed in the Friend Update Widget.
+// Synced from the RN app via syncFriendUpdate — widget reads the cached binary
+// profile/content images directly from SharedDataManager.
+struct FriendUpdate: Decodable {
+    enum Kind: String, Decodable {
+        case post
+        case checkin
     }
+
+    enum CheckinVariation: String, Decodable {
+        case album
+        case mood
+        case socialBattery = "social_battery"
+        case thought
+    }
+
+    struct Friend: Decodable {
+        let username: String
+    }
+
+    struct Post: Decodable {
+        let id: Int
+        let content: String
+        let hasImage: Bool
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case content
+            case hasImage = "has_image"
+        }
+    }
+
+    struct Checkin: Decodable {
+        let variation: CheckinVariation
+        let mood: String?
+        let socialBattery: String?
+        let description: String?
+        let trackId: String?
+
+        enum CodingKeys: String, CodingKey {
+            case variation
+            case mood
+            case socialBattery = "social_battery"
+            case description
+            case trackId = "track_id"
+        }
+    }
+
+    let kind: Kind
+    let friend: Friend
+    let post: Post?
+    let checkin: Checkin?
 }
 
 // One track from the shared playlist (someone else's song that the user discovers).

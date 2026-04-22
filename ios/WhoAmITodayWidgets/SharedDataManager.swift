@@ -100,6 +100,10 @@ class SharedDataManager {
         return vt == "default"
     }
 
+    var isVersionQ: Bool {
+        string(forKey: "user_version_type") == "version_q"
+    }
+
     var apiBaseUrl: String? {
         if let s = string(forKey: "api_base_url"), !s.isEmpty { return s }
         return utf8StringFromAppGroupFile("widget_api_base_url.txt")
@@ -175,25 +179,25 @@ class SharedDataManager {
         }
     }
 
-    // MARK: - Friend post
+    // MARK: - Friend update
 
-    var friendPost: FriendPost? {
-        guard let d = data(forKey: "friend_post") else { return nil }
-        return try? JSONDecoder().decode(FriendPost.self, from: d)
+    var friendUpdate: FriendUpdate? {
+        guard let d = data(forKey: "friend_update") else { return nil }
+        return try? JSONDecoder().decode(FriendUpdate.self, from: d)
     }
 
-    var cachedFriendPostImage: Data? {
-        get { data(forKey: "widget_friend_post_image") }
+    var cachedFriendUpdateContentImage: Data? {
+        get { data(forKey: "widget_friend_update_content_image") }
         set {
-            sharedDefaults?.set(newValue, forKey: "widget_friend_post_image")
+            sharedDefaults?.set(newValue, forKey: "widget_friend_update_content_image")
             sharedDefaults?.synchronize()
         }
     }
 
-    var cachedFriendPostAuthorImage: Data? {
-        get { data(forKey: "widget_friend_post_author_image") }
+    var cachedFriendUpdateProfileImage: Data? {
+        get { data(forKey: "widget_friend_update_profile_image") }
         set {
-            sharedDefaults?.set(newValue, forKey: "widget_friend_post_author_image")
+            sharedDefaults?.set(newValue, forKey: "widget_friend_update_profile_image")
             sharedDefaults?.synchronize()
         }
     }
@@ -202,6 +206,7 @@ class SharedDataManager {
 
     var rawMyCheckInBytes: Data? { myCheckInJSONData() }
     var rawSharedPlaylistTrackBytes: Data? { data(forKey: "shared_playlist_track") }
+    var rawFriendUpdateBytes: Data? { data(forKey: "friend_update") }
 
     var appGroupReachable: Bool {
         sharedDefaults != nil
@@ -225,20 +230,20 @@ class SharedDataManager {
         let udAccess = ud?.string(forKey: "access_token") != nil
         let udCheckin = ud?.data(forKey: "my_check_in") != nil
         let udPlaylist = ud?.data(forKey: "shared_playlist_track") != nil
-        let udFriend = ud?.data(forKey: "friend_post") != nil
+        let udFriend = ud?.data(forKey: "friend_update") != nil
 
         let pd = plistDict
         let pdCsrf = pd?["csrftoken"] as? String != nil
         let pdAccess = pd?["access_token"] as? String != nil
         let pdCheckin = pd?["my_check_in"] as? Data != nil
-        let pdFriend = pd?["friend_post"] as? Data != nil
+        let pdFriend = pd?["friend_update"] as? Data != nil
         let pdPlaylist = pd?["shared_playlist_track"] as? Data != nil
 
         // Image data sizes
         let albumImgLen = cachedSharedPlaylistAlbumImage?.count ?? 0
         let avatarImgLen = cachedSharedPlaylistAvatarImage?.count ?? 0
         let checkinAlbumLen = cachedAlbumImageData?.count ?? 0
-        let friendPostImgLen = cachedFriendPostImage?.count ?? 0
+        let friendUpdateImgLen = cachedFriendUpdateContentImage?.count ?? 0
 
         let csrfVal = csrfToken
         let accessVal = accessToken
@@ -273,7 +278,7 @@ class SharedDataManager {
         sharedPlaylistAlbum: \(albumImgLen)
         sharedPlaylistAvatar: \(avatarImgLen)
         checkinAlbum: \(checkinAlbumLen)
-        friendPostImage: \(friendPostImgLen)
+        friendUpdateImage: \(friendUpdateImgLen)
         """
 
         let heartbeatURL = containerURL.appendingPathComponent("widget_heartbeat.txt")

@@ -3,13 +3,11 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Middle layer: wrap_content height forces square via spacer -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="center_vertical">
 
-        <!-- Invisible 1:1 spacer: height = width -->
         <ImageView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -18,7 +16,6 @@
             android:visibility="invisible"
             android:importantForAccessibility="no" />
 
-        <!-- Actual visible content (square) -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
@@ -32,43 +29,32 @@
                 android:orientation="vertical"
                 android:gravity="center_horizontal">
 
+                <ImageView
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:src="@mipmap/ic_launcher_round"
+                    android:contentDescription="WhoAmI Today Logo"
+                    android:layout_marginBottom="10dp" />
+
                 <LinearLayout
-                    android:layout_width="match_parent"
+                    android:id="@+id/signin_button"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:gravity="center_vertical|center_horizontal">
+                    android:gravity="center"
+                    android:background="@drawable/widget_signin_button_bg"
+                    android:paddingHorizontal="18dp"
+                    android:paddingVertical="10dp">
 
-                    <!-- WhoAmI Today Logo -->
-                    <ImageView
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:src="@mipmap/ic_launcher_round"
-                        android:contentDescription="WhoAmI Today Logo"
-                        android:layout_marginEnd="10dp" />
-
-                    <!-- Sign In Button -->
-                    <LinearLayout
-                        android:id="@+id/signin_button"
+                    <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center"
-                        android:background="@drawable/widget_signin_button_bg"
-                        android:paddingHorizontal="18dp"
-                        android:paddingVertical="10dp">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Sign In"
-                            android:textColor="#FFFFFF"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
-
-                    </LinearLayout>
+                        android:text="Sign In"
+                        android:textColor="#FFFFFF"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
                 </LinearLayout>
 
-                <!-- Description Text -->
                 <TextView
                     android:id="@+id/signin_description"
                     android:layout_width="match_parent"
@@ -79,7 +65,6 @@
                     android:textSize="11sp"
                     android:gravity="center"
                     android:maxLines="3" />
-
             </LinearLayout>
 
         </FrameLayout>

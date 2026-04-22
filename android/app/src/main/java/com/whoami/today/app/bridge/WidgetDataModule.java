@@ -179,7 +179,12 @@ public class WidgetDataModule extends ReactContextBaseJavaModule {
                 com.facebook.react.bridge.ReadableType moodType = checkInData.getType("mood");
                 if (moodType == com.facebook.react.bridge.ReadableType.Array) {
                     com.facebook.react.bridge.ReadableArray arr = checkInData.getArray("mood");
-                    mood = (arr != null && arr.size() > 0) ? arr.getString(0) : "";
+                    if (arr != null && arr.size() > 0) {
+                        int idx = (int) (Math.random() * arr.size());
+                        mood = arr.getString(idx);
+                    } else {
+                        mood = "";
+                    }
                 } else {
                     mood = checkInData.getString("mood");
                 }
@@ -407,131 +412,120 @@ public class WidgetDataModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void syncFriendPost(ReadableMap postData, String authorImageBase64, String postImageBase64, Promise promise) {
+    public void syncFriendUpdate(ReadableMap payload, String profileImageBase64, String contentImageBase64, Promise promise) {
         long startTime = System.currentTimeMillis();
         try {
             Context context = getReactApplicationContext();
             if (context == null) {
-                Log.e(TAG, "[syncFriendPost] App context not available");
+                Log.e(TAG, "[syncFriendUpdate] App context not available");
                 promise.reject("ERROR", "App context not available");
                 return;
             }
-            
-            Log.d(TAG, "[syncFriendPost] START - Syncing friend post to widget");
-            
+
+            String kind = payload.hasKey("kind") ? payload.getString("kind") : null;
+            Log.d(TAG, "[syncFriendUpdate] START kind=" + kind);
+
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             String existingJson = prefs.getString("widget_data", "{}");
             if (existingJson == null) existingJson = "{}";
-            
+
             JSONObject root = new JSONObject(existingJson);
-            JSONObject friendPost = new JSONObject();
-            
-            if (postData.hasKey("id")) {
-                int id = postData.getInt("id");
-                friendPost.put("id", id);
-                Log.d(TAG, "[syncFriendPost] id: " + id);
-            }
-            if (postData.hasKey("type")) {
-                String type = postData.getString("type");
-                friendPost.put("type", type);
-                Log.d(TAG, "[syncFriendPost] type: " + type);
-            }
-            if (postData.hasKey("content")) {
-                String content = postData.getString("content");
-                friendPost.put("content", content);
-                Log.d(TAG, "[syncFriendPost] content length: " + (content != null ? content.length() : 0));
-            }
-            if (postData.hasKey("images")) {
-                // Convert ReadableArray to JSONArray
-                com.facebook.react.bridge.ReadableArray imagesArray = postData.getArray("images");
-                org.json.JSONArray jsonImages = new org.json.JSONArray();
-                if (imagesArray != null) {
-                    for (int i = 0; i < imagesArray.size(); i++) {
-                        jsonImages.put(imagesArray.getString(i));
-                    }
+            JSONObject friendUpdate = new JSONObject();
+            friendUpdate.put("kind", kind);
+
+            if (payload.hasKey("friend")) {
+                ReadableMap friend = payload.getMap("friend");
+                JSONObject friendJson = new JSONObject();
+                if (friend != null && friend.hasKey("username")) {
+                    friendJson.put("username", friend.getString("username"));
                 }
-                friendPost.put("images", jsonImages);
-                Log.d(TAG, "[syncFriendPost] images count: " + jsonImages.length());
+                friendUpdate.put("friend", friendJson);
             }
-            if (postData.hasKey("current_user_read")) {
-                boolean currentUserRead = postData.getBoolean("current_user_read");
-                friendPost.put("current_user_read", currentUserRead);
-                Log.d(TAG, "[syncFriendPost] current_user_read: " + currentUserRead);
+
+            if ("post".equals(kind) && payload.hasKey("post")) {
+                ReadableMap post = payload.getMap("post");
+                JSONObject postJson = new JSONObject();
+                if (post != null) {
+                    if (post.hasKey("id")) postJson.put("id", post.getInt("id"));
+                    if (post.hasKey("content")) postJson.put("content", post.getString("content"));
+                    if (post.hasKey("has_image")) postJson.put("has_image", post.getBoolean("has_image"));
+                }
+                friendUpdate.put("post", postJson);
+            } else if ("checkin".equals(kind) && payload.hasKey("checkin")) {
+                ReadableMap checkin = payload.getMap("checkin");
+                JSONObject checkinJson = new JSONObject();
+                if (checkin != null) {
+                    if (checkin.hasKey("variation")) checkinJson.put("variation", checkin.getString("variation"));
+                    if (checkin.hasKey("mood") && !checkin.isNull("mood")) checkinJson.put("mood", checkin.getString("mood"));
+                    if (checkin.hasKey("social_battery") && !checkin.isNull("social_battery")) checkinJson.put("social_battery", checkin.getString("social_battery"));
+                    if (checkin.hasKey("description") && !checkin.isNull("description")) checkinJson.put("description", checkin.getString("description"));
+                    if (checkin.hasKey("track_id") && !checkin.isNull("track_id")) checkinJson.put("track_id", checkin.getString("track_id"));
+                }
+                friendUpdate.put("checkin", checkinJson);
             }
-            if (postData.hasKey("author_username")) {
-                String authorUsername = postData.getString("author_username");
-                friendPost.put("author_username", authorUsername);
-                Log.d(TAG, "[syncFriendPost] author_username: " + authorUsername);
-            }
-            
-            root.put("friend_post", friendPost);
-            
+
+            root.put("friend_update", friendUpdate);
+            // Remove legacy key if present
+            root.remove("friend_post");
+
             SharedPreferences.Editor editor = prefs.edit();
             editor.putString("widget_data", root.toString());
-            
-            // Store post image as base64 string
-            if (postImageBase64 != null && !postImageBase64.isEmpty()) {
-                editor.putString("widget_friend_post_image_base64", postImageBase64);
-                Log.d(TAG, "[syncFriendPost] Post image base64 length: " + postImageBase64.length());
+
+            if (contentImageBase64 != null && !contentImageBase64.isEmpty()) {
+                editor.putString("widget_friend_update_content_image", contentImageBase64);
             } else {
-                editor.remove("widget_friend_post_image_base64");
-                Log.d(TAG, "[syncFriendPost] No post image provided");
+                editor.remove("widget_friend_update_content_image");
             }
-            
-            // Store author image as base64 string
-            if (authorImageBase64 != null && !authorImageBase64.isEmpty()) {
-                editor.putString("widget_friend_post_author_image_base64", authorImageBase64);
-                Log.d(TAG, "[syncFriendPost] Author image base64 length: " + authorImageBase64.length());
+            if (profileImageBase64 != null && !profileImageBase64.isEmpty()) {
+                editor.putString("widget_friend_update_profile_image", profileImageBase64);
             } else {
-                editor.remove("widget_friend_post_author_image_base64");
-                Log.d(TAG, "[syncFriendPost] No author image provided");
+                editor.remove("widget_friend_update_profile_image");
             }
-            
+            // Clean up legacy keys
+            editor.remove("widget_friend_post_image_base64");
+            editor.remove("widget_friend_post_author_image_base64");
+
             boolean success = editor.commit();
-            
             long elapsed = System.currentTimeMillis() - startTime;
-            Log.d(TAG, "[syncFriendPost] Data saved with commit(): " + success + ", Elapsed: " + elapsed + "ms");
+            Log.d(TAG, "[syncFriendUpdate] saved=" + success + " elapsed=" + elapsed + "ms");
 
             updatePhotoWidget(context);
-            
             promise.resolve(true);
         } catch (Exception e) {
             long elapsed = System.currentTimeMillis() - startTime;
-            Log.e(TAG, "[syncFriendPost] FAILED after " + elapsed + "ms", e);
+            Log.e(TAG, "[syncFriendUpdate] FAILED after " + elapsed + "ms", e);
             promise.reject("ERROR", e.getMessage());
         }
     }
 
     @ReactMethod
-    public void clearFriendPost(Promise promise) {
+    public void clearFriendUpdate(Promise promise) {
         try {
             Context context = getReactApplicationContext();
             if (context == null) {
-                Log.e(TAG, "[clearFriendPost] App context not available");
                 promise.reject("ERROR", "App context not available");
                 return;
             }
-            
-            Log.d(TAG, "[clearFriendPost] Clearing friend post from widget");
-            
+
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             String existingJson = prefs.getString("widget_data", "{}");
             JSONObject root = new JSONObject(existingJson);
+            root.remove("friend_update");
             root.remove("friend_post");
-            
+
             boolean success = prefs.edit()
                 .putString("widget_data", root.toString())
+                .remove("widget_friend_update_content_image")
+                .remove("widget_friend_update_profile_image")
                 .remove("widget_friend_post_image_base64")
                 .remove("widget_friend_post_author_image_base64")
                 .commit();
-            
-            Log.d(TAG, "[clearFriendPost] Cleared with commit(): " + success);
 
+            Log.d(TAG, "[clearFriendUpdate] cleared=" + success);
             updatePhotoWidget(context);
-            
             promise.resolve(true);
         } catch (Exception e) {
-            Log.e(TAG, "[clearFriendPost] FAILED", e);
+            Log.e(TAG, "[clearFriendUpdate] FAILED", e);
             promise.reject("ERROR", e.getMessage());
         }
     }
@@ -615,19 +609,19 @@ public class WidgetDataModule extends ReactContextBaseJavaModule {
             String friendPostJson = "";
             try {
                 JSONObject widgetData = new JSONObject(widgetDataJson);
-                if (widgetData.has("friend_post")) {
-                    friendPostJson = widgetData.getJSONObject("friend_post").toString();
+                if (widgetData.has("friend_update")) {
+                    friendPostJson = widgetData.getJSONObject("friend_update").toString();
                 }
             } catch (Exception e) {
-                Log.e(TAG, "getWidgetDiagnostics: failed to parse friend_post", e);
+                Log.e(TAG, "getWidgetDiagnostics: failed to parse friend_update", e);
             }
-            diagnostics.put("friendPostJson", friendPostJson);
-            diagnostics.put("friendPostJsonLen", friendPostJson.length());
-            
-            String postImageBase64 = prefs.getString("widget_friend_post_image_base64", "");
-            String authorImageBase64 = prefs.getString("widget_friend_post_author_image_base64", "");
-            diagnostics.put("friendPostImageLen", postImageBase64 != null ? postImageBase64.length() : 0);
-            diagnostics.put("friendPostAuthorImageLen", authorImageBase64 != null ? authorImageBase64.length() : 0);
+            diagnostics.put("friendUpdateJson", friendPostJson);
+            diagnostics.put("friendUpdateJsonLen", friendPostJson.length());
+
+            String contentImageBase64 = prefs.getString("widget_friend_update_content_image", "");
+            String profileImageBase64 = prefs.getString("widget_friend_update_profile_image", "");
+            diagnostics.put("friendUpdateContentImageLen", contentImageBase64 != null ? contentImageBase64.length() : 0);
+            diagnostics.put("friendUpdateProfileImageLen", profileImageBase64 != null ? profileImageBase64.length() : 0);
             
             // Spotify credentials
             String spotifyClientId = prefs.getString("spotify_client_id", "");
