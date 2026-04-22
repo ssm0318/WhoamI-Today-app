@@ -8,14 +8,12 @@ import { name as appName } from './app.json';
 import 'intl-pluralrules';
 import './src/i18n';
 import messaging from '@react-native-firebase/messaging';
+import { handleSilentVersionChange } from './src/tools/silentVersionHandler';
 
 // Background handling with Firebase messaging
 messaging().setBackgroundMessageHandler(async (remoteMessage) => {
   console.log('[Firebase remote message on background] : ', remoteMessage);
   if (remoteMessage?.data?.type === 'version_change') {
-    const { handleSilentVersionChange } = await import(
-      './src/tools/silentVersionHandler'
-    );
     await handleSilentVersionChange(remoteMessage.data);
   }
 });
