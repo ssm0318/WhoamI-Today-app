@@ -1,10 +1,14 @@
-apply plugin: "com.android.application"
-apply plugin: "com.facebook.react"
-apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
+plugins {
+    id "com.android.application"
+    id "com.facebook.react"
+    id "com.google.gms.google-services"
+    id "com.google.firebase.crashlytics"
+}
 
 import com.android.build.OutputFile
 
 react {
+    autolinkLibrariesWithApp()
 }
 
 def enableSeparateBuildPerCPUArchitecture = false
@@ -43,8 +47,12 @@ android {
         applicationId "com.whoami.today.app"
         minSdk rootProject.ext.minSdkVersion
         targetSdk rootProject.ext.targetSdkVersion
-        versionCode 10411
+        versionCode 10420
         versionName "1.6"
+        ndk {
+            // Ship arm64-only native binaries for Play 16KB page-size compatibility.
+            abiFilters "arm64-v8a"
+        }
         // .env from repo root (react-native-config) so Config.SPOTIFY_* is available on Android
         def envFile = rootProject.file("../.env")
         println("WhoAmI .env: path=" + envFile.getAbsolutePath() + " exists=" + envFile.exists())
@@ -98,7 +106,7 @@ android {
 
     packagingOptions {
         jniLibs {
-            // Keep modern native packaging so produced AAB preserves up-to-date ELF alignment/metadata.
+            // AGP 8.5.1+ path: keep modern packaging to request proper 16KB page alignment in Play-generated APKs.
             useLegacyPackaging false
         }
     }
@@ -138,5 +146,3 @@ dependencies {
     // ❗ '+'는 재현성 깨짐. 가능하면 고정 권장
     implementation("androidx.activity:activity:1.9.3")
 }
-
-apply plugin: 'com.google.gms.google-services'

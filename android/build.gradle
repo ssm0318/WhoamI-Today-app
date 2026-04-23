@@ -3,8 +3,8 @@
 buildscript {
     ext {
         buildToolsVersion = "34.0.0"
-        minSdkVersion = 21
-        compileSdkVersion = 34
+        minSdkVersion = 24
+        compileSdkVersion = 36
         targetSdkVersion = 35
 
         // NDK r26 includes modern linker/toolchain updates used by 16KB page-size compatible builds.
@@ -18,9 +18,9 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("com.android.tools.build:gradle:8.3.2")
-        classpath("com.facebook.react:react-native-gradle-plugin")
+        classpath("com.android.tools.build:gradle:8.9.1")
         classpath 'com.google.gms:google-services:4.4.2'
+        classpath 'com.google.firebase:firebase-crashlytics-gradle:3.0.2'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
