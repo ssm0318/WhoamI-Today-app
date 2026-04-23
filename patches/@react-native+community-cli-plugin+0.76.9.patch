@@ -1,0 +1,30 @@
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/start/middleware.js b/node_modules/@react-native/community-cli-plugin/dist/commands/start/middleware.js
+index 676675c..b9fc0a2 100644
+--- a/node_modules/@react-native/community-cli-plugin/dist/commands/start/middleware.js
++++ b/node_modules/@react-native/community-cli-plugin/dist/commands/start/middleware.js
+@@ -36,8 +36,10 @@ try {
+   const communityCliServerApi = require(communityCliServerApiPath);
+   communityMiddlewareFallback.createDevServerMiddleware =
+     communityCliServerApi.createDevServerMiddleware;
+-  communityMiddlewareFallback.indexPageMiddleware =
+-    communityCliServerApi.indexPageMiddleware;
++  if (typeof communityCliServerApi.indexPageMiddleware === "function") {
++    communityMiddlewareFallback.indexPageMiddleware =
++      communityCliServerApi.indexPageMiddleware;
++  }
+ } catch {
+   _logger.logger.debug(`⚠️ Unable to find @react-native-community/cli-server-api
+ Starting the server without the community middleware.`);
+diff --git a/node_modules/@react-native/community-cli-plugin/dist/commands/start/runServer.js b/node_modules/@react-native/community-cli-plugin/dist/commands/start/runServer.js
+index 91cd2ff..c7e6f73 100644
+--- a/node_modules/@react-native/community-cli-plugin/dist/commands/start/runServer.js
++++ b/node_modules/@react-native/community-cli-plugin/dist/commands/start/runServer.js
+@@ -16,7 +16,7 @@ var _loadMetroConfig = _interopRequireDefault(
+ var _logger = require("../../utils/logger");
+ var version = _interopRequireWildcard(require("../../utils/version"));
+ var _attachKeyHandlers = _interopRequireDefault(require("./attachKeyHandlers"));
+-var _cliServerApi = require("@react-native-community/cli-server-api");
++var _cliServerApi = require("./middleware");
+ var _devMiddleware = require("@react-native/dev-middleware");
+ var _chalk = _interopRequireDefault(require("chalk"));
+ var _metro = _interopRequireDefault(require("metro"));
