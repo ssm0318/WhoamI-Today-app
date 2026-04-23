@@ -38,7 +38,7 @@ struct SignInView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            refreshButton
+            WidgetRefreshButton(kind: widgetKind)
                 .padding(.top, 6)
                 .padding(.trailing, 6)
         }
@@ -69,25 +69,31 @@ struct SignInView: View {
         }
     }
 
-    @ViewBuilder
-    private var refreshButton: some View {
-        if #available(iOS 17.0, *) {
-            Button(intent: ReloadWidgetByKindIntent(kind: widgetKind)) {
-                refreshIcon
-            }
-            .buttonStyle(.plain)
-        } else {
-            Link(destination: URL(string: "whoami://widget-refresh")!) {
-                refreshIcon
+}
+
+struct WidgetRefreshButton: View {
+    let kind: String
+
+    var body: some View {
+        Group {
+            if #available(iOS 17.0, *) {
+                Button(intent: ReloadWidgetByKindIntent(kind: kind)) {
+                    icon
+                }
+                .buttonStyle(.plain)
+            } else {
+                Link(destination: URL(string: "whoami://widget-refresh")!) {
+                    icon
+                }
             }
         }
     }
 
-    private var refreshIcon: some View {
+    private var icon: some View {
         Image(systemName: "arrow.clockwise")
-            .font(.system(size: 11, weight: .regular))
+            .font(.system(size: 14, weight: .regular))
             .foregroundColor(Color.gray.opacity(0.7))
-            .frame(width: 20, height: 20)
+            .frame(width: 24, height: 24)
             .background(Circle().fill(Color.gray.opacity(0.08)))
     }
 }

@@ -179,8 +179,13 @@ struct AlbumCoverWidgetView: View {
     @ViewBuilder
     var body: some View {
         if entry.isVersionQ {
-            Color.clear
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ZStack(alignment: .topTrailing) {
+                Color.clear
+                WidgetRefreshButton(kind: "AlbumCoverWidgetV3")
+                    .padding(.top, 6)
+                    .padding(.trailing, 6)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             mainContent
                 .widgetURL(URL(string: "whoami://app/discover"))
@@ -252,6 +257,10 @@ struct AlbumCoverWidgetView: View {
                     .padding(6)
                     Spacer()
                 }
+
+                WidgetRefreshButton(kind: "AlbumCoverWidgetV3")
+                    .padding(6)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

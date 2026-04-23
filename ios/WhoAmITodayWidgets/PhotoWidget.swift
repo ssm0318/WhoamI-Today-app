@@ -171,7 +171,12 @@ struct PhotoWidgetView: View {
             } else if entry.isDefaultVersion {
                 DefaultVersionView()
             } else if entry.isVersionQ {
-                Color.clear
+                ZStack(alignment: .topTrailing) {
+                    Color.clear
+                    WidgetRefreshButton(kind: "PhotoWidget")
+                        .padding(.top, 6)
+                        .padding(.trailing, 6)
+                }
             } else {
                 photoContent
             }
@@ -180,13 +185,16 @@ struct PhotoWidgetView: View {
 
     @ViewBuilder
     var photoContent: some View {
-        Link(destination: URL(string: "whoami://app/friends")!) {
-            ZStack(alignment: .topTrailing) {
-                contentView
-                profileAvatar
-            }
+        ZStack {
+            contentView
+            profileAvatar
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            WidgetRefreshButton(kind: "PhotoWidget")
+                .padding(6)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .widgetURL(URL(string: "whoami://app/friends"))
     }
 
     @ViewBuilder
