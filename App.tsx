@@ -7,11 +7,29 @@ import {
   LinkingOptions,
   CommonActions,
 } from '@react-navigation/native';
+import crashlytics from '@react-native-firebase/crashlytics';
 import { RootNavigator } from '@navigation';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { RouteType } from '@types';
 import NavigationService from '@libs/NavigationService';
 import { triggerWidgetRefresh } from './src/native/WidgetDataModule';
+
+if (!__DEV__) {
+  crashlytics().setCrashlyticsCollectionEnabled(true);
+
+  const defaultHandler = ErrorUtils.getGlobalHandler();
+  ErrorUtils.setGlobalHandler((error, isFatal) => {
+    crashlytics().recordError(error);
+    defaultHandler(error, isFatal);
+  });
+
+  const originalConsoleError = console.error;
+  console.error = (...args: unknown[]) => {
+    const first = args[0];
+    if (first instanceof Error) crashlytics().recordError(first);
+    originalConsoleError(...args);
+  };
+}
 
 const PREFIXES = ['whoami://', 'https://whoami-admin-group.gina-park.site'];
 
