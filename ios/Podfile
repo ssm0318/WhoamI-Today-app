@@ -1,5 +1,4 @@
 require_relative '../node_modules/react-native/scripts/react_native_pods'
-require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
 
 # boost podspec의 체크섬 검증 제거 (JFrog 저장소 체크섬 불일치 문제 해결)
 boost_podspec_path = File.join(__dir__, '..', 'node_modules', 'react-native', 'third-party-podspecs', 'boost.podspec')
@@ -16,9 +15,6 @@ end
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
-# Flipper 설정 (Flipper를 완전히 비활성화)
-flipper_config = FlipperConfiguration.disabled
-
 # 사용하려는 프레임워크 설정
 linkage = ENV['USE_FRAMEWORKS']
 if linkage != nil
@@ -32,6 +28,10 @@ target 'whoAmIToday' do
   # 필요한 Firebase 및 Google Utilities 추가
   pod 'GoogleUtilities', :modular_headers => true
   pod 'FirebaseCore', :modular_headers => true
+  pod 'FirebaseCoreExtension', :modular_headers => true
+  pod 'FirebaseInstallations', :modular_headers => true
+  pod 'GoogleDataTransport', :modular_headers => true
+  pod 'nanopb', :modular_headers => true
   pod 'RNFBAnalytics', :path => '../node_modules/@react-native-firebase/analytics'
 
   # react-native-fetch-blob 경로 지정
@@ -48,7 +48,6 @@ target 'whoAmIToday' do
     :path => config[:reactNativePath],
     :hermes_enabled => false,  # Hermes 사용 여부 설정 (false로 설정)
     :fabric_enabled => flags[:fabric_enabled],  # Fabric 활성화 여부
-    :flipper_configuration => flipper_config,  # Flipper 비활성화
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
 
