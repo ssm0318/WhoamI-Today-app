@@ -225,7 +225,12 @@ struct CheckinWidgetView: View {
             } else if entry.isAuthenticated && entry.isDefaultVersion {
                 DefaultVersionView()
             } else if entry.isVersionQ {
-                Color.clear
+                ZStack(alignment: .topTrailing) {
+                    Color.clear
+                    WidgetRefreshButton(kind: "CheckinWidgetV3")
+                        .padding(.top, 6)
+                        .padding(.trailing, 6)
+                }
             } else {
                 checkinContent
             }
