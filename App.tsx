@@ -1,5 +1,11 @@
-import React, { useMemo, useRef } from 'react';
-import { Linking, NativeModules, Platform } from 'react-native';
+import React, { useEffect, useMemo, useRef } from 'react';
+import {
+  AppState,
+  AppStateStatus,
+  Linking,
+  NativeModules,
+  Platform,
+} from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   NavigationContainer,
@@ -7,6 +13,7 @@ import {
   LinkingOptions,
   CommonActions,
 } from '@react-navigation/native';
+import analytics from '@react-native-firebase/analytics';
 import crashlytics from '@react-native-firebase/crashlytics';
 import { RootNavigator } from '@navigation';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -183,6 +190,33 @@ const App: React.FC = () => {
     () => buildLinking(navigationRef, pendingDeepLinkRef),
     [navigationRef],
   );
+
+  // Firebase Analytics: app lifecycle events
+  useEffect(() => {
+    if (!__DEV__) {
+      analytics().setAnalyticsCollectionEnabled(true);
+    }
+
+    const appStateRef = { current: AppState.currentState };
+    const subscription = AppState.addEventListener(
+      'change',
+      (nextState: AppStateStatus) => {
+        if (
+          appStateRef.current.match(/inactive|background/) &&
+          nextState === 'active'
+        ) {
+          analytics().logEvent('app_foreground');
+        } else if (
+          appStateRef.current === 'active' &&
+          nextState.match(/inactive|background/)
+        ) {
+          analytics().logEvent('app_background');
+        }
+        appStateRef.current = nextState;
+      },
+    );
+    return () => subscription.remove();
+  }, []);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

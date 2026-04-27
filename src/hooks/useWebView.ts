@@ -1,5 +1,10 @@
 import { useFirebaseMessage, useNavigationService } from '@hooks';
 import {
+  setAnalyticsUser,
+  trackScreenView,
+  AnalyticsUserProperties,
+} from '../utils/analytics';
+import {
   CookieStorage,
   parseCookie,
   redirectSetting,
@@ -406,6 +411,16 @@ const useWebView = () => {
         case 'OPEN_VIDEO_CAMERA':
           openVideoCamera();
           return;
+        case 'ANALYTICS_PAGE_VIEW': {
+          const { page_name, page_path } = data;
+          trackScreenView(page_name, page_path);
+          return;
+        }
+        case 'ANALYTICS_SET_USER': {
+          const { user_id, ...properties } = data;
+          setAnalyticsUser(user_id, properties as AnalyticsUserProperties);
+          return;
+        }
         case 'WIDGET_DATA_UPDATED': {
           // If web sends check_in in the message (when user saves check-in), use it so widget
           // matches the app screen without waiting for API. Otherwise fetch from API.
