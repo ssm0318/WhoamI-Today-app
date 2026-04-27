@@ -287,6 +287,11 @@ const useWebView = () => {
           // Consider using openBrowserAsync in future updates
           await Linking.openURL(data.url);
           return;
+        case 'OPEN_VIDEO':
+          if (data.url) {
+            navigation.navigate('VideoScreen', { url: data.url });
+          }
+          return;
         case 'NAVIGATE': {
           if (!data.screenName) return;
           return navigation.push(
