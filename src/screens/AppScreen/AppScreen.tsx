@@ -305,7 +305,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         containerStyle={{ backgroundColor: '#FFFFFF' }}
         injectedJavaScriptBeforeContentLoaded={
           (APP_CONSTS.MAINTENANCE_BYPASS
-            ? `(function(){if(!document.cookie.includes('maintenance_bypass=whoami2026')){document.cookie="maintenance_bypass=whoami2026; path=/; secure; max-age=31536000";location.reload();}})();`
+            ? `(function(){if(!document.cookie.includes('maintenance_bypass=${APP_CONSTS.MAINTENANCE_BYPASS_COOKIE}')){document.cookie="maintenance_bypass=${APP_CONSTS.MAINTENANCE_BYPASS_COOKIE}; path=/; secure; max-age=31536000";location.reload();}})();`
             : '') +
           injectCookieScript(tokens.csrftoken, tokens.access_token) +
           (isDeepLinkPath

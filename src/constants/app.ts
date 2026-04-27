@@ -14,6 +14,7 @@ export const IS_ADMIN = false; // Whether it is admin environment
 export const IS_DEV = false;
 // Set true for TestFlight/dev builds to bypass maintenance page. Set false for App Store release.
 export const MAINTENANCE_BYPASS = true;
+export const MAINTENANCE_BYPASS_COOKIE = 'whoami2026_v18'; // 추가
 
 export const WEB_VIEW_URL_INFO = {
   DEV: `http://${WEB_VIEW_DEV_HOSTNAME}:3000`,
