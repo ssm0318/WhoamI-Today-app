@@ -92,42 +92,6 @@ const useWebView = () => {
     fetchTokens();
   }, []);
 
-  // 📸 Camera capture
-  const openCamera = useCallback(() => {
-    ImagePicker.openCamera({
-      width: 300,
-      height: 400,
-      cropping: true,
-      compressImageQuality: 0.8,
-      includeBase64: true,
-    })
-      .then((image) => {
-        sendFileToWeb(image);
-      })
-      .catch((error) => {
-        console.log('Camera Error: ', error);
-      });
-  }, []);
-
-  // 📂 Select file from gallery
-  const openGallery = useCallback(() => {
-    console.log('openGallery');
-    ImagePicker.openPicker({
-      width: 300,
-      height: 400,
-      cropping: true,
-      multiple: false,
-      compressImageQuality: 0.8,
-      includeBase64: true,
-    })
-      .then((image) => {
-        sendFileToWeb(image);
-      })
-      .catch((error) => {
-        console.log('Gallery Error: ', error);
-      });
-  }, []);
-
   const sendFileToWeb = useCallback(
     (image: any) => {
       const fileData: FileData = {
@@ -141,6 +105,136 @@ const useWebView = () => {
     },
     [postMessage],
   );
+
+  // 📸 Camera capture (image or video)
+  const openCamera = useCallback(() => {
+    ImagePicker.openCamera({
+      mediaType: 'any',
+      compressImageQuality: 0.8,
+      compressVideoPreset: 'MediumQuality',
+      includeBase64: true,
+    })
+      .then(async (media) => {
+        if (media.mime?.startsWith('video/')) {
+          try {
+            const RNFetchBlob = (await import('rn-fetch-blob')).default;
+            const base64Data = await RNFetchBlob.fs.readFile(
+              media.path,
+              'base64',
+            );
+            const fileData: FileData = {
+              uri: media.path,
+              type: media.mime || 'video/mp4',
+              name: media.path.split('/').pop() || 'video.mp4',
+              base64: base64Data,
+            };
+            postMessage('FILE_SELECTED', { ...fileData, isVideo: true });
+          } catch (err) {
+            console.log('Video base64 conversion error:', err);
+          }
+        } else {
+          sendFileToWeb(media);
+        }
+      })
+      .catch((error) => {
+        console.log('Camera Error: ', error);
+      });
+  }, [postMessage, sendFileToWeb]);
+
+  // 📂 Select file from gallery (image or video)
+  const openGallery = useCallback(() => {
+    console.log('openGallery');
+    ImagePicker.openPicker({
+      mediaType: 'any',
+      multiple: false,
+      compressImageQuality: 0.8,
+      compressVideoPreset: 'MediumQuality',
+      includeBase64: true,
+    })
+      .then(async (media) => {
+        if (media.mime?.startsWith('video/')) {
+          try {
+            const RNFetchBlob = (await import('rn-fetch-blob')).default;
+            const base64Data = await RNFetchBlob.fs.readFile(
+              media.path,
+              'base64',
+            );
+            const fileData: FileData = {
+              uri: media.path,
+              type: media.mime || 'video/mp4',
+              name: media.path.split('/').pop() || 'video.mp4',
+              base64: base64Data,
+            };
+            postMessage('FILE_SELECTED', { ...fileData, isVideo: true });
+          } catch (err) {
+            console.log('Video base64 conversion error:', err);
+          }
+        } else {
+          sendFileToWeb(media);
+        }
+      })
+      .catch((error) => {
+        console.log('Gallery Error: ', error);
+      });
+  }, [postMessage, sendFileToWeb]);
+
+  // 🎬 Video from gallery
+  const openVideoGallery = useCallback(() => {
+    ImagePicker.openPicker({
+      mediaType: 'video',
+      compressVideoPreset: 'MediumQuality',
+    })
+      .then(async (video) => {
+        try {
+          const RNFetchBlob = (await import('rn-fetch-blob')).default;
+          const base64Data = await RNFetchBlob.fs.readFile(
+            video.path,
+            'base64',
+          );
+          const fileData: FileData = {
+            uri: video.path,
+            type: video.mime || 'video/mp4',
+            name: video.path.split('/').pop() || 'video.mp4',
+            base64: base64Data,
+          };
+          postMessage('FILE_SELECTED', { ...fileData, isVideo: true });
+        } catch (err) {
+          console.log('Video base64 conversion error:', err);
+        }
+      })
+      .catch((error) => {
+        console.log('Video Gallery Error:', error);
+      });
+  }, [postMessage]);
+
+  // 🎬 Video from camera
+  const openVideoCamera = useCallback(() => {
+    ImagePicker.openCamera({
+      mediaType: 'video',
+      compressVideoPreset: 'MediumQuality',
+    })
+      .then(async (video) => {
+        try {
+          const RNFetchBlob = (await import('rn-fetch-blob')).default;
+          const base64Data = await RNFetchBlob.fs.readFile(
+            video.path,
+            'base64',
+          );
+          const fileData: FileData = {
+            uri: video.path,
+            type: video.mime || 'video/mp4',
+            name: video.path.split('/').pop() || 'video.mp4',
+            base64: base64Data,
+          };
+          postMessage('FILE_SELECTED', { ...fileData, isVideo: true });
+        } catch (err) {
+          console.log('Video base64 conversion error:', err);
+        }
+      })
+      .catch((error) => {
+        console.log('Video Camera Error:', error);
+      });
+  }, [postMessage]);
 
   /**
    * Handle requests from webview
@@ -306,6 +400,12 @@ const useWebView = () => {
         case 'OPEN_CAMERA':
           openCamera();
           return;
+        case 'OPEN_VIDEO_GALLERY':
+          openVideoGallery();
+          return;
+        case 'OPEN_VIDEO_CAMERA':
+          openVideoCamera();
+          return;
         case 'WIDGET_DATA_UPDATED': {
           // If web sends check_in in the message (when user saves check-in), use it so widget
           // matches the app screen without waiting for API. Otherwise fetch from API.
@@ -464,7 +564,7 @@ const useWebView = () => {
           return;
       }
     },
-    [openCamera, openGallery],
+    [openCamera, openGallery, openVideoGallery, openVideoCamera],
   );
 
   const onLoadProgress = useCallback((e: WebViewProgressEvent) => {
@@ -484,6 +584,8 @@ const useWebView = () => {
     isCanGoBack,
     openCamera,
     openGallery,
+    openVideoGallery,
+    openVideoCamera,
   };
 };
 
