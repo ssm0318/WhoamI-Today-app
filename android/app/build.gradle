@@ -47,7 +47,7 @@ android {
         applicationId "com.whoami.today.app"
         minSdk rootProject.ext.minSdkVersion
         targetSdk rootProject.ext.targetSdkVersion
-        versionCode 7
+        versionCode 10425
         versionName "1.8"
         ndk {
             // Ship arm64-only native binaries for Play 16KB page-size compatibility.
