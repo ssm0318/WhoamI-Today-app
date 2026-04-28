@@ -47,3 +47,14 @@ export const removeCookie = async () => {
   await CookieManager.clearAll(true);
   removeCookie();
 };
+
+// Pre-seed the maintenance bypass cookie natively so the first WebView request
+// already carries it — avoids the page-side `location.reload()` round-trip.
+export const setMaintenanceBypassCookie = async (cookieValue: string) => {
+  await CookieManager.set(APP_CONSTS.WEB_VIEW_URL, {
+    name: 'maintenance_bypass',
+    value: cookieValue,
+    path: '/',
+    secure: true,
+  });
+};

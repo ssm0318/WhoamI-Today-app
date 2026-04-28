@@ -1,55 +1,88 @@
-import React, { useCallback, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StatusBar,
-  StyleSheet,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Video from 'react-native-video';
-import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenRouteParamList } from '@screens';
+import { trackEvent } from '../../utils/analytics';
 
 type Props = NativeStackScreenProps<ScreenRouteParamList, 'VideoScreen'>;
 
 const VideoScreen = ({ route, navigation }: Props) => {
-  const { url } = route.params;
+  const { url, postId, postType } = route.params;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const insets = useSafeAreaInsets();
 
-  useFocusEffect(
-    useCallback(() => {
-      StatusBar.setHidden(true, 'fade');
-      return () => StatusBar.setHidden(false, 'fade');
-    }, []),
-  );
+  const startedAtRef = useRef<number>(Date.now());
+  const completedRef = useRef(false);
+
+  useEffect(() => {
+    if (postId === undefined || postType === undefined) return;
+    trackEvent('video_open', { post_id: postId, post_type: postType });
+
+    return () => {
+      trackEvent('video_close', {
+        post_id: postId,
+        post_type: postType,
+        duration_ms: Date.now() - startedAtRef.current,
+        completed: completedRef.current ? 1 : 0,
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleClose = () => navigation.goBack();
+
+  const handleEnd = () => {
+    completedRef.current = true;
+    if (postId !== undefined && postType !== undefined) {
+      trackEvent('video_play_complete', {
+        post_id: postId,
+        post_type: postType,
+        duration_ms: Date.now() - startedAtRef.current,
+      });
+    }
+    handleClose();
+  };
+
+  const handleError = () => {
+    setLoading(false);
+    setError(true);
+    if (postId !== undefined && postType !== undefined) {
+      trackEvent('video_error', { post_id: postId, post_type: postType });
+    }
+  };
+
+  const videoAreaStyle = {
+    top: insets.top,
+    bottom: insets.bottom,
+    left: 0,
+    right: 0,
+  };
 
   return (
     <View style={styles.root}>
       <Video
         source={{ uri: url }}
-        style={StyleSheet.absoluteFill}
+        style={[styles.video, videoAreaStyle]}
         controls
         resizeMode="contain"
         paused={false}
         ignoreSilentSwitch="ignore"
         onLoad={() => setLoading(false)}
-        onError={() => {
-          setLoading(false);
-          setError(true);
-        }}
-        onEnd={handleClose}
+        onError={handleError}
+        onEnd={handleEnd}
       />
       {loading && !error && (
-        <View style={styles.center} pointerEvents="none">
+        <View style={[styles.center, videoAreaStyle]} pointerEvents="none">
           <ActivityIndicator size="large" color="#fff" />
         </View>
       )}
-      <SafeAreaView style={styles.safeArea} pointerEvents="box-none">
+      <View
+        style={[styles.closeContainer, { top: insets.top }]}
+        pointerEvents="box-none"
+      >
         <Pressable
           onPress={handleClose}
           hitSlop={12}
@@ -61,7 +94,7 @@ const VideoScreen = ({ route, navigation }: Props) => {
           <View style={styles.closeIconBar1} />
           <View style={styles.closeIconBar2} />
         </Pressable>
-      </SafeAreaView>
+      </View>
     </View>
   );
 };
@@ -71,14 +104,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
+  video: {
+    position: 'absolute',
+  },
   center: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  safeArea: {
+  closeContainer: {
     position: 'absolute',
-    top: 0,
     left: 0,
     right: 0,
   },
@@ -107,9 +142,17 @@ const styles = StyleSheet.create({
   },
 });
 
+export type VideoPostType =
+  | 'check_in_post'
+  | 'check_in_post_story'
+  | 'note'
+  | 'response';
+
 export type VideoScreenRoute = {
   VideoScreen: {
     url: string;
+    postId?: number | string;
+    postType?: VideoPostType;
   };
 };
 

@@ -9,7 +9,10 @@ import {
   parseCookie,
   redirectSetting,
   saveCookie,
+  setMaintenanceBypassCookie,
+  userVersionStorage,
 } from '@tools';
+import { APP_CONSTS } from '@constants';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking } from 'react-native';
 import {
@@ -77,6 +80,17 @@ const useWebView = () => {
 
   useEffect(() => {
     const fetchTokens = async () => {
+      // Pre-seed the maintenance bypass cookie before the WebView mounts so the
+      // very first request already has it — replaces the page-side reload.
+      if (APP_CONSTS.MAINTENANCE_BYPASS) {
+        try {
+          await setMaintenanceBypassCookie(
+            APP_CONSTS.MAINTENANCE_BYPASS_COOKIE,
+          );
+        } catch (e) {
+          console.warn('[useWebView] setMaintenanceBypassCookie failed:', e);
+        }
+      }
       const { access_token, csrftoken } = await getCookie();
       setTokens({ access_token, csrftoken });
       // Push tokens to the App Group before WebView mounts so home-screen widgets
@@ -289,7 +303,11 @@ const useWebView = () => {
           return;
         case 'OPEN_VIDEO':
           if (data.url) {
-            navigation.navigate('VideoScreen', { url: data.url });
+            navigation.navigate('VideoScreen', {
+              url: data.url,
+              postId: data.postId,
+              postType: data.postType,
+            });
           }
           return;
         case 'NAVIGATE': {
@@ -360,6 +378,31 @@ const useWebView = () => {
           });
 
           await CookieStorage.removeCookie();
+          // CookieManager.clearAll() above wiped maintenance_bypass too, which
+          // would make the post-logout reload hit nginx 503 → maintenance.html.
+          // Re-seed it before any reload happens.
+          if (APP_CONSTS.MAINTENANCE_BYPASS) {
+            try {
+              await setMaintenanceBypassCookie(
+                APP_CONSTS.MAINTENANCE_BYPASS_COOKIE,
+              );
+            } catch (e) {
+              console.warn(
+                '[useWebView] Re-seed maintenance bypass after logout failed',
+                e,
+              );
+            }
+          }
+          // Clear stored user version so a different account logging in next
+          // doesn't see a stale value and trigger a redundant version-changed reload.
+          try {
+            await userVersionStorage.clear();
+          } catch (e) {
+            console.warn(
+              '[useWebView] Clearing user version on logout failed',
+              e,
+            );
+          }
           setTokens({ csrftoken: '', access_token: '' });
           setCachedCheckInForWidget(null);
           setWidgetDataStale(true);
@@ -373,30 +416,33 @@ const useWebView = () => {
           ]);
           await triggerWidgetRefresh();
 
-          // Improved WebView cookie and storage cleanup
+          // Improved WebView cookie and storage cleanup.
+          // maintenance_bypass must be preserved so the post-reload request
+          // doesn't get a 503 → maintenance.html response from nginx.
           ref.current?.injectJavaScript(`
           (function() {
-            // Clear cookies
+            // Clear cookies (preserve maintenance_bypass)
             const cookies = document.cookie.split(';');
             for (let i = 0; i < cookies.length; i++) {
               const cookie = cookies[i];
               const eqPos = cookie.indexOf('=');
               const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+              if (name === 'maintenance_bypass') continue;
               document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
               document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=' + window.location.hostname;
             }
-            
+
             // Clear storage
             localStorage.clear();
             sessionStorage.clear();
-            
+
             // Clear cache and reload
             if (window.caches) {
               caches.keys().then(function(names) {
                 for (let name of names) caches.delete(name);
               });
             }
-            
+
             // Force reload from server
             window.location.reload(true);
           })();

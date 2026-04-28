@@ -73,7 +73,8 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   const navigation = useNavigation();
   const { url = '/' } = route.params ?? {};
   const isDeepLinkPath = url !== '/' && url !== '';
-  const initialUri = isDeepLinkPath ? BASE_URL : BASE_URL + url;
+  // Load the target URL directly instead of root → JS redirect (saves one full page load).
+  const initialUri = BASE_URL + (url || '/');
   const deepLinkBackToBaseDoneRef = useRef(false);
 
   const {
@@ -99,15 +100,17 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
 
   // Automatically perform version check and update
   // Detect version changes
-  const versionChanged = useVersionCheckUpdate(tokens);
+  const { versionChanged, resetVersionChanged } = useVersionCheckUpdate(tokens);
 
-  // Reload on version change (rare, after the initial load)
+  // Reload on version change (rare, after the initial load).
+  // Reset the flag so a future change can trigger another reload.
   useEffect(() => {
     if (versionChanged && ref.current) {
       console.log('[AppScreen] Version changed, reloading WebView');
       ref.current.reload();
+      resetVersionChanged();
     }
-  }, [versionChanged]);
+  }, [versionChanged, resetVersionChanged]);
 
   // Modified to check only when returning to app after changing push permission settings
   useAppStateActiveEffect(async () => {
@@ -294,7 +297,7 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
     }
     return (
       <WebView
-        key={isDeepLinkPath ? `${BASE_URL}-redirect-${url}` : initialUri}
+        key={initialUri}
         ref={ref}
         onMessage={handleWebViewMessage}
         onNavigationStateChange={onNavigationStateChange}
@@ -303,19 +306,10 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         }}
         style={{ backgroundColor: 'transparent' }}
         containerStyle={{ backgroundColor: '#FFFFFF' }}
-        injectedJavaScriptBeforeContentLoaded={
-          (APP_CONSTS.MAINTENANCE_BYPASS
-            ? `(function(){if(!document.cookie.includes('maintenance_bypass=${APP_CONSTS.MAINTENANCE_BYPASS_COOKIE}')){document.cookie="maintenance_bypass=${APP_CONSTS.MAINTENANCE_BYPASS_COOKIE}; path=/; secure; max-age=31536000";location.reload();}})();`
-            : '') +
-          injectCookieScript(tokens.csrftoken, tokens.access_token) +
-          (isDeepLinkPath
-            ? `(function(){var b=${JSON.stringify(
-                BASE_URL.replace(/\/+$/, ''),
-              )},p=${JSON.stringify(
-                url,
-              )};if(p&&p!=="/"&&p!==""){var pathPart=p.replace(/^\\/+/, "");if(location.pathname==="/"||location.pathname===""){location.replace(b+(pathPart?"/"+pathPart:""));}}})();`
-            : '')
-        }
+        injectedJavaScriptBeforeContentLoaded={injectCookieScript(
+          tokens.csrftoken,
+          tokens.access_token,
+        )}
         allowsBackForwardNavigationGestures
         allowFileAccess={true}
         allowFileAccessFromFileURLs={true}

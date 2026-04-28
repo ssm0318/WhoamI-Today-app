@@ -7,13 +7,14 @@ import { syncVersionTypeToWidget } from '../native/WidgetDataModule';
 
 // Constants
 const USER_VERSION_KEY = '@user_version';
+const ACTIVE_CHECK_THROTTLE_MS = 5 * 60 * 1000;
 
 /**
  * Hook that automatically handles version check and update
  * Performs check on initial mount and whenever app becomes active
  *
  * @param tokens Token object (access_token, csrftoken)
- * @returns Version change status (true: changed, false: no change)
+ * @returns Object with versionChanged flag and reset function
  */
 const useVersionCheckUpdate = (tokens: {
   access_token?: string;
@@ -24,6 +25,9 @@ const useVersionCheckUpdate = (tokens: {
 
   // Ref for tracking check state
   const isChecking = useRef<boolean>(false);
+  // Last successful check time — used to throttle redundant API calls
+  // when the app rapidly toggles foreground/background.
+  const lastCheckedAtRef = useRef<number>(0);
 
   // Version check and update logic
   const checkAndUpdateVersion = useCallback(async (): Promise<{
@@ -64,14 +68,19 @@ const useVersionCheckUpdate = (tokens: {
       // Compare current version with stored version
       const currentVersion = meResponse.current_ver ?? VersionType.DEFAULT;
       const storedVersion = await AsyncStorage.getItem(USER_VERSION_KEY);
-      const hasChanged = storedVersion !== currentVersion;
+      // First write (storedVersion === null) is initialization, not a change —
+      // don't trigger a reload for it.
+      const hasChanged =
+        storedVersion !== null && storedVersion !== currentVersion;
 
-      if (hasChanged) {
-        // Save if version has changed
+      if (storedVersion !== currentVersion) {
         await AsyncStorage.setItem(
           USER_VERSION_KEY,
           currentVersion || VersionType.DEFAULT,
         );
+      }
+
+      if (hasChanged) {
         console.log(
           '🔄 [useVersionCheckUpdate] Version Change Detected!\n',
           '📱 Previous Version:',
@@ -80,13 +89,13 @@ const useVersionCheckUpdate = (tokens: {
           '✨ New Version:',
           currentVersion,
         );
-
-        // Update version change state
         setVersionChanged(true);
       }
 
       // Sync version type to native widgets (always sync, not just on change)
       await syncVersionTypeToWidget(currentVersion || VersionType.DEFAULT);
+
+      lastCheckedAtRef.current = Date.now();
 
       return {
         hasChanged,
@@ -124,11 +133,14 @@ const useVersionCheckUpdate = (tokens: {
     }
   }, [tokens.access_token, tokens.csrftoken, checkAndUpdateVersion]);
 
-  // Check version every time the app becomes active. No throttling — the
-  // isChecking ref inside checkAndUpdateVersion already collapses overlapping
-  // calls, so rapid background/foreground toggles can't stack requests.
+  // Check version when the app becomes active, but skip if we just checked.
+  // Short background/foreground hops shouldn't fire a network request — and
+  // crucially shouldn't risk a WebView reload from a transient version flip.
   useAppStateActiveEffect(() => {
     if (!tokens.access_token || !tokens.csrftoken) return;
+    if (Date.now() - lastCheckedAtRef.current < ACTIVE_CHECK_THROTTLE_MS) {
+      return;
+    }
 
     console.log('[useVersionCheckUpdate] Checking version on app activation');
     checkAndUpdateVersion().catch((error) => {
@@ -139,8 +151,11 @@ const useVersionCheckUpdate = (tokens: {
     });
   });
 
-  // Return version change status
-  return versionChanged;
+  const resetVersionChanged = useCallback(() => {
+    setVersionChanged(false);
+  }, []);
+
+  return { versionChanged, resetVersionChanged };
 };
 
 export default useVersionCheckUpdate;
