@@ -25,14 +25,16 @@ static NSData *WAIWidgetImageDataForWidgetStorage(NSData *data, CGFloat maxSideP
     if (targetSize.width < 1 || targetSize.height < 1) {
         return data;
     }
-    UIGraphicsBeginImageContextWithOptions(targetSize, NO, 1.0);
-    [image drawInRect:CGRectMake(0, 0, targetSize.width, targetSize.height)];
-    UIImage *scaled = UIGraphicsGetImageFromCurrentImageContext();
-    UIGraphicsEndImageContext();
-    if (!scaled) {
-        return data;
-    }
-    NSData *jpeg = UIImageJPEGRepresentation(scaled, 0.88);
+    // UIGraphicsImageRenderer is thread-safe (unlike the deprecated
+    // UIGraphicsBeginImageContextWithOptions which must run on the main thread
+    // and crashes on background threads in iOS 17+).
+    UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat defaultFormat];
+    format.scale = 1.0;
+    format.opaque = NO;
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:targetSize format:format];
+    NSData *jpeg = [renderer JPEGDataWithCompressionQuality:0.88 actions:^(UIGraphicsImageRendererContext * _Nonnull ctx) {
+        [image drawInRect:CGRectMake(0, 0, targetSize.width, targetSize.height)];
+    }];
     return jpeg ?: data;
 }
 
@@ -152,7 +154,11 @@ static NSMutableDictionary<NSString *, NSNumber *> *_waiFollowUpGensByKind = nil
 }
 
 - (void)reloadTimelinesWithFollowUpForKind:(NSString *)kind {
+    __weak typeof(self) weakSelf = self;
     dispatch_async(dispatch_get_main_queue(), ^{
+        typeof(self) strongSelf = weakSelf;
+        if (!strongSelf) return;
+
         NSDate *now = [NSDate date];
         NSDate *lastFire = _waiLastFireTimesByKind[kind];
         NSTimeInterval elapsed = lastFire
@@ -162,7 +168,7 @@ static NSMutableDictionary<NSString *, NSNumber *> *_waiFollowUpGensByKind = nil
         if (elapsed >= kWAIImmediateReloadCooldown) {
             NSLog(@"[WidgetSync][iOSNative] reloadWithFollowUp[%@] fire (elapsed=%.2fs)", kind, elapsed);
             _waiLastFireTimesByKind[kind] = now;
-            [self reloadTimelinesOfKind:kind];
+            [strongSelf reloadTimelinesOfKind:kind];
         } else {
             NSLog(@"[WidgetSync][iOSNative] reloadWithFollowUp[%@] coalesced (elapsed=%.2fs)", kind, elapsed);
         }
@@ -179,7 +185,7 @@ static NSMutableDictionary<NSString *, NSNumber *> *_waiFollowUpGensByKind = nil
             NSLog(@"[WidgetSync][iOSNative] reloadWithFollowUp[%@] follow-up fires (gen=%lu)",
                   kind, (unsigned long)gen);
             _waiLastFireTimesByKind[kind] = [NSDate date];
-            [self reloadTimelinesOfKind:kind];
+            [weakSelf reloadTimelinesOfKind:kind];
         });
     });
 }
@@ -189,22 +195,27 @@ static NSMutableDictionary<NSString *, NSNumber *> *_waiFollowUpGensByKind = nil
     [self reloadTimelinesOfKind:@"CheckinWidgetV3"];
     [self reloadTimelinesOfKind:@"AlbumCoverWidgetV3"];
     [self reloadTimelinesOfKind:@"PhotoWidget"];
+    __weak typeof(self) weakSelf = self;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-        [self reloadTimelinesOfKind:@"CheckinWidgetV3"];
-        [self reloadTimelinesOfKind:@"AlbumCoverWidgetV3"];
-        [self reloadTimelinesOfKind:@"PhotoWidget"];
+        [weakSelf reloadTimelinesOfKind:@"CheckinWidgetV3"];
+        [weakSelf reloadTimelinesOfKind:@"AlbumCoverWidgetV3"];
+        [weakSelf reloadTimelinesOfKind:@"PhotoWidget"];
     });
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(6.0 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-        [self reloadTimelinesOfKind:@"CheckinWidgetV3"];
-        [self reloadTimelinesOfKind:@"AlbumCoverWidgetV3"];
-        [self reloadTimelinesOfKind:@"PhotoWidget"];
+        [weakSelf reloadTimelinesOfKind:@"CheckinWidgetV3"];
+        [weakSelf reloadTimelinesOfKind:@"AlbumCoverWidgetV3"];
+        [weakSelf reloadTimelinesOfKind:@"PhotoWidget"];
     });
 }
 
 - (void)reloadWidgetTimelinesWithFollowUp {
+    __weak typeof(self) weakSelf = self;
     dispatch_async(dispatch_get_main_queue(), ^{
+        typeof(self) strongSelf = weakSelf;
+        if (!strongSelf) return;
+
         NSDate *now = [NSDate date];
         NSTimeInterval elapsed = _waiLastImmediateFireTime
             ? [now timeIntervalSinceDate:_waiLastImmediateFireTime]
@@ -213,7 +224,7 @@ static NSMutableDictionary<NSString *, NSNumber *> *_waiFollowUpGensByKind = nil
         if (elapsed >= kWAIImmediateReloadCooldown) {
             NSLog(@"[WidgetSync][iOSNative] reloadWithFollowUp fire (elapsed=%.2fs)", elapsed);
             _waiLastImmediateFireTime = now;
-            [self reloadWidgetTimelines];
+            [strongSelf reloadWidgetTimelines];
         } else {
             NSLog(@"[WidgetSync][iOSNative] reloadWithFollowUp coalesced (elapsed=%.2fs)", elapsed);
         }
@@ -227,7 +238,7 @@ static NSMutableDictionary<NSString *, NSNumber *> *_waiFollowUpGensByKind = nil
             NSLog(@"[WidgetSync][iOSNative] reloadWithFollowUp follow-up fires (gen=%lu)",
                   (unsigned long)gen);
             _waiLastImmediateFireTime = [NSDate date];
-            [self reloadWidgetTimelines];
+            [weakSelf reloadWidgetTimelines];
         });
     });
 }
