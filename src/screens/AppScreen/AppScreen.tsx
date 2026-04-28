@@ -332,6 +332,8 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         cacheEnabled={true}
         cacheMode={Platform.OS === 'android' ? 'LOAD_DEFAULT' : undefined}
         domStorageEnabled
+        allowsInlineMediaPlayback={true}
+        mediaPlaybackRequiresUserAction={false}
         /* Keyboard-related settings - apply platform-specific differences */
         scrollEnabled={true}
         keyboardDisplayRequiresUserAction={Platform.OS === 'ios'}
