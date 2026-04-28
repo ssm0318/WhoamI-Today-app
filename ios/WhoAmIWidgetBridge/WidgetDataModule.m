@@ -8,34 +8,36 @@ static NSData *WAIWidgetImageDataForWidgetStorage(NSData *data, CGFloat maxSideP
     if (data.length == 0) {
         return nil;
     }
-    UIImage *image = [UIImage imageWithData:data];
-    if (!image) {
-        return data;
+    @autoreleasepool {
+        UIImage *image = [UIImage imageWithData:data];
+        if (!image) {
+            return data;
+        }
+        CGFloat w = image.size.width * image.scale;
+        CGFloat h = image.size.height * image.scale;
+        CGFloat maxSide = MAX(w, h);
+        CGSize targetSize;
+        if (maxSide <= maxSidePoints) {
+            targetSize = CGSizeMake(w, h);
+        } else {
+            CGFloat ratio = maxSidePoints / maxSide;
+            targetSize = CGSizeMake(round(w * ratio), round(h * ratio));
+        }
+        if (targetSize.width < 1 || targetSize.height < 1) {
+            return data;
+        }
+        // UIGraphicsImageRenderer is thread-safe (unlike the deprecated
+        // UIGraphicsBeginImageContextWithOptions which must run on the main thread
+        // and crashes on background threads in iOS 17+).
+        UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat defaultFormat];
+        format.scale = 1.0;
+        format.opaque = NO;
+        UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:targetSize format:format];
+        NSData *jpeg = [renderer JPEGDataWithCompressionQuality:0.88 actions:^(UIGraphicsImageRendererContext * _Nonnull ctx) {
+            [image drawInRect:CGRectMake(0, 0, targetSize.width, targetSize.height)];
+        }];
+        return jpeg ?: data;
     }
-    CGFloat w = image.size.width * image.scale;
-    CGFloat h = image.size.height * image.scale;
-    CGFloat maxSide = MAX(w, h);
-    CGSize targetSize;
-    if (maxSide <= maxSidePoints) {
-        targetSize = CGSizeMake(w, h);
-    } else {
-        CGFloat ratio = maxSidePoints / maxSide;
-        targetSize = CGSizeMake(round(w * ratio), round(h * ratio));
-    }
-    if (targetSize.width < 1 || targetSize.height < 1) {
-        return data;
-    }
-    // UIGraphicsImageRenderer is thread-safe (unlike the deprecated
-    // UIGraphicsBeginImageContextWithOptions which must run on the main thread
-    // and crashes on background threads in iOS 17+).
-    UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat defaultFormat];
-    format.scale = 1.0;
-    format.opaque = NO;
-    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:targetSize format:format];
-    NSData *jpeg = [renderer JPEGDataWithCompressionQuality:0.88 actions:^(UIGraphicsImageRendererContext * _Nonnull ctx) {
-        [image drawInRect:CGRectMake(0, 0, targetSize.width, targetSize.height)];
-    }];
-    return jpeg ?: data;
 }
 
 static NSString *const kWAIAppGroupId = @"group.com.whoami.today.app";
@@ -87,6 +89,19 @@ static NSString *WAIReadUTF8AppGroupFile(NSString *filename) {
 @implementation WidgetDataModule
 
 RCT_EXPORT_MODULE();
+
++ (BOOL)requiresMainQueueSetup {
+    return NO;
+}
+
+- (dispatch_queue_t)methodQueue {
+    static dispatch_queue_t queue;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        queue = dispatch_queue_create("com.whoami.today.WidgetDataModule", DISPATCH_QUEUE_SERIAL);
+    });
+    return queue;
+}
 
 static NSArray *kWidgetKinds = nil;
 
@@ -369,11 +384,13 @@ RCT_EXPORT_METHOD(syncMyCheckIn:(NSDictionary *)checkInData
 
         // Store album image binary if provided
         if (albumImageBase64.length > 0) {
-            NSData *imageData = [[NSData alloc] initWithBase64EncodedString:albumImageBase64
-                                                                   options:NSDataBase64DecodingIgnoreUnknownCharacters];
-            if (imageData) {
-                [sharedDefaults setObject:imageData forKey:@"widget_album_image"];
-                WAIWriteDataFile(@"widget_album_image.bin", imageData);
+            @autoreleasepool {
+                NSData *imageData = [[NSData alloc] initWithBase64EncodedString:albumImageBase64
+                                                                       options:NSDataBase64DecodingIgnoreUnknownCharacters];
+                if (imageData) {
+                    [sharedDefaults setObject:imageData forKey:@"widget_album_image"];
+                    WAIWriteDataFile(@"widget_album_image.bin", imageData);
+                }
             }
         } else {
             [sharedDefaults removeObjectForKey:@"widget_album_image"];
@@ -447,15 +464,17 @@ RCT_EXPORT_METHOD(syncSharedPlaylistTrack:(NSDictionary *)trackData
         containerURLForSecurityApplicationGroupIdentifier:@"group.com.whoami.today.app"];
 
     if (albumImageBase64.length > 0) {
-        NSData *albumData = [[NSData alloc] initWithBase64EncodedString:albumImageBase64
-                                                                options:NSDataBase64DecodingIgnoreUnknownCharacters];
-        if (albumData) {
-            NSData *storedAlbum = WAIWidgetImageDataForWidgetStorage(albumData, 512);
-            if (storedAlbum) {
-                [sharedDefaults setObject:storedAlbum forKey:@"widget_shared_playlist_album_image"];
-                if (containerURL) {
-                    [storedAlbum writeToURL:[containerURL URLByAppendingPathComponent:@"shared_playlist_album.bin"]
-                                 atomically:YES];
+        @autoreleasepool {
+            NSData *albumData = [[NSData alloc] initWithBase64EncodedString:albumImageBase64
+                                                                    options:NSDataBase64DecodingIgnoreUnknownCharacters];
+            if (albumData) {
+                NSData *storedAlbum = WAIWidgetImageDataForWidgetStorage(albumData, 512);
+                if (storedAlbum) {
+                    [sharedDefaults setObject:storedAlbum forKey:@"widget_shared_playlist_album_image"];
+                    if (containerURL) {
+                        [storedAlbum writeToURL:[containerURL URLByAppendingPathComponent:@"shared_playlist_album.bin"]
+                                     atomically:YES];
+                    }
                 }
             }
         }
@@ -468,15 +487,17 @@ RCT_EXPORT_METHOD(syncSharedPlaylistTrack:(NSDictionary *)trackData
 
     // Sharer avatar — same dual storage
     if (avatarImageBase64.length > 0) {
-        NSData *avatarData = [[NSData alloc] initWithBase64EncodedString:avatarImageBase64
-                                                                 options:NSDataBase64DecodingIgnoreUnknownCharacters];
-        if (avatarData) {
-            NSData *storedAvatar = WAIWidgetImageDataForWidgetStorage(avatarData, 160);
-            if (storedAvatar) {
-                [sharedDefaults setObject:storedAvatar forKey:@"widget_shared_playlist_avatar_image"];
-                if (containerURL) {
-                    [storedAvatar writeToURL:[containerURL URLByAppendingPathComponent:@"shared_playlist_avatar.bin"]
-                                 atomically:YES];
+        @autoreleasepool {
+            NSData *avatarData = [[NSData alloc] initWithBase64EncodedString:avatarImageBase64
+                                                                     options:NSDataBase64DecodingIgnoreUnknownCharacters];
+            if (avatarData) {
+                NSData *storedAvatar = WAIWidgetImageDataForWidgetStorage(avatarData, 160);
+                if (storedAvatar) {
+                    [sharedDefaults setObject:storedAvatar forKey:@"widget_shared_playlist_avatar_image"];
+                    if (containerURL) {
+                        [storedAvatar writeToURL:[containerURL URLByAppendingPathComponent:@"shared_playlist_avatar.bin"]
+                                     atomically:YES];
+                    }
                 }
             }
         }
@@ -700,20 +721,24 @@ RCT_EXPORT_METHOD(syncFriendUpdate:(NSDictionary *)payload
     [sharedDefaults removeObjectForKey:@"friend_post"];
 
     if (profileImageBase64.length > 0) {
-        NSData *profileData = [[NSData alloc] initWithBase64EncodedString:profileImageBase64
-                                                                  options:NSDataBase64DecodingIgnoreUnknownCharacters];
-        if (profileData) {
-            [sharedDefaults setObject:profileData forKey:@"widget_friend_update_profile_image"];
+        @autoreleasepool {
+            NSData *profileData = [[NSData alloc] initWithBase64EncodedString:profileImageBase64
+                                                                      options:NSDataBase64DecodingIgnoreUnknownCharacters];
+            if (profileData) {
+                [sharedDefaults setObject:profileData forKey:@"widget_friend_update_profile_image"];
+            }
         }
     } else {
         [sharedDefaults removeObjectForKey:@"widget_friend_update_profile_image"];
     }
 
     if (contentImageBase64.length > 0) {
-        NSData *contentData = [[NSData alloc] initWithBase64EncodedString:contentImageBase64
-                                                                  options:NSDataBase64DecodingIgnoreUnknownCharacters];
-        if (contentData) {
-            [sharedDefaults setObject:contentData forKey:@"widget_friend_update_content_image"];
+        @autoreleasepool {
+            NSData *contentData = [[NSData alloc] initWithBase64EncodedString:contentImageBase64
+                                                                      options:NSDataBase64DecodingIgnoreUnknownCharacters];
+            if (contentData) {
+                [sharedDefaults setObject:contentData forKey:@"widget_friend_update_content_image"];
+            }
         }
     } else {
         [sharedDefaults removeObjectForKey:@"widget_friend_update_content_image"];
