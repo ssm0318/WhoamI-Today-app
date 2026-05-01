@@ -482,14 +482,12 @@ public class CheckinWidgetProvider extends AppWidgetProvider {
     private static String getBatteryEmoji(String battery) {
         if (battery == null || battery.isEmpty()) return "+";
         switch (battery.toLowerCase()) {
-            case "super_social": return "🔋";
-            case "fully_charged": return "🔋";
+            case "super_social": return "🤩";
+            case "fully_charged": return "🚀";
             case "moderately_social": return "🔋";
-            // Use widely supported glyph for Android widget text rendering.
-            // The low-battery emoji (🪫) can render as tofu/x on some devices.
-            case "needs_recharge": return "🔋";
-            case "low": return "🔋";
-            case "completely_drained": return "🔋";
+            case "needs_recharge": return "🔌";
+            case "low": return "🪫";
+            case "completely_drained": return "💤";
             default: return battery;
         }
     }

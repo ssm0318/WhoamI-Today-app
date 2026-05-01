@@ -7,8 +7,8 @@ buildscript {
         compileSdkVersion = 36
         targetSdkVersion = 35
 
-        // NDK r26 includes modern linker/toolchain updates used by 16KB page-size compatible builds.
-        ndkVersion = "26.1.10909125"
+        // NDK r27+ improves 16KB page-size linking behavior for native modules.
+        ndkVersion = "27.1.12297006"
 
         kotlinVersion = '1.9.24'
         kotlin_version = '1.9.24'

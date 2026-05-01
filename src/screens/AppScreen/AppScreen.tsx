@@ -162,9 +162,11 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
   useFocusEffect(
     React.useCallback(() => {
       const handler = () => onPressHardwareBackButtonRef.current();
-      BackHandler.addEventListener('hardwareBackPress', handler);
-      return () =>
-        BackHandler.removeEventListener('hardwareBackPress', handler);
+      const backPressSubscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        handler,
+      );
+      return () => backPressSubscription.remove();
     }, []),
   );
 

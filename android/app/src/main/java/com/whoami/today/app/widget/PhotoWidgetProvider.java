@@ -174,9 +174,9 @@ public class PhotoWidgetProvider extends AppWidgetProvider {
             int appWidgetId, JSONObject friendUpdate, String contentImageBase64,
             String profileImageBase64, long startTime) {
         String kind = friendUpdate.optString("kind", "");
-        Intent feedIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("whoami://app/friends/feed"));
+        Intent friendsIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("whoami://app/friends"));
         PendingIntent pendingIntent = PendingIntent.getActivity(
-            context, 0, feedIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            context, 0, friendsIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         // Decode images off the main thread
         final String finalContentImageBase64 = contentImageBase64 != null ? contentImageBase64 : "";
