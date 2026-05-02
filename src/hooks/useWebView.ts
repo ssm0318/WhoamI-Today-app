@@ -1,6 +1,7 @@
 import { useFirebaseMessage, useNavigationService } from '@hooks';
 import {
   setAnalyticsUser,
+  trackEvent,
   trackScreenView,
   AnalyticsUserProperties,
 } from '../utils/analytics';
@@ -470,6 +471,11 @@ const useWebView = () => {
         case 'ANALYTICS_SET_USER': {
           const { user_id, ...properties } = data;
           setAnalyticsUser(user_id, properties as AnalyticsUserProperties);
+          return;
+        }
+        case 'ANALYTICS_TRACK_EVENT': {
+          const { name, params } = data;
+          trackEvent(name, params);
           return;
         }
         case 'WIDGET_DATA_UPDATED': {
