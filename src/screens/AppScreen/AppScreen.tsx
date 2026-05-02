@@ -606,9 +606,10 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
           }
 
           // ── Friend update sync ──
-          // Picks a random friend with a check-in or post update and syncs one
-          // representative update (post prioritized over check-in) to the
-          // Friend Update Widget. Check-in variation follows last_updated_field.
+          // Picks the friend with the most recent visible update (post or
+          // check-in component) and syncs that update to the Friend Update
+          // Widget. Recency is sourced from backend `last_updated_at` and the
+          // post-vs-checkin choice from `last_updated_kind`.
           try {
             console.log(
               '[WidgetSync] Fetching friend list from /user/friends/',
@@ -668,20 +669,20 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
               id: number;
               username: string;
               profile_image: string | null;
-              current_user_read: boolean;
-              unread_post_cnt: number;
-              latest_unread_post: {
-                id: number;
-                type: string;
-                content: string;
-                images: string[];
-              } | null;
+              last_updated_at: string | null;
+              last_updated_kind: 'post' | 'checkin' | null;
               last_updated_field:
                 | 'mood'
                 | 'social_battery'
                 | 'song'
                 | 'thought'
                 | null;
+              recent_posts?: Array<{
+                id: number;
+                type?: string;
+                content?: string;
+                images?: string[];
+              }>;
               mood: string[] | string | null;
               social_battery: string | null;
               thought: string | null;
@@ -709,22 +710,15 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
               firstFriendSample: allFriends[0]
                 ? {
                     username: allFriends[0].username,
-                    current_user_read: allFriends[0].current_user_read,
-                    unread_post_cnt: allFriends[0].unread_post_cnt,
-                    has_latest_unread_post: !!allFriends[0].latest_unread_post,
+                    last_updated_at: allFriends[0].last_updated_at,
+                    last_updated_kind: allFriends[0].last_updated_kind,
                     last_updated_field: allFriends[0].last_updated_field,
+                    recent_posts_len: allFriends[0].recent_posts?.length ?? 0,
                   }
                 : null,
             });
 
-            const hasPostUpdate = (f: FriendItem) =>
-              (f.unread_post_cnt ?? 0) > 0 || !!f.latest_unread_post;
-            const hasCheckinUpdate = (f: FriendItem) =>
-              f.current_user_read === false && !!f.last_updated_field;
-
-            const candidates = allFriends.filter(
-              (f) => hasPostUpdate(f) || hasCheckinUpdate(f),
-            );
+            const candidates = allFriends.filter((f) => !!f.last_updated_at);
             console.log('[WidgetSync] Friend update candidates:', {
               total: allFriends.length,
               candidates: candidates.length,
@@ -735,30 +729,38 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
               );
               await clearFriendUpdateFromWidget();
             } else {
-              const picked =
-                candidates[Math.floor(Math.random() * candidates.length)];
-              const preferPost = hasPostUpdate(picked);
+              const picked = candidates
+                .slice()
+                .sort((a, b) =>
+                  (b.last_updated_at ?? '').localeCompare(
+                    a.last_updated_at ?? '',
+                  ),
+                )[0];
+              const preferPost = picked.last_updated_kind === 'post';
               console.log('[WidgetSync] Picked friend:', {
                 username: picked.username,
                 kind: preferPost ? 'post' : 'checkin',
+                lastUpdatedAt: picked.last_updated_at,
                 lastUpdatedField: picked.last_updated_field,
               });
 
               let payload: FriendUpdatePayload | null = null;
               let contentImageBase64 = '';
 
-              if (preferPost && picked.latest_unread_post) {
-                const post = picked.latest_unread_post;
-                const hasImage = (post.images?.length ?? 0) > 0;
-                if (hasImage) {
-                  contentImageBase64 = await fetchImageAsBase64(post.images[0]);
+              const recentPost = picked.recent_posts?.[0];
+              if (preferPost && recentPost) {
+                const hasImage = (recentPost.images?.length ?? 0) > 0;
+                if (hasImage && recentPost.images?.[0]) {
+                  contentImageBase64 = await fetchImageAsBase64(
+                    recentPost.images[0],
+                  );
                 }
                 payload = {
                   kind: 'post',
                   friend: { username: picked.username },
                   post: {
-                    id: post.id,
-                    content: post.content ?? '',
+                    id: recentPost.id,
+                    content: recentPost.content ?? '',
                     has_image: hasImage,
                   },
                 };
