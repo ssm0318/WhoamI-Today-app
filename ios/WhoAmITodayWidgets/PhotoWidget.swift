@@ -70,25 +70,25 @@ struct PhotoWidgetProvider: TimelineProvider {
         guard let results = json["results"] as? [[String: Any]] else { return }
 
         let candidates: [[String: Any]] = results.filter { friend in
-            let hasPost = (friend["unread_post_cnt"] as? Int ?? 0) > 0
-                || !(friend["latest_unread_post"] is NSNull || friend["latest_unread_post"] == nil)
-            let currentUserRead = friend["current_user_read"] as? Bool ?? true
-            let lastUpdatedField = friend["last_updated_field"] as? String
-            let hasCheckin = !currentUserRead && (lastUpdatedField != nil)
-            return hasPost || hasCheckin
+            guard let ts = friend["last_updated_at"] as? String else { return false }
+            return !ts.isEmpty
         }
 
-        guard !candidates.isEmpty, let picked = candidates.randomElement() else { return }
+        guard !candidates.isEmpty,
+              let picked = candidates.max(by: {
+                  ($0["last_updated_at"] as? String ?? "") < ($1["last_updated_at"] as? String ?? "")
+              }) else { return }
         let username = picked["username"] as? String ?? ""
         let profileImageUrl = picked["profile_image"] as? String ?? ""
 
-        let preferPost = (picked["unread_post_cnt"] as? Int ?? 0) > 0
-            || !(picked["latest_unread_post"] is NSNull || picked["latest_unread_post"] == nil)
+        let preferPost = (picked["last_updated_kind"] as? String) == "post"
 
         var payload: [String: Any] = ["friend": ["username": username]]
         var contentImageUrl: URL? = nil
 
-        if preferPost, let post = picked["latest_unread_post"] as? [String: Any] {
+        if preferPost,
+           let posts = picked["recent_posts"] as? [[String: Any]],
+           let post = posts.first {
             let images = post["images"] as? [String] ?? []
             let hasImage = !images.isEmpty
             payload["kind"] = "post"

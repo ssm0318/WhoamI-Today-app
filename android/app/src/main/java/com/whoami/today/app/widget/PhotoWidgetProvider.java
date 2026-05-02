@@ -339,15 +339,12 @@ public class PhotoWidgetProvider extends AppWidgetProvider {
                     return;
                 }
 
-                // Collect candidates (post OR checkin update)
+                // Collect candidates: any friend with a visible recent update
                 java.util.List<JSONObject> candidates = new java.util.ArrayList<>();
                 for (int i = 0; i < results.length(); i++) {
                     JSONObject friend = results.getJSONObject(i);
-                    boolean hasPost = friend.optInt("unread_post_cnt", 0) > 0
-                            || (friend.has("latest_unread_post") && !friend.isNull("latest_unread_post"));
-                    boolean hasCheckin = !friend.optBoolean("current_user_read", true)
-                            && friend.has("last_updated_field") && !friend.isNull("last_updated_field");
-                    if (hasPost || hasCheckin) {
+                    String ts = friend.optString("last_updated_at", "");
+                    if (!ts.isEmpty()) {
                         candidates.add(friend);
                     }
                 }
@@ -357,12 +354,14 @@ public class PhotoWidgetProvider extends AppWidgetProvider {
                     return;
                 }
 
-                JSONObject picked = candidates.get((int) (Math.random() * candidates.size()));
+                // Sort by last_updated_at desc (ISO 8601 lex order = chronological)
+                candidates.sort((a, b) -> b.optString("last_updated_at", "")
+                                          .compareTo(a.optString("last_updated_at", "")));
+                JSONObject picked = candidates.get(0);
                 String username = picked.optString("username", "");
                 String profileImageUrl = picked.optString("profile_image", "");
 
-                boolean preferPost = picked.optInt("unread_post_cnt", 0) > 0
-                        || (picked.has("latest_unread_post") && !picked.isNull("latest_unread_post"));
+                boolean preferPost = "post".equals(picked.optString("last_updated_kind", ""));
 
                 JSONObject friendUpdate = new JSONObject();
                 JSONObject friendJson = new JSONObject();
@@ -371,8 +370,13 @@ public class PhotoWidgetProvider extends AppWidgetProvider {
 
                 String contentImageBase64 = "";
 
-                if (preferPost && picked.has("latest_unread_post") && !picked.isNull("latest_unread_post")) {
-                    JSONObject post = picked.getJSONObject("latest_unread_post");
+                JSONArray recentPosts = picked.optJSONArray("recent_posts");
+                JSONObject recentPost = (recentPosts != null && recentPosts.length() > 0)
+                        ? recentPosts.optJSONObject(0)
+                        : null;
+
+                if (preferPost && recentPost != null) {
+                    JSONObject post = recentPost;
                     JSONArray images = post.optJSONArray("images");
                     boolean hasImage = images != null && images.length() > 0;
 
