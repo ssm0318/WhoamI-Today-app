@@ -10,8 +10,8 @@ buildscript {
         // NDK r27+ improves 16KB page-size linking behavior for native modules.
         ndkVersion = "27.1.12297006"
 
-        kotlinVersion = '1.9.24'
-        kotlin_version = '1.9.24'
+        kotlinVersion = '2.0.21'
+        kotlin_version = '2.0.21'
     }
     repositories {
         google()
