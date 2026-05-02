@@ -1,6 +1,10 @@
 import { trackEvent } from './analytics';
 
-type WidgetKind = 'album_cover' | 'photo' | 'checkin' | 'unauthenticated';
+type WidgetKind =
+  | 'shared_playlist'
+  | 'friend_update'
+  | 'checkin'
+  | 'unauthenticated';
 type CheckinEditor = 'mood' | 'battery' | 'song' | 'thought';
 
 type WidgetTapInfo = {
@@ -44,10 +48,10 @@ export function parseWidgetTap(url: string): WidgetTapInfo | null {
     return { widget_kind: 'unauthenticated' };
   }
   if (rest.startsWith('app/discover')) {
-    return { widget_kind: 'album_cover' };
+    return { widget_kind: 'shared_playlist' };
   }
   if (rest.startsWith('app/friends')) {
-    return { widget_kind: 'photo' };
+    return { widget_kind: 'friend_update' };
   }
   if (rest.startsWith('app/update')) {
     const editor = getQueryParam(url, 'editor');
