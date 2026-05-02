@@ -56,7 +56,12 @@ struct PhotoWidgetProvider: TimelineProvider {
         let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
         completion(timeline)
 
-        if entry.isAuthenticated && !entry.isDefaultVersion && !entry.isVersionQ && entry.friendUpdate == nil {
+        // Always fetch on each timeline tick so the widget can surface a
+        // friend's update without the user having to open the app first.
+        // Render returns immediately with the cached entry above; the fetch
+        // writes new data to App Group storage and reloads the timeline,
+        // producing a quick second render with the fresh content.
+        if entry.isAuthenticated && !entry.isDefaultVersion && !entry.isVersionQ {
             Task.detached {
                 await Self.fetchFriendUpdateFromApi()
             }

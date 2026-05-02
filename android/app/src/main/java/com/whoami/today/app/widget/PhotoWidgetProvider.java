@@ -65,6 +65,23 @@ public class PhotoWidgetProvider extends AppWidgetProvider {
                 }
             }
         }
+
+        // Active fetch on the system's natural update cycle so the widget can
+        // surface a friend's update without the user having to open the app.
+        // updateAppWidget already renders the cached entry above; the fetch
+        // overwrites the cache and re-runs updateAppWidget on completion.
+        // RN's own WIDGET_UPDATE broadcast path skips this — see onReceive —
+        // because the RN sync just wrote fresh data itself.
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        String accessToken = prefs.getString("access_token", "");
+        String versionType = prefs.getString("user_version_type", VERSION_TYPE_DEFAULT);
+        if (accessToken != null && !accessToken.isEmpty()
+                && !VERSION_TYPE_DEFAULT.equals(versionType)
+                && !VERSION_TYPE_Q.equals(versionType)) {
+            for (int appWidgetId : appWidgetIds) {
+                fetchFriendUpdateFromApi(context, appWidgetManager, appWidgetId, prefs);
+            }
+        }
     }
 
     @Override
@@ -73,10 +90,18 @@ public class PhotoWidgetProvider extends AppWidgetProvider {
         String action = intent.getAction();
         Log.d(TAG, "[onReceive] Received broadcast: " + action);
         if ("com.whoami.today.app.WIDGET_UPDATE".equals(action)) {
+            // RN sync just wrote fresh data — only re-render, do NOT trigger
+            // another fetch (would race with RN's writes and waste a request).
             AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
             int[] appWidgetIds = appWidgetManager.getAppWidgetIds(
                 new android.content.ComponentName(context, PhotoWidgetProvider.class));
-            onUpdate(context, appWidgetManager, appWidgetIds);
+            for (int appWidgetId : appWidgetIds) {
+                try {
+                    updateAppWidget(context, appWidgetManager, appWidgetId);
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to update widget " + appWidgetId + " from broadcast", e);
+                }
+            }
         }
     }
 
