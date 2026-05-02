@@ -304,6 +304,14 @@ struct PhotoWidgetView: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(Color.white, lineWidth: 2))
                 .padding(6)
+        } else if UIImage(named: "DefaultProfile") != nil {
+            Image("DefaultProfile")
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 32, height: 32)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                .padding(6)
         } else if let update = entry.friendUpdate, let firstChar = update.friend.username.first {
             Text(String(firstChar).uppercased())
                 .font(.system(size: 13, weight: .semibold))
