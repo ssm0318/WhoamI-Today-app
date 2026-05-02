@@ -13,6 +13,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { RouteType } from '@types';
 import NavigationService from '@libs/NavigationService';
 import { triggerWidgetRefresh } from './src/native/WidgetDataModule';
+import { trackWidgetTap } from './src/utils/widgetTapAnalytics';
 
 if (!__DEV__) {
   crashlytics().setCrashlyticsCollectionEnabled(true);
@@ -122,6 +123,7 @@ function buildLinking(
         return null; // Don't navigate within our app
       }
 
+      trackWidgetTap(url);
       return url;
     },
     subscribe(listener) {
@@ -155,6 +157,7 @@ function buildLinking(
         }
 
         console.log('[Deep Link] Passing URL to navigation:', url);
+        trackWidgetTap(url);
         listener(url);
 
         // Ensure AppScreen gets the URL when subscribe fires (e.g. cold start from widget)
