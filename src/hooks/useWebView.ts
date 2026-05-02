@@ -27,7 +27,12 @@ const useWebView = () => {
   const { getCookie } = CookieStorage;
   const { registerOrUpdatePushToken } = useFirebaseMessage();
   const [isCanGoBack, setIsCanGoBack] = useState(false);
-  const { handleLogout } = useAnalytics(tokens);
+  const {
+    handleLogout,
+    trackBridgedEvent,
+    trackBridgedScreenView,
+    setBridgedUserProperties,
+  } = useAnalytics(tokens);
   const postMessage = useCallback((key: string, data: any) => {
     ref.current?.postMessage(JSON.stringify({ key, data }));
   }, []);
@@ -202,11 +207,33 @@ const useWebView = () => {
         case 'OPEN_CAMERA':
           openCamera();
           return;
+        // Analytics bridge: the web frontend already emits rich
+        // page-view / event / user-property messages, but they were
+        // being dropped here. Forward them to Firebase Analytics so
+        // research dashboards see route-level + feature-level traffic.
+        case 'ANALYTICS_TRACK_EVENT':
+          trackBridgedEvent(data.name, data.params);
+          return;
+        case 'ANALYTICS_PAGE_VIEW':
+          trackBridgedScreenView({
+            page_name: data.page_name,
+            page_path: data.page_path,
+          });
+          return;
+        case 'ANALYTICS_SET_USER':
+          setBridgedUserProperties(data);
+          return;
         default:
           return;
       }
     },
-    [openCamera, openGallery],
+    [
+      openCamera,
+      openGallery,
+      trackBridgedEvent,
+      trackBridgedScreenView,
+      setBridgedUserProperties,
+    ],
   );
 
   const onLoadProgress = useCallback((e: WebViewProgressEvent) => {
