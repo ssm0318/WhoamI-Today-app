@@ -43,6 +43,50 @@ const useAnalytics = (tokens: {
     }
   };
 
+  // Generic counterpart to trackEvent for events forwarded from the
+  // WebView (browse_mode_picked, etc.). Same fire-and-forget behaviour.
+  const trackBridgedEvent = async (
+    eventName: string,
+    params?: Record<string, any>,
+  ) => {
+    try {
+      await analyticsInstance.logEvent(eventName, { ...params });
+    } catch (e) {
+      console.log('[useAnalytics] bridged logEvent failed', eventName, e);
+    }
+  };
+
+  const trackBridgedScreenView = async (params: {
+    page_name: string;
+    page_path: string;
+  }) => {
+    try {
+      await analyticsInstance.logScreenView({
+        screen_name: params.page_name,
+        screen_class: params.page_path,
+      });
+    } catch (e) {
+      console.log('[useAnalytics] bridged logScreenView failed', e);
+    }
+  };
+
+  const setBridgedUserProperties = async (props: Record<string, any>) => {
+    try {
+      const { user_id, ...rest } = props;
+      if (user_id !== undefined && user_id !== null) {
+        await analyticsInstance.setUserId(String(user_id));
+      }
+      // Firebase requires string values for setUserProperties.
+      const stringProps: Record<string, string> = {};
+      Object.entries(rest).forEach(([k, v]) => {
+        stringProps[k] = v === null || v === undefined ? '' : String(v);
+      });
+      await analyticsInstance.setUserProperties(stringProps);
+    } catch (e) {
+      console.log('[useAnalytics] bridged setUserProperties failed', e);
+    }
+  };
+
   const handleAppStateChange = useCallback(async (state: AppStateStatus) => {
     if (state.match(/inactive|background/)) {
       console.log('[useAnalytics] App is inactive or background');
@@ -92,6 +136,9 @@ const useAnalytics = (tokens: {
     setUserProperties,
     trackEvent,
     handleLogout,
+    trackBridgedEvent,
+    trackBridgedScreenView,
+    setBridgedUserProperties,
   };
 };
 
