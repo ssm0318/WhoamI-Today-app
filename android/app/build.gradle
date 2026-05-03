@@ -111,6 +111,14 @@ android {
         }
     }
 
+    bundle {
+        // Bundle native libs into base APK instead of splitting per-ABI. Some OEM ROMs (notably OnePlus on
+        // Android 11) fail to install the per-ABI split, leaving the app without libreactnative.so / libhermes.so.
+        abi {
+            enableSplit false
+        }
+    }
+
     applicationVariants.all { variant ->
         variant.outputs.each { output ->
             def versionCodes = ["armeabi-v7a": 1, "x86": 2, "arm64-v8a": 3, "x86_64": 4]
