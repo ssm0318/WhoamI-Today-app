@@ -4,6 +4,13 @@
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
     </style>
 
+    <!-- Local copy of Theme.BootSplash so resource linking works (library attrs mirrored in attrs.xml) -->
+    <style name="Theme.BootSplash" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="bootSplashBackground">?android:colorBackground</item>
+        <item name="bootSplashLogo">@android:drawable/sym_def_app_icon</item>
+        <item name="postBootSplashTheme">?android:attr/theme</item>
+    </style>
+
     <style name="BootTheme" parent="Theme.BootSplash">
         <item name="bootSplashBackground">@color/bootsplash_background</item>
         <item name="bootSplashLogo">@drawable/bootsplash_logo</item>

@@ -1,0 +1,22 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Warn when node_modules/react-native version disagrees with package.json — the trap
+# that broke production 1.9. Switching branches doesn't update node_modules, so a
+# stale install from a previous branch can produce builds that don't match the
+# committed package.json (and crash at JS mount with 'Incompatible React versions').
+#
+# Args from git: $1=prev-HEAD $2=new-HEAD $3=branch-checkout-flag (1=branch, 0=file)
+[ "$3" = "1" ] || exit 0
+
+declared=$(node -p "require('./package.json').dependencies['react-native']" 2>/dev/null)
+installed=$(node -p "require('./node_modules/react-native/package.json').version" 2>/dev/null)
+
+[ -z "$declared" ] || [ -z "$installed" ] && exit 0
+
+case "$installed" in
+  $declared|${declared#^}|${declared#~}) exit 0 ;;
+esac
+
+printf '\n\033[33m⚠  react-native drift: package.json wants %s but node_modules has %s\033[0m\n' "$declared" "$installed" >&2
+printf '\033[33m   Run `rm -rf node_modules && yarn install` before building.\033[0m\n\n' >&2

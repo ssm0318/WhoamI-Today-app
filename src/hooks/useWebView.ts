@@ -1,16 +1,48 @@
-import { useAnalytics, useFirebaseMessage, useNavigationService } from '@hooks';
+import { useFirebaseMessage, useNavigationService } from '@hooks';
+import {
+  setAnalyticsUser,
+  trackEvent,
+  trackScreenView,
+  AnalyticsUserProperties,
+} from '../utils/analytics';
 import {
   CookieStorage,
   parseCookie,
   redirectSetting,
   saveCookie,
+  setMaintenanceBypassCookie,
+  userVersionStorage,
 } from '@tools';
+import { APP_CONSTS } from '@constants';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking } from 'react-native';
-import { WebViewMessageEvent, WebView } from 'react-native-webview';
+import {
+  WebViewMessageEvent,
+  WebView,
+  type WebViewNavigation,
+} from 'react-native-webview';
 import { WebViewProgressEvent } from 'react-native-webview/lib/WebViewTypes';
 import { ScreenRouteParamList } from '@screens';
 import ImagePicker from 'react-native-image-crop-picker';
+import {
+  clearAllWidgetDataForLogout,
+  clearFriendUpdateFromWidget,
+  clearMyCheckInFromWidget,
+  clearSharedPlaylistTrackFromWidget,
+  clearWidgetTokens,
+  getWidgetDiagnostics,
+  syncMyCheckInToWidget,
+  syncTokensToWidget,
+  triggerWidgetRefresh,
+} from '../native/WidgetDataModule';
+import {
+  normalizeDescriptionForWidget,
+  normalizeMoodForWidget,
+} from '../utils/widgetCheckInNormalize';
+import { setWidgetDataStale } from '../utils/widgetDataStale';
+import { setCachedCheckInForWidget } from '../utils/widgetCheckInCache';
+import { fetchSpotifyAlbumImageUrl } from '../utils/spotifyAlbumImage';
+import ApiService from '../apis/API';
 
 interface FileData {
   uri: string;
@@ -24,15 +56,15 @@ const useWebView = () => {
   const ref = useRef<WebView>(null);
   const navigation = useNavigationService();
   const [tokens, setTokens] = useState({ csrftoken: '', access_token: '' });
+  const [tokenLoadComplete, setTokenLoadComplete] = useState(false);
   const { getCookie } = CookieStorage;
   const { registerOrUpdatePushToken } = useFirebaseMessage();
   const [isCanGoBack, setIsCanGoBack] = useState(false);
-  const {
-    handleLogout,
-    trackBridgedEvent,
-    trackBridgedScreenView,
-    setBridgedUserProperties,
-  } = useAnalytics(tokens);
+
+  const onNavigationStateChange = useCallback((navState: WebViewNavigation) => {
+    setIsCanGoBack(navState.canGoBack ?? false);
+  }, []);
+
   const postMessage = useCallback((key: string, data: any) => {
     ref.current?.postMessage(JSON.stringify({ key, data }));
   }, []);
@@ -49,47 +81,35 @@ const useWebView = () => {
 
   useEffect(() => {
     const fetchTokens = async () => {
+      // Pre-seed the maintenance bypass cookie before the WebView mounts so the
+      // very first request already has it — replaces the page-side reload.
+      if (APP_CONSTS.MAINTENANCE_BYPASS) {
+        try {
+          await setMaintenanceBypassCookie(
+            APP_CONSTS.MAINTENANCE_BYPASS_COOKIE,
+          );
+        } catch (e) {
+          console.warn('[useWebView] setMaintenanceBypassCookie failed:', e);
+        }
+      }
       const { access_token, csrftoken } = await getCookie();
       setTokens({ access_token, csrftoken });
+      // Push tokens to the App Group before WebView mounts so home-screen widgets
+      // (Check-in reads csrftoken/access_token) see auth even if runWidgetSync runs later.
+      if (access_token && csrftoken) {
+        try {
+          await syncTokensToWidget(csrftoken, access_token);
+          console.log(
+            '[WidgetSync] Tokens synced to widget storage after AsyncStorage load',
+          );
+        } catch (e) {
+          console.warn('[WidgetSync] Early syncTokensToWidget failed:', e);
+        }
+      }
+      setTokenLoadComplete(true);
     };
 
     fetchTokens();
-  }, []);
-
-  // 📸 Camera capture
-  const openCamera = useCallback(() => {
-    ImagePicker.openCamera({
-      width: 300,
-      height: 400,
-      cropping: true,
-      compressImageQuality: 0.8,
-      includeBase64: true,
-    })
-      .then((image) => {
-        sendFileToWeb(image);
-      })
-      .catch((error) => {
-        console.log('Camera Error: ', error);
-      });
-  }, []);
-
-  // 📂 Select file from gallery
-  const openGallery = useCallback(() => {
-    console.log('openGallery');
-    ImagePicker.openPicker({
-      width: 300,
-      height: 400,
-      cropping: true,
-      multiple: false,
-      compressImageQuality: 0.8,
-      includeBase64: true,
-    })
-      .then((image) => {
-        sendFileToWeb(image);
-      })
-      .catch((error) => {
-        console.log('Gallery Error: ', error);
-      });
   }, []);
 
   const sendFileToWeb = useCallback(
@@ -105,6 +125,136 @@ const useWebView = () => {
     },
     [postMessage],
   );
+
+  // 📸 Camera capture (image or video)
+  const openCamera = useCallback(() => {
+    ImagePicker.openCamera({
+      mediaType: 'any',
+      compressImageQuality: 0.8,
+      compressVideoPreset: 'MediumQuality',
+      includeBase64: true,
+    })
+      .then(async (media) => {
+        if (media.mime?.startsWith('video/')) {
+          try {
+            const RNFetchBlob = (await import('rn-fetch-blob')).default;
+            const base64Data = await RNFetchBlob.fs.readFile(
+              media.path,
+              'base64',
+            );
+            const fileData: FileData = {
+              uri: media.path,
+              type: media.mime || 'video/mp4',
+              name: media.path.split('/').pop() || 'video.mp4',
+              base64: base64Data,
+            };
+            postMessage('FILE_SELECTED', { ...fileData, isVideo: true });
+          } catch (err) {
+            console.log('Video base64 conversion error:', err);
+          }
+        } else {
+          sendFileToWeb(media);
+        }
+      })
+      .catch((error) => {
+        console.log('Camera Error: ', error);
+      });
+  }, [postMessage, sendFileToWeb]);
+
+  // 📂 Select file from gallery (image or video)
+  const openGallery = useCallback(() => {
+    console.log('openGallery');
+    ImagePicker.openPicker({
+      mediaType: 'any',
+      multiple: false,
+      compressImageQuality: 0.8,
+      compressVideoPreset: 'MediumQuality',
+      includeBase64: true,
+    })
+      .then(async (media) => {
+        if (media.mime?.startsWith('video/')) {
+          try {
+            const RNFetchBlob = (await import('rn-fetch-blob')).default;
+            const base64Data = await RNFetchBlob.fs.readFile(
+              media.path,
+              'base64',
+            );
+            const fileData: FileData = {
+              uri: media.path,
+              type: media.mime || 'video/mp4',
+              name: media.path.split('/').pop() || 'video.mp4',
+              base64: base64Data,
+            };
+            postMessage('FILE_SELECTED', { ...fileData, isVideo: true });
+          } catch (err) {
+            console.log('Video base64 conversion error:', err);
+          }
+        } else {
+          sendFileToWeb(media);
+        }
+      })
+      .catch((error) => {
+        console.log('Gallery Error: ', error);
+      });
+  }, [postMessage, sendFileToWeb]);
+
+  // 🎬 Video from gallery
+  const openVideoGallery = useCallback(() => {
+    ImagePicker.openPicker({
+      mediaType: 'video',
+      compressVideoPreset: 'MediumQuality',
+    })
+      .then(async (video) => {
+        try {
+          const RNFetchBlob = (await import('rn-fetch-blob')).default;
+          const base64Data = await RNFetchBlob.fs.readFile(
+            video.path,
+            'base64',
+          );
+          const fileData: FileData = {
+            uri: video.path,
+            type: video.mime || 'video/mp4',
+            name: video.path.split('/').pop() || 'video.mp4',
+            base64: base64Data,
+          };
+          postMessage('FILE_SELECTED', { ...fileData, isVideo: true });
+        } catch (err) {
+          console.log('Video base64 conversion error:', err);
+        }
+      })
+      .catch((error) => {
+        console.log('Video Gallery Error:', error);
+      });
+  }, [postMessage]);
+
+  // 🎬 Video from camera
+  const openVideoCamera = useCallback(() => {
+    ImagePicker.openCamera({
+      mediaType: 'video',
+      compressVideoPreset: 'MediumQuality',
+    })
+      .then(async (video) => {
+        try {
+          const RNFetchBlob = (await import('rn-fetch-blob')).default;
+          const base64Data = await RNFetchBlob.fs.readFile(
+            video.path,
+            'base64',
+          );
+          const fileData: FileData = {
+            uri: video.path,
+            type: video.mime || 'video/mp4',
+            name: video.path.split('/').pop() || 'video.mp4',
+            base64: base64Data,
+          };
+          postMessage('FILE_SELECTED', { ...fileData, isVideo: true });
+        } catch (err) {
+          console.log('Video base64 conversion error:', err);
+        }
+      })
+      .catch((error) => {
+        console.log('Video Camera Error:', error);
+      });
+  }, [postMessage]);
 
   /**
    * Handle requests from webview
@@ -134,13 +284,32 @@ const useWebView = () => {
       // Handle specific action types
       if (!('actionType' in data)) return;
 
+      console.log('[useWebView] Web action received:', data.actionType);
+
       switch (data.actionType) {
-        case 'CONSOLE':
-          console.log('[WEBVIEW CONSOLE]', data.data);
+        case 'CONSOLE': {
+          const logFn =
+            data.type && typeof (console as any)[data.type] === 'function'
+              ? (console as any)[data.type]
+              : console.log;
+          logFn(
+            `[WEBVIEW ${String(data.type || 'log').toUpperCase()}]`,
+            data.data,
+          );
           return;
+        }
         case 'OPEN_BROWSER':
           // Consider using openBrowserAsync in future updates
           await Linking.openURL(data.url);
+          return;
+        case 'OPEN_VIDEO':
+          if (data.url) {
+            navigation.navigate('VideoScreen', {
+              url: data.url,
+              postId: data.postId,
+              postType: data.postType,
+            });
+          }
           return;
         case 'NAVIGATE': {
           if (!data.screenName) return;
@@ -155,45 +324,126 @@ const useWebView = () => {
           return redirectSetting();
         case 'SET_COOKIE': {
           const parsedCookie = parseCookie(data.value);
-          setTokens(parsedCookie);
-          return saveCookie(parsedCookie);
+          const prevTokens = await CookieStorage.getCookie();
+          const mergedCookie = {
+            csrftoken: parsedCookie.csrftoken || prevTokens.csrftoken || '',
+            access_token:
+              parsedCookie.access_token || prevTokens.access_token || '',
+          };
+          // Persist to AsyncStorage/CookieManager BEFORE updating React state.
+          // The axios interceptor (apis/API.ts) reads tokens from CookieStorage
+          // asynchronously; if setTokens ran first, the token-driven useEffect
+          // would fire runWidgetSync → profile API call before AsyncStorage had
+          // the new tokens, and the interceptor would reject with "Missing
+          // authentication tokens" — leaving the widget on the previous
+          // account's data after account switch.
+          if (mergedCookie.csrftoken && mergedCookie.access_token) {
+            await saveCookie(mergedCookie);
+            await syncTokensToWidget(
+              mergedCookie.csrftoken,
+              mergedCookie.access_token,
+            );
+            await triggerWidgetRefresh();
+          } else {
+            console.log(
+              '[WidgetSync] SET_COOKIE skipped: incomplete token pair',
+              {
+                parsed: {
+                  hasCsrf: !!parsedCookie.csrftoken,
+                  hasAccess: !!parsedCookie.access_token,
+                },
+                merged: {
+                  hasCsrf: !!mergedCookie.csrftoken,
+                  hasAccess: !!mergedCookie.access_token,
+                },
+              },
+            );
+          }
+          setTokens(mergedCookie);
+          return;
         }
         case 'LOGOUT': {
           console.log('LOGOUT');
 
-          // End session
-          await handleLogout();
+          // Prioritize widget sign-out UX first. If app lifecycle changes quickly
+          // (e.g. user goes home immediately), widget storage is already cleared.
+          await clearAllWidgetDataForLogout();
+          await triggerWidgetRefresh();
 
-          // Unregister firebase push token
-          await registerOrUpdatePushToken(tokens, false);
+          // Unregister push token in best-effort mode; never block logout cleanup.
+          await registerOrUpdatePushToken(tokens, false).catch((e) => {
+            console.warn(
+              '[WidgetSync] Push token unregister failed during logout',
+              e,
+            );
+          });
 
           await CookieStorage.removeCookie();
+          // CookieManager.clearAll() above wiped maintenance_bypass too, which
+          // would make the post-logout reload hit nginx 503 → maintenance.html.
+          // Re-seed it before any reload happens.
+          if (APP_CONSTS.MAINTENANCE_BYPASS) {
+            try {
+              await setMaintenanceBypassCookie(
+                APP_CONSTS.MAINTENANCE_BYPASS_COOKIE,
+              );
+            } catch (e) {
+              console.warn(
+                '[useWebView] Re-seed maintenance bypass after logout failed',
+                e,
+              );
+            }
+          }
+          // Clear stored user version so a different account logging in next
+          // doesn't see a stale value and trigger a redundant version-changed reload.
+          try {
+            await userVersionStorage.clear();
+          } catch (e) {
+            console.warn(
+              '[useWebView] Clearing user version on logout failed',
+              e,
+            );
+          }
           setTokens({ csrftoken: '', access_token: '' });
+          setCachedCheckInForWidget(null);
+          setWidgetDataStale(true);
 
-          // Improved WebView cookie and storage cleanup
+          // Fallback clear calls keep compatibility if older native bridge is loaded.
+          await Promise.allSettled([
+            clearWidgetTokens(),
+            clearMyCheckInFromWidget(),
+            clearSharedPlaylistTrackFromWidget(),
+            clearFriendUpdateFromWidget(),
+          ]);
+          await triggerWidgetRefresh();
+
+          // Improved WebView cookie and storage cleanup.
+          // maintenance_bypass must be preserved so the post-reload request
+          // doesn't get a 503 → maintenance.html response from nginx.
           ref.current?.injectJavaScript(`
           (function() {
-            // Clear cookies
+            // Clear cookies (preserve maintenance_bypass)
             const cookies = document.cookie.split(';');
             for (let i = 0; i < cookies.length; i++) {
               const cookie = cookies[i];
               const eqPos = cookie.indexOf('=');
               const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+              if (name === 'maintenance_bypass') continue;
               document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
               document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=' + window.location.hostname;
             }
-            
+
             // Clear storage
             localStorage.clear();
             sessionStorage.clear();
-            
+
             // Clear cache and reload
             if (window.caches) {
               caches.keys().then(function(names) {
                 for (let name of names) caches.delete(name);
               });
             }
-            
+
             // Force reload from server
             window.location.reload(true);
           })();
@@ -207,33 +457,186 @@ const useWebView = () => {
         case 'OPEN_CAMERA':
           openCamera();
           return;
-        // Analytics bridge: the web frontend already emits rich
-        // page-view / event / user-property messages, but they were
-        // being dropped here. Forward them to Firebase Analytics so
-        // research dashboards see route-level + feature-level traffic.
-        case 'ANALYTICS_TRACK_EVENT':
-          trackBridgedEvent(data.name, data.params);
+        case 'OPEN_VIDEO_GALLERY':
+          openVideoGallery();
           return;
-        case 'ANALYTICS_PAGE_VIEW':
-          trackBridgedScreenView({
-            page_name: data.page_name,
-            page_path: data.page_path,
-          });
+        case 'OPEN_VIDEO_CAMERA':
+          openVideoCamera();
           return;
-        case 'ANALYTICS_SET_USER':
-          setBridgedUserProperties(data);
+        case 'ANALYTICS_PAGE_VIEW': {
+          const { page_name, page_path } = data;
+          trackScreenView(page_name, page_path);
           return;
+        }
+        case 'ANALYTICS_SET_USER': {
+          const { user_id, ...properties } = data;
+          setAnalyticsUser(user_id, properties as AnalyticsUserProperties);
+          return;
+        }
+        case 'ANALYTICS_TRACK_EVENT': {
+          const { name, params } = data;
+          trackEvent(name, params);
+          return;
+        }
+        case 'WIDGET_DATA_UPDATED': {
+          // If web sends check_in in the message (when user saves check-in), use it so widget
+          // matches the app screen without waiting for API. Otherwise fetch from API.
+          console.log(
+            '[WidgetSync] WIDGET_DATA_UPDATED received from WebView',
+            {
+              hasCheckInPayload: !!data.check_in,
+              payload: data.check_in,
+            },
+          );
+          setWidgetDataStale(true);
+          (async () => {
+            try {
+              const raw = data.check_in as
+                | {
+                    id?: number;
+                    is_active?: boolean;
+                    created_at?: string;
+                    mood?: string | string[];
+                    social_battery?: string | null;
+                    description?: string;
+                    thought?: string;
+                    track_id?: string;
+                    album_image_url?: string | null;
+                  }
+                | undefined;
+              if (raw && typeof raw.id === 'number') {
+                console.log(
+                  '[WidgetSync] WIDGET_DATA_UPDATED: using inline payload (id=' +
+                    raw.id +
+                    ')',
+                );
+                let albumImageUrl: string | null = raw.album_image_url ?? null;
+                if (!albumImageUrl && raw.track_id?.trim()) {
+                  albumImageUrl = await fetchSpotifyAlbumImageUrl(raw.track_id);
+                }
+                const payload = {
+                  id: raw.id,
+                  isActive: raw.is_active ?? true,
+                  createdAt: raw.created_at ?? '',
+                  mood: normalizeMoodForWidget(raw.mood),
+                  socialBattery: raw.social_battery ?? null,
+                  description: normalizeDescriptionForWidget(raw),
+                  trackId: raw.track_id ?? '',
+                  albumImageUrl,
+                };
+                await syncMyCheckInToWidget(payload);
+                setCachedCheckInForWidget(payload);
+
+                // Q1 verification: before firing reloads, read back what's actually in
+                // the App Group so we can distinguish a failed write from a failed reload.
+                try {
+                  const diag = await getWidgetDiagnostics();
+                  let persistedBattery: unknown = '(no-diag)';
+                  if (diag?.myCheckInJsonFile) {
+                    try {
+                      persistedBattery = JSON.parse(
+                        diag.myCheckInJsonFile,
+                      ).social_battery;
+                    } catch {
+                      persistedBattery = '(parse-failed)';
+                    }
+                  }
+                  console.log(
+                    '[WidgetSync] WIDGET_DATA_UPDATED: post-write verification',
+                    {
+                      expectedBattery: payload.socialBattery,
+                      persistedBattery,
+                      fileLen: diag?.myCheckInJsonFile?.length ?? 0,
+                      defaultsLen: diag?.myCheckInJson?.length ?? 0,
+                    },
+                  );
+                } catch (diagErr) {
+                  console.warn(
+                    '[WidgetSync] post-write verification failed',
+                    diagErr,
+                  );
+                }
+
+                // syncMyCheckInToWidget now triggers a kind-specific reload
+                // (CheckinWidgetV3) internally, so calling triggerWidgetRefresh
+                // here would burn album/photo widget reload budgets unnecessarily.
+                return;
+              }
+              console.log(
+                '[WidgetSync] WIDGET_DATA_UPDATED: no inline payload, fetching from API',
+              );
+              const [profileResponse, songResponse] = await Promise.all([
+                ApiService.API.get('user/me/profile') as Promise<unknown>,
+                ApiService.API.get('check_in/song/').catch(
+                  () => [],
+                ) as Promise<unknown>,
+              ]);
+              const res = profileResponse as {
+                check_in?: {
+                  id: number;
+                  is_active: boolean;
+                  created_at: string;
+                  mood?: string | string[];
+                  social_battery?: string | null;
+                  description?: string;
+                  thought?: string;
+                };
+              };
+              // /check_in/song/ returns DRF-paginated shape: { count, next, previous, results: [...] }
+              type SongItem = { track_id: string; is_active: boolean };
+              const songsResRaw = songResponse as
+                | SongItem[]
+                | { results?: SongItem[] }
+                | null
+                | undefined;
+              let songsList: SongItem[] = [];
+              if (Array.isArray(songsResRaw)) {
+                songsList = songsResRaw;
+              } else if (songsResRaw && Array.isArray(songsResRaw.results)) {
+                songsList = songsResRaw.results as SongItem[];
+              }
+              console.log('[WidgetSync] WIDGET_DATA_UPDATED: API responses', {
+                hasCheckInInProfile: !!res?.check_in,
+                checkInRaw: res?.check_in,
+                songsListLen: songsList.length,
+                songsRaw: songsResRaw,
+              });
+              const trackId =
+                songsList.find((s) => s.is_active)?.track_id ?? '';
+              const checkIn = res?.check_in;
+              if (checkIn) {
+                let albumImageUrl: string | null = null;
+                if (trackId.trim()) {
+                  albumImageUrl = await fetchSpotifyAlbumImageUrl(trackId);
+                }
+                const payload = {
+                  id: checkIn.id,
+                  isActive: checkIn.is_active,
+                  createdAt: checkIn.created_at,
+                  mood: normalizeMoodForWidget(checkIn.mood),
+                  socialBattery: checkIn.social_battery ?? null,
+                  description: normalizeDescriptionForWidget(checkIn),
+                  trackId,
+                  albumImageUrl,
+                };
+                await syncMyCheckInToWidget(payload);
+                setCachedCheckInForWidget(payload);
+              }
+              // syncMyCheckInToWidget above triggers a kind-specific reload
+              // internally — no all-kinds triggerWidgetRefresh needed.
+              void getWidgetDiagnostics();
+            } catch (err) {
+              console.warn('[WidgetSync] WIDGET_DATA_UPDATED failed:', err);
+              await triggerWidgetRefresh();
+            }
+          })();
+          return;
+        }
         default:
           return;
       }
     },
-    [
-      openCamera,
-      openGallery,
-      trackBridgedEvent,
-      trackBridgedScreenView,
-      setBridgedUserProperties,
-    ],
+    [openCamera, openGallery, openVideoGallery, openVideoCamera],
   );
 
   const onLoadProgress = useCallback((e: WebViewProgressEvent) => {
@@ -245,12 +648,16 @@ const useWebView = () => {
     loadProgress,
     onMessage,
     onLoadProgress,
+    onNavigationStateChange,
     postMessage,
     injectCookieScript,
     tokens,
+    tokenLoadComplete,
     isCanGoBack,
     openCamera,
     openGallery,
+    openVideoGallery,
+    openVideoCamera,
   };
 };
 

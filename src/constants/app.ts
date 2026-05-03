@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import Config from 'react-native-config';
 
 export const IS_IOS = Platform.OS === 'ios';
 export const IS_ANDROID = Platform.OS === 'android';
@@ -7,9 +8,13 @@ export const IS_ANDROID = Platform.OS === 'android';
 // NOTE
 // This hostname should be used when developing locally
 // Must be changed to PROD when actually archiving
-export const WEB_VIEW_DEV_HOSTNAME = 'localhost';
+export const WEB_VIEW_DEV_HOSTNAME = '192.168.219.175';
 export const IS_ADMIN = false; // Whether it is admin environment
-export const IS_DEV = false; // Whether it is development environment
+// Local WebView + LAN frontend: use DEV URLs below. Set false before release/archive builds.
+export const IS_DEV = false;
+// Set true for TestFlight/dev builds to bypass maintenance page. Set false for App Store release.
+export const MAINTENANCE_BYPASS = true;
+export const MAINTENANCE_BYPASS_COOKIE = 'whoami2026_v18_go'; // testflight 빌드 용 새 시크릿 (nginx admin 채널)
 
 export const WEB_VIEW_URL_INFO = {
   DEV: `http://${WEB_VIEW_DEV_HOSTNAME}:3000`,
@@ -39,3 +44,8 @@ export const API_URL = (() => {
   if (IS_DEV) return API_BASE_URL.DEV;
   return API_BASE_URL.PROD;
 })();
+
+// Spotify API credentials for widget
+// Values are loaded from .env file via react-native-config
+export const SPOTIFY_CLIENT_ID = Config.SPOTIFY_CLIENT_ID || '';
+export const SPOTIFY_CLIENT_SECRET = Config.SPOTIFY_CLIENT_SECRET || '';

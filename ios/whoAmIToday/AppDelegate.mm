@@ -1,8 +1,10 @@
 #import <Firebase.h>
 #import "AppDelegate.h"
-#import "RNBootSplash.h" 
+#import "RNBootSplash.h"
 
 #import <React/RCTBundleURLProvider.h>
+#import <React/RCTLinkingManager.h>
+#import "InitialURLModule.h"
 
 @implementation AppDelegate
 
@@ -21,6 +23,15 @@
 }
 
 - (NSURL *)sourceURLForBridge:(RCTBridge *)bridge
+{
+#if DEBUG
+  return [[RCTBundleURLProvider sharedSettings] jsBundleURLForBundleRoot:@"index"];
+#else
+  return [[NSBundle mainBundle] URLForResource:@"main" withExtension:@"jsbundle"];
+#endif
+}
+
+- (NSURL *)bundleURL
 {
 #if DEBUG
   return [[RCTBundleURLProvider sharedSettings] jsBundleURLForBundleRoot:@"index"];
@@ -49,6 +60,29 @@
   [RNBootSplash initWithStoryboard:@"BootSplash" rootView:rootView]; 
 
   return rootView;
+}
+
+// Handle deep links from widget
+- (BOOL)application:(UIApplication *)application
+            openURL:(NSURL *)url
+            options:(NSDictionary<UIApplicationOpenURLOptionsKey,id> *)options
+{
+  // Store URL so getInitialURL can return it when app was cold-started from widget
+  // (launchOptions may not contain the URL in that case)
+  if (url.absoluteString.length > 0) {
+    SetStoredInitialURL(url.absoluteString);
+  }
+  return [RCTLinkingManager application:application openURL:url options:options];
+}
+
+// Handle universal links
+- (BOOL)application:(UIApplication *)application
+    continueUserActivity:(NSUserActivity *)userActivity
+    restorationHandler:(void (^)(NSArray<id<UIUserActivityRestoring>> *))restorationHandler
+{
+  return [RCTLinkingManager application:application
+                   continueUserActivity:userActivity
+                     restorationHandler:restorationHandler];
 }
 
 @end

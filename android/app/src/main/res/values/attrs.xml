@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Mirrored from react-native-bootsplash so app style can link; runtime uses library R.attr -->
+    <attr name="bootSplashBackground" format="color" />
+    <attr name="bootSplashLogo" format="reference" />
+    <attr name="postBootSplashTheme" format="reference" />
+</resources>

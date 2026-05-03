@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Middle layer: wrap_content height forces square via spacer -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical">
+
+        <!-- Invisible 1:1 spacer: height = width -->
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:adjustViewBounds="true"
+            android:src="@drawable/spacer_square"
+            android:visibility="invisible"
+            android:importantForAccessibility="no" />
+
+        <!-- Actual visible content (square) -->
+        <FrameLayout
+            android:id="@+id/widget_album_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="0dp"
+            android:background="#FFFFFF">
+
+            <!-- Album cover image (fills entire widget) -->
+            <ImageView
+                android:id="@+id/album_image"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:visibility="gone" />
+
+            <!-- Playlist icon top-left, slightly inset from corner -->
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="top|start"
+                android:layout_marginStart="10dp"
+                android:layout_marginTop="10dp"
+                android:src="@drawable/ic_playlist"
+                android:contentDescription="Playlist" />
+
+            <!-- Friend profile image top-right, circular -->
+            <ImageView
+                android:id="@+id/friend_profile_image"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_gravity="top|end"
+                android:layout_marginEnd="10dp"
+                android:layout_marginTop="10dp"
+                android:scaleType="fitCenter"
+                android:visibility="gone"
+                android:contentDescription="Friend Profile" />
+
+            <!-- Placeholder when no album available -->
+            <LinearLayout
+                android:id="@+id/album_placeholder"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="#F5F5F5"
+                android:visibility="visible">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🎵"
+                    android:textSize="32sp" />
+
+            </LinearLayout>
+
+        </FrameLayout>
+    </FrameLayout>
+</FrameLayout>

@@ -3,24 +3,24 @@
 buildscript {
     ext {
         buildToolsVersion = "34.0.0"
-        minSdkVersion = 21
-        compileSdkVersion = 34
+        minSdkVersion = 24
+        compileSdkVersion = 36
         targetSdkVersion = 35
 
-        // We use NDK 23 which has both M1 support and is the side-by-side NDK version from AGP.
-        ndkVersion = "25.1.8937393" 
+        // NDK r27+ improves 16KB page-size linking behavior for native modules.
+        ndkVersion = "27.1.12297006"
 
-        kotlinVersion = '1.6.10'
-        kotlin_version = '1.6.10'
+        kotlinVersion = '1.9.24'
+        kotlin_version = '1.9.24'
     }
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
-        classpath("com.android.tools.build:gradle:7.3.1")
-        classpath("com.facebook.react:react-native-gradle-plugin")
-        classpath 'com.google.gms:google-services:4.3.5'
+        classpath("com.android.tools.build:gradle:8.9.1")
+        classpath 'com.google.gms:google-services:4.4.2'
+        classpath 'com.google.firebase:firebase-crashlytics-gradle:3.0.2'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }

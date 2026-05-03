@@ -11,13 +11,13 @@
             buildForTesting = "NO"
             buildForRunning = "YES"
             buildForProfiling = "YES"
-            buildForArchiving = "NO"
-            buildForAnalyzing = "NO">
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-               BuildableName = "WhoAmIToday.app"
-               BlueprintName = "whoAmIToday"
+               BlueprintIdentifier = "337225912D9EBEAD004127FB"
+               BuildableName = "whoAmITodaySecond.app"
+               BlueprintName = "whoAmITodaySecond"
                ReferencedContainer = "container:whoAmIToday.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -25,7 +25,7 @@
             buildForTesting = "YES"
             buildForRunning = "YES"
             buildForProfiling = "YES"
-            buildForArchiving = "YES"
+            buildForArchiving = "NO"
             buildForAnalyzing = "YES">
             <AutocreatedTestPlanReference>
             </AutocreatedTestPlanReference>
@@ -59,15 +59,6 @@
             ReferencedContainer = "container:whoAmIToday.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
-      <MacroExpansion>
-         <BuildableReference
-            BuildableIdentifier = "primary"
-            BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "WhoAmIToday.app"
-            BlueprintName = "whoAmIToday"
-            ReferencedContainer = "container:whoAmIToday.xcodeproj">
-         </BuildableReference>
-      </MacroExpansion>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"

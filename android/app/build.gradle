@@ -1,9 +1,14 @@
-apply plugin: "com.android.application"
-apply plugin: "com.facebook.react"
+plugins {
+    id "com.android.application"
+    id "com.facebook.react"
+    id "com.google.gms.google-services"
+    id "com.google.firebase.crashlytics"
+}
 
 import com.android.build.OutputFile
 
 react {
+    autolinkLibrariesWithApp()
 }
 
 def enableSeparateBuildPerCPUArchitecture = false
@@ -25,29 +30,42 @@ if (localPropertiesFile.exists()) {
 
 android {
     ndkVersion rootProject.ext.ndkVersion
-    compileSdkVersion rootProject.ext.compileSdkVersion
+    compileSdk rootProject.ext.compileSdkVersion
 
     namespace "com.whoami.today.app"
 
-    defaultConfig {
-        applicationId "com.whoami.today.app"
-        minSdkVersion rootProject.ext.minSdkVersion
-        targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 10403
-        versionName "1.4.3"
-
-        // ✅ 16KB page size 지원 (필수)
-        externalNativeBuild {
-            cmake {
-                arguments "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+    sourceSets {
+        main {
+            java {
+                // Exclude deprecated widget code (Manifest entries are commented out; layouts removed)
+                exclude '**/widget/*_DEPRECATED.java'
             }
         }
     }
 
-    // ✅ CMake 빌드 설정 (프로젝트에 CMakeLists가 있어야 함)
-    externalNativeBuild {
-        cmake {
-            path file("src/main/jni/CMakeLists.txt")
+    defaultConfig {
+        applicationId "com.whoami.today.app"
+        minSdk rootProject.ext.minSdkVersion
+        targetSdk rootProject.ext.targetSdkVersion
+        versionCode 10433
+        versionName "1.9"
+        ndk {
+            // Ship arm64-only native binaries for Play 16KB page-size compatibility.
+            abiFilters "arm64-v8a"
+        }
+        // .env from repo root (react-native-config) so Config.SPOTIFY_* is available on Android
+        def envFile = rootProject.file("../.env")
+        println("WhoAmI .env: path=" + envFile.getAbsolutePath() + " exists=" + envFile.exists())
+        if (envFile.exists()) {
+            envFile.eachLine { line ->
+                def matcher = (line =~ /^\s*(?:export\s+|)([\w\d\.\-_]+)\s*=\s*['"]?(.*?)?['"]?\s*$/)
+                if (matcher.getCount() == 1 && matcher[0].size() == 3) {
+                    def key = matcher[0][1]
+                    def value = matcher[0][2].replace('"', '\\"').replaceAll("%", "\\\\u0025")
+                    buildConfigField "String", key, "\"$value\""
+                    resValue "string", key, "\"$value\""
+                }
+            }
         }
     }
 
@@ -86,6 +104,21 @@ android {
         }
     }
 
+    packagingOptions {
+        jniLibs {
+            // AGP 8.5.1+ path: keep modern packaging to request proper 16KB page alignment in Play-generated APKs.
+            useLegacyPackaging false
+        }
+    }
+
+    bundle {
+        // Bundle native libs into base APK instead of splitting per-ABI. Some OEM ROMs (notably OnePlus on
+        // Android 11) fail to install the per-ABI split, leaving the app without libreactnative.so / libhermes.so.
+        abi {
+            enableSplit false
+        }
+    }
+
     applicationVariants.all { variant ->
         variant.outputs.each { output ->
             def versionCodes = ["armeabi-v7a": 1, "x86": 2, "arm64-v8a": 3, "x86_64": 4]
@@ -113,12 +146,11 @@ dependencies {
         implementation jscFlavor
     }
 
-    implementation 'com.google.firebase:firebase-messaging:21.1.0'
+    implementation platform('com.google.firebase:firebase-bom:33.5.1')
+    implementation 'com.google.firebase:firebase-messaging'
     implementation 'com.google.firebase:firebase-analytics'
     implementation 'org.jetbrains:annotations:16.0.2'
 
     // ❗ '+'는 재현성 깨짐. 가능하면 고정 권장
     implementation("androidx.activity:activity:1.9.3")
 }
-
-apply plugin: 'com.google.gms.google-services'

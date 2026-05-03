@@ -1,5 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CookieType } from '@types';
+import {
+  syncTokensToWidget,
+  clearWidgetTokens,
+} from '../native/WidgetDataModule';
 
 export const COOKIE_STORAGE_KEYS = {
   COOKIE: 'COOKIE',
@@ -15,6 +19,9 @@ export const CookieStorage = (() => {
       COOKIE_STORAGE_KEYS.COOKIE,
       JSON.stringify({ csrftoken, access_token }),
     );
+
+    // Sync to native widget storage
+    await syncTokensToWidget(csrftoken, access_token);
   };
 
   // Get cookies
@@ -39,6 +46,9 @@ export const CookieStorage = (() => {
       if (remaining) {
         console.warn('Cookie removal may not have been successful');
       }
+
+      // Clear widget storage
+      await clearWidgetTokens();
     } catch (error) {
       console.error('Error removing cookies:', error);
     }

@@ -48,6 +48,17 @@ export const displayNotification = async (
   } else {
     if (!notification) return;
     const { title, body } = notification;
+    // Cancel existing notification with the same tag so new one replaces it
+    if (data?.tag) {
+      const displayedNotifications = await notifee.getDisplayedNotifications();
+      const existing = displayedNotifications.find(
+        (n) => n.notification?.data?.tag === data.tag,
+      );
+      if (existing && existing.id) {
+        await notifee.cancelNotification(existing.id);
+      }
+    }
+
     await notifee.displayNotification({
       title,
       body,

@@ -6,6 +6,10 @@ const USER_VERSION_KEY = '@user_version';
 export const userVersionStorage = {
   get: () => AsyncStorage.getItem(USER_VERSION_KEY),
 
+  // Wipe stored version so the next login doesn't compare against the previous
+  // user's value (which would trigger a redundant WebView reload).
+  clear: () => AsyncStorage.removeItem(USER_VERSION_KEY),
+
   checkAndUpdate: async (currentVer: VersionType) => {
     console.log('[UserVersionStorage] Checking version:', currentVer);
     const previousVersion = await AsyncStorage.getItem(USER_VERSION_KEY);
