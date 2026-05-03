@@ -16,7 +16,13 @@ const useFirebaseMessage = () => {
   const handleOnMessage = useCallback(
     (message: FirebaseMessagingTypes.RemoteMessage) => {
       console.log('[Firebase Remote Message] : ', message);
-      displayNotification(message);
+
+      // onMessage only fires while the app is in the foreground. Do not show
+      // a local notification banner in that state; only process cancellation
+      // payloads so stale notifications can be removed from the tray.
+      if (message.data?.type === 'cancel') {
+        displayNotification(message);
+      }
     },
     [],
   );
