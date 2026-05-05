@@ -109,7 +109,7 @@ static NSArray *kWidgetKinds = nil;
     if (self == [WidgetDataModule class]) {
         kWidgetKinds = @[
             @"WhoAmITodayWidget",
-            @"PhotoWidget",
+            @"PhotoWidgetV2",
             // V2 kinds — old "AlbumCoverWidget" / "CheckinWidget" kinds were bumped
             // to force iOS to discard cached snapshots for stale widget instances.
             @"AlbumCoverWidgetV3",
@@ -209,19 +209,19 @@ static NSMutableDictionary<NSString *, NSNumber *> *_waiFollowUpGensByKind = nil
     [self reloadWidgetTimelines];
     [self reloadTimelinesOfKind:@"CheckinWidgetV3"];
     [self reloadTimelinesOfKind:@"AlbumCoverWidgetV3"];
-    [self reloadTimelinesOfKind:@"PhotoWidget"];
+    [self reloadTimelinesOfKind:@"PhotoWidgetV2"];
     __weak typeof(self) weakSelf = self;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
         [weakSelf reloadTimelinesOfKind:@"CheckinWidgetV3"];
         [weakSelf reloadTimelinesOfKind:@"AlbumCoverWidgetV3"];
-        [weakSelf reloadTimelinesOfKind:@"PhotoWidget"];
+        [weakSelf reloadTimelinesOfKind:@"PhotoWidgetV2"];
     });
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(6.0 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
         [weakSelf reloadTimelinesOfKind:@"CheckinWidgetV3"];
         [weakSelf reloadTimelinesOfKind:@"AlbumCoverWidgetV3"];
-        [weakSelf reloadTimelinesOfKind:@"PhotoWidget"];
+        [weakSelf reloadTimelinesOfKind:@"PhotoWidgetV2"];
     });
 }
 
@@ -608,11 +608,16 @@ RCT_EXPORT_METHOD(getWidgetDiagnostics:(RCTPromiseResolveBlock)resolve
     NSString *checkInDecodeSource = [sharedDefaults stringForKey:@"widget_my_check_in_decode_source"] ?: @"(never)";
     NSString *checkInRawPreview = [sharedDefaults stringForKey:@"widget_my_check_in_raw_preview"] ?: @"";
     NSString *checkInJsonFile = WAIReadUTF8AppGroupFile(@"my_check_in.json");
+    NSString *widgetHeartbeat = WAIReadUTF8AppGroupFile(@"widget_heartbeat.txt");
 
     // Auth token presence — if these come back 0/empty but app shows user logged in,
     // it means syncTokensToWidget was never called OR its write didn't stick.
     NSString *storedCsrf = [sharedDefaults stringForKey:@"csrftoken"] ?: @"";
     NSString *storedAccess = [sharedDefaults stringForKey:@"access_token"] ?: @"";
+    NSString *fileCsrf = WAIReadUTF8AppGroupFile(@"widget_auth_csrftoken.txt");
+    NSString *fileAccess = WAIReadUTF8AppGroupFile(@"widget_auth_access_token.txt");
+    NSString *storedApiBaseUrl = [sharedDefaults stringForKey:@"api_base_url"] ?: @"";
+    NSString *fileApiBaseUrl = WAIReadUTF8AppGroupFile(@"widget_api_base_url.txt");
     NSInteger csrfLen = storedCsrf.length;
     NSInteger accessLen = storedAccess.length;
 
@@ -633,8 +638,16 @@ RCT_EXPORT_METHOD(getWidgetDiagnostics:(RCTPromiseResolveBlock)resolve
             fpJsonString = decoded;
         }
     }
+    NSString *fpJsonFileString = WAIReadUTF8AppGroupFile(@"friend_update.json");
     NSData *fpImageData = [sharedDefaults dataForKey:@"widget_friend_update_content_image"];
     NSData *fpAuthorData = [sharedDefaults dataForKey:@"widget_friend_update_profile_image"];
+    NSURL *containerURL = WAIAppGroupRootURL();
+    NSData *fpImageFileData = containerURL
+        ? [NSData dataWithContentsOfURL:[containerURL URLByAppendingPathComponent:@"friend_update_content_image.bin"]]
+        : nil;
+    NSData *fpAuthorFileData = containerURL
+        ? [NSData dataWithContentsOfURL:[containerURL URLByAppendingPathComponent:@"friend_update_profile_image.bin"]]
+        : nil;
 
     // Widget-side render diagnostics (written from PhotoWidgetProvider.currentEntry)
     NSString *photoRenderDiag = [sharedDefaults stringForKey:@"photo_widget_last_render_diag"] ?: @"(never)";
@@ -652,6 +665,7 @@ RCT_EXPORT_METHOD(getWidgetDiagnostics:(RCTPromiseResolveBlock)resolve
         @"myCheckInDecodeOk": @(checkInDecodeOk),
         @"myCheckInDecodeSource": checkInDecodeSource,
         @"myCheckInRawPreview": checkInRawPreview,
+        @"widgetHeartbeat": widgetHeartbeat,
         @"sharedPlaylistJson": spJsonString,
         @"sharedPlaylistAlbumImageLen": @(spAlbumData.length),
         @"sharedPlaylistAvatarImageLen": @(spAvatarData.length),
@@ -662,12 +676,19 @@ RCT_EXPORT_METHOD(getWidgetDiagnostics:(RCTPromiseResolveBlock)resolve
         @"albumLastAvatarImageLen": @(albumAvatarLen),
         @"albumLastDecodeError": albumDecodeErr,
         @"friendUpdateJson": fpJsonString,
+        @"friendUpdateJsonFile": fpJsonFileString,
         @"friendUpdateContentImageLen": @(fpImageData.length),
         @"friendUpdateProfileImageLen": @(fpAuthorData.length),
+        @"friendUpdateContentImageFileLen": @(fpImageFileData.length),
+        @"friendUpdateProfileImageFileLen": @(fpAuthorFileData.length),
         @"photoWidgetLastRenderDiag": photoRenderDiag,
         @"photoWidgetLastRenderAt": photoRenderAt,
         @"csrftokenLen": @(csrfLen),
-        @"accessTokenLen": @(accessLen)
+        @"accessTokenLen": @(accessLen),
+        @"csrftokenFileLen": @(fileCsrf.length),
+        @"accessTokenFileLen": @(fileAccess.length),
+        @"apiBaseUrl": storedApiBaseUrl,
+        @"apiBaseUrlFile": fileApiBaseUrl
     });
 }
 
@@ -717,6 +738,7 @@ RCT_EXPORT_METHOD(syncFriendUpdate:(NSDictionary *)payload
         return;
     }
     [sharedDefaults setObject:jsonData forKey:@"friend_update"];
+    WAIWriteDataFile(@"friend_update.json", jsonData);
     // Clean up legacy keys
     [sharedDefaults removeObjectForKey:@"friend_post"];
 
@@ -725,11 +747,16 @@ RCT_EXPORT_METHOD(syncFriendUpdate:(NSDictionary *)payload
             NSData *profileData = [[NSData alloc] initWithBase64EncodedString:profileImageBase64
                                                                       options:NSDataBase64DecodingIgnoreUnknownCharacters];
             if (profileData) {
-                [sharedDefaults setObject:profileData forKey:@"widget_friend_update_profile_image"];
+                NSData *storedProfile = WAIWidgetImageDataForWidgetStorage(profileData, 160);
+                if (storedProfile) {
+                    [sharedDefaults setObject:storedProfile forKey:@"widget_friend_update_profile_image"];
+                    WAIWriteDataFile(@"friend_update_profile_image.bin", storedProfile);
+                }
             }
         }
     } else {
         [sharedDefaults removeObjectForKey:@"widget_friend_update_profile_image"];
+        WAIRemoveAppGroupFile(@"friend_update_profile_image.bin");
     }
 
     if (contentImageBase64.length > 0) {
@@ -737,11 +764,16 @@ RCT_EXPORT_METHOD(syncFriendUpdate:(NSDictionary *)payload
             NSData *contentData = [[NSData alloc] initWithBase64EncodedString:contentImageBase64
                                                                       options:NSDataBase64DecodingIgnoreUnknownCharacters];
             if (contentData) {
-                [sharedDefaults setObject:contentData forKey:@"widget_friend_update_content_image"];
+                NSData *storedContent = WAIWidgetImageDataForWidgetStorage(contentData, 512);
+                if (storedContent) {
+                    [sharedDefaults setObject:storedContent forKey:@"widget_friend_update_content_image"];
+                    WAIWriteDataFile(@"friend_update_content_image.bin", storedContent);
+                }
             }
         }
     } else {
         [sharedDefaults removeObjectForKey:@"widget_friend_update_content_image"];
+        WAIRemoveAppGroupFile(@"friend_update_content_image.bin");
     }
     // Clean up legacy image keys
     [sharedDefaults removeObjectForKey:@"widget_friend_post_image"];
@@ -764,6 +796,9 @@ RCT_EXPORT_METHOD(clearFriendUpdate:(RCTPromiseResolveBlock)resolve
         [sharedDefaults removeObjectForKey:@"friend_update"];
         [sharedDefaults removeObjectForKey:@"widget_friend_update_content_image"];
         [sharedDefaults removeObjectForKey:@"widget_friend_update_profile_image"];
+        WAIRemoveAppGroupFile(@"friend_update.json");
+        WAIRemoveAppGroupFile(@"friend_update_content_image.bin");
+        WAIRemoveAppGroupFile(@"friend_update_profile_image.bin");
         // Legacy cleanup
         [sharedDefaults removeObjectForKey:@"friend_post"];
         [sharedDefaults removeObjectForKey:@"widget_friend_post_image"];
@@ -815,6 +850,9 @@ RCT_EXPORT_METHOD(clearAllWidgetData:(RCTPromiseResolveBlock)resolve
     [sharedDefaults removeObjectForKey:@"friend_update"];
     [sharedDefaults removeObjectForKey:@"widget_friend_update_content_image"];
     [sharedDefaults removeObjectForKey:@"widget_friend_update_profile_image"];
+    WAIRemoveAppGroupFile(@"friend_update.json");
+    WAIRemoveAppGroupFile(@"friend_update_content_image.bin");
+    WAIRemoveAppGroupFile(@"friend_update_profile_image.bin");
     [sharedDefaults removeObjectForKey:@"friend_post"];
     [sharedDefaults removeObjectForKey:@"widget_friend_post_image"];
     [sharedDefaults removeObjectForKey:@"widget_friend_post_author_image"];

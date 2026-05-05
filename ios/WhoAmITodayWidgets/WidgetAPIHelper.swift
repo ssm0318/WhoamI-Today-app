@@ -76,6 +76,8 @@ struct WidgetAPIHelper {
         // Mirror files so the widget reads the same data when UserDefaults is stale (matches RN `syncMyCheckIn`).
         if key == "my_check_in", let url = appGroupRootURL()?.appendingPathComponent("my_check_in.json") {
             try? data.write(to: url, options: .atomic)
+        } else if key == "friend_update", let url = appGroupRootURL()?.appendingPathComponent("friend_update.json") {
+            try? data.write(to: url, options: .atomic)
         }
     }
 
@@ -85,6 +87,12 @@ struct WidgetAPIHelper {
         defaults?.set(data, forKey: key)
         defaults?.synchronize()
         if key == "widget_album_image", let url = appGroupRootURL()?.appendingPathComponent("widget_album_image.bin") {
+            try? data.write(to: url, options: .atomic)
+        } else if key == "widget_friend_update_profile_image",
+                  let url = appGroupRootURL()?.appendingPathComponent("friend_update_profile_image.bin") {
+            try? data.write(to: url, options: .atomic)
+        } else if key == "widget_friend_update_content_image",
+                  let url = appGroupRootURL()?.appendingPathComponent("friend_update_content_image.bin") {
             try? data.write(to: url, options: .atomic)
         }
     }

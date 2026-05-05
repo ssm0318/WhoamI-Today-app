@@ -2,6 +2,8 @@ import WidgetKit
 import SwiftUI
 import UIKit
 
+private let photoWidgetKind = "PhotoWidgetV2"
+
 struct PhotoWidgetEntry: TimelineEntry {
     let date: Date
     let isAuthenticated: Bool
@@ -31,6 +33,7 @@ struct PhotoWidgetProvider: TimelineProvider {
         let d = UserDefaults(suiteName: "group.com.whoami.today.app")
         d?.set(diagnostic, forKey: "photo_widget_last_render_diag")
         d?.set(ISO8601DateFormatter().string(from: Date()), forKey: "photo_widget_last_render_at")
+        mgr.writeWidgetHeartbeat(source: "PhotoWidget.\(source)")
         return PhotoWidgetEntry(
             date: Date(),
             isAuthenticated: mgr.isAuthenticated,
@@ -162,7 +165,7 @@ struct PhotoWidgetProvider: TimelineProvider {
             WidgetAPIHelper.storeData(data, forKey: "widget_friend_update_content_image")
         }
 
-        WidgetCenter.shared.reloadTimelines(ofKind: "PhotoWidget")
+        WidgetCenter.shared.reloadTimelines(ofKind: photoWidgetKind)
     }
 }
 
@@ -172,13 +175,13 @@ struct PhotoWidgetView: View {
     var body: some View {
         Group {
             if !entry.isAuthenticated {
-                SignInView(widgetKind: "PhotoWidget", descriptionText: "Sign in to see the latest updates from your friends")
+                SignInView(widgetKind: photoWidgetKind, descriptionText: "Sign in to see the latest updates from your friends")
             } else if entry.isDefaultVersion {
                 DefaultVersionView()
             } else if entry.isVersionQ {
                 ZStack(alignment: .topTrailing) {
                     Color.clear
-                    WidgetRefreshButton(kind: "PhotoWidget")
+                    WidgetRefreshButton(kind: photoWidgetKind)
                         .padding(.top, 6)
                         .padding(.trailing, 6)
                 }
@@ -190,13 +193,19 @@ struct PhotoWidgetView: View {
 
     @ViewBuilder
     var photoContent: some View {
-        ZStack {
-            contentView
-            profileAvatar
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-            WidgetRefreshButton(kind: "PhotoWidget")
-                .padding(6)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        GeometryReader { geometry in
+            let side = min(geometry.size.width, geometry.size.height)
+            ZStack {
+                contentView
+                    .frame(width: side, height: side)
+                    .clipped()
+                profileAvatar
+                    .frame(width: side, height: side, alignment: .topTrailing)
+                WidgetRefreshButton(kind: photoWidgetKind)
+                    .padding(6)
+                    .frame(width: side, height: side, alignment: .bottomLeading)
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .widgetURL(URL(string: "whoami://app/friends"))
@@ -341,7 +350,9 @@ struct PhotoWidgetView: View {
 }
 
 struct PhotoWidget: Widget {
-    let kind: String = "PhotoWidget"
+    // Bumped from "PhotoWidget" so real devices/TestFlight discard stale WidgetKit
+    // snapshots/timelines from older Friend Update implementations.
+    let kind: String = photoWidgetKind
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: PhotoWidgetProvider()) { entry in

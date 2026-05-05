@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { getRoutes } from './routes';
 import { useAsyncEffect, useFirebaseMessage } from '@hooks';
@@ -13,13 +13,12 @@ const RootNavigator = () => {
 
   const { routes } = useMemo(() => getRoutes(), []);
 
-  useLayoutEffect(() => {
-    initializeFirebaseMessage();
-
-    // initialize language from device settings
+  // After first paint: touch native modules (localize, FCM, Notifee) so the bridge is ready.
+  useEffect(() => {
     const language = getDeviceLanguage();
-    i18n.changeLanguage(language);
-  }, []);
+    void i18n.changeLanguage(language);
+    void initializeFirebaseMessage();
+  }, [i18n, initializeFirebaseMessage]);
 
   // initialize with async handlers
   useAsyncEffect(async () => {

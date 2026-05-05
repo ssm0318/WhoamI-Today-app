@@ -8,10 +8,11 @@ export const IS_ANDROID = Platform.OS === 'android';
 // NOTE
 // This hostname should be used when developing locally
 // Must be changed to PROD when actually archiving
-export const WEB_VIEW_DEV_HOSTNAME = '192.168.219.175';
+export const WEB_VIEW_DEV_HOSTNAME = IS_ANDROID ? '10.0.2.2' : 'localhost';
 export const IS_ADMIN = false; // Whether it is admin environment
-// Local WebView + LAN frontend: use DEV URLs below. Set false before release/archive builds.
-export const IS_DEV = false;
+// Use the local frontend bundle and local API while developing on emulator.
+export const IS_WEB_VIEW_DEV = false;
+export const IS_API_DEV = false;
 // Set true for TestFlight/dev builds to bypass maintenance page. Set false for App Store release.
 export const MAINTENANCE_BYPASS = true;
 export const MAINTENANCE_BYPASS_COOKIE = 'whoami2026_v18_go'; // testflight 빌드 용 새 시크릿 (nginx admin 채널)
@@ -26,7 +27,7 @@ export const WEB_VIEW_URL_INFO = {
 
 export const WEB_VIEW_URL = (() => {
   if (IS_ADMIN) return WEB_VIEW_URL_INFO.PROD_ADMIN;
-  if (IS_DEV) return WEB_VIEW_URL_INFO.DEV;
+  if (IS_WEB_VIEW_DEV) return WEB_VIEW_URL_INFO.DEV;
   return WEB_VIEW_URL_INFO.PROD;
 })();
 
@@ -41,7 +42,7 @@ export const API_BASE_URL = {
 
 export const API_URL = (() => {
   if (IS_ADMIN) return API_BASE_URL.PROD_ADMIN;
-  if (IS_DEV) return API_BASE_URL.DEV;
+  if (IS_API_DEV) return API_BASE_URL.DEV;
   return API_BASE_URL.PROD;
 })();
 

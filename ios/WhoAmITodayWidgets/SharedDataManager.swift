@@ -181,13 +181,31 @@ class SharedDataManager {
 
     // MARK: - Friend update
 
+    private func friendUpdateJSONDataCandidatesWithSource() -> [(source: String, data: Data)] {
+        var out: [(source: String, data: Data)] = []
+        if let url = appGroupContainerURL?.appendingPathComponent("friend_update.json"),
+           let d = try? Data(contentsOf: url), !d.isEmpty {
+            out.append((source: "file:friend_update.json", data: d))
+        }
+        if let d = data(forKey: "friend_update"), !d.isEmpty {
+            out.append((source: "defaults:friend_update", data: d))
+        }
+        return out
+    }
+
     var friendUpdate: FriendUpdate? {
-        guard let d = data(forKey: "friend_update") else { return nil }
-        return try? JSONDecoder().decode(FriendUpdate.self, from: d)
+        for candidate in friendUpdateJSONDataCandidatesWithSource() {
+            if let v = try? JSONDecoder().decode(FriendUpdate.self, from: candidate.data) { return v }
+        }
+        return nil
     }
 
     var cachedFriendUpdateContentImage: Data? {
-        get { data(forKey: "widget_friend_update_content_image") }
+        get {
+            if let d = data(forKey: "widget_friend_update_content_image") { return d }
+            guard let url = appGroupContainerURL?.appendingPathComponent("friend_update_content_image.bin") else { return nil }
+            return try? Data(contentsOf: url)
+        }
         set {
             sharedDefaults?.set(newValue, forKey: "widget_friend_update_content_image")
             sharedDefaults?.synchronize()
@@ -195,7 +213,11 @@ class SharedDataManager {
     }
 
     var cachedFriendUpdateProfileImage: Data? {
-        get { data(forKey: "widget_friend_update_profile_image") }
+        get {
+            if let d = data(forKey: "widget_friend_update_profile_image") { return d }
+            guard let url = appGroupContainerURL?.appendingPathComponent("friend_update_profile_image.bin") else { return nil }
+            return try? Data(contentsOf: url)
+        }
         set {
             sharedDefaults?.set(newValue, forKey: "widget_friend_update_profile_image")
             sharedDefaults?.synchronize()
@@ -206,7 +228,7 @@ class SharedDataManager {
 
     var rawMyCheckInBytes: Data? { myCheckInJSONData() }
     var rawSharedPlaylistTrackBytes: Data? { data(forKey: "shared_playlist_track") }
-    var rawFriendUpdateBytes: Data? { data(forKey: "friend_update") }
+    var rawFriendUpdateBytes: Data? { friendUpdateJSONDataCandidatesWithSource().first?.data }
 
     var appGroupReachable: Bool {
         sharedDefaults != nil

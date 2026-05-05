@@ -16,6 +16,7 @@ import {
 import { APP_CONSTS } from '@constants';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking } from 'react-native';
+import CookieManager from '@react-native-cookies/cookies';
 import {
   WebViewMessageEvent,
   WebView,
@@ -92,7 +93,52 @@ const useWebView = () => {
           console.warn('[useWebView] setMaintenanceBypassCookie failed:', e);
         }
       }
-      const { access_token, csrftoken } = await getCookie();
+      let { access_token, csrftoken } = await getCookie();
+
+      // Existing WebView sessions can survive while our AsyncStorage mirror is
+      // empty (TestFlight update/reinstall, older builds, or cookie-only login).
+      // In that case the app looks logged in, but widgets still see no App Group
+      // auth unless we recover the cookies from CookieManager and mirror them.
+      if (!access_token || !csrftoken) {
+        const cookieDomains = Array.from(
+          new Set([
+            APP_CONSTS.WEB_VIEW_URL,
+            APP_CONSTS.WEB_VIEW_URL_INFO.PROD,
+            APP_CONSTS.WEB_VIEW_URL_INFO.PROD_ADMIN,
+          ]),
+        );
+
+        for (const domain of cookieDomains) {
+          try {
+            const cookies = await CookieManager.get(domain, true);
+            const recoveredCsrf = cookies?.csrftoken?.value ?? '';
+            const recoveredAccess = cookies?.access_token?.value ?? '';
+            console.log('[WidgetSync] CookieManager token fallback checked', {
+              domain,
+              hasCsrf: !!recoveredCsrf,
+              hasAccess: !!recoveredAccess,
+            });
+            if (recoveredCsrf && recoveredAccess) {
+              csrftoken = recoveredCsrf;
+              access_token = recoveredAccess;
+              await CookieStorage.setCookie({
+                csrftoken,
+                access_token,
+              });
+              console.log(
+                '[WidgetSync] Tokens recovered from CookieManager and mirrored to widget storage',
+              );
+              break;
+            }
+          } catch (e) {
+            console.warn('[WidgetSync] CookieManager token fallback failed:', {
+              domain,
+              error: e,
+            });
+          }
+        }
+      }
+
       setTokens({ access_token, csrftoken });
       // Push tokens to the App Group before WebView mounts so home-screen widgets
       // (Check-in reads csrftoken/access_token) see auth even if runWidgetSync runs later.

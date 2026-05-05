@@ -297,6 +297,10 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         </View>
       );
     }
+    const androidCacheMode = APP_CONSTS.IS_WEB_VIEW_DEV
+      ? 'LOAD_NO_CACHE'
+      : 'LOAD_DEFAULT';
+
     return (
       <WebView
         key={initialUri}
@@ -325,8 +329,8 @@ const AppScreen: React.FC<AppScreenProps> = ({ route }) => {
         scalesPageToFit={false}
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
-        cacheEnabled={true}
-        cacheMode={Platform.OS === 'android' ? 'LOAD_DEFAULT' : undefined}
+        cacheEnabled={!APP_CONSTS.IS_WEB_VIEW_DEV}
+        cacheMode={Platform.OS === 'android' ? androidCacheMode : undefined}
         domStorageEnabled
         allowsInlineMediaPlayback={true}
         mediaPlaybackRequiresUserAction={false}

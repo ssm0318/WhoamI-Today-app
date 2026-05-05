@@ -47,7 +47,7 @@
 /// @return: `true` if the `concurrentRoot` feature is enabled. Otherwise, it returns `false`.
 - (BOOL)concurrentRootEnabled
 {
-  return true;
+  return false;
 }
 
 - (UIView *)createRootViewWithBridge:(RCTBridge *)bridge

@@ -77,12 +77,16 @@ interface WidgetDataModuleInterface {
     myCheckInJsonFile: string;
     myCheckInRawPresent: boolean;
     myCheckInDecodeOk: boolean;
+    widgetHeartbeat: string;
     sharedPlaylistJson: string;
     sharedPlaylistAlbumImageLen: number;
     sharedPlaylistAvatarImageLen: number;
     friendUpdateJson: string;
+    friendUpdateJsonFile: string;
     friendUpdateContentImageLen: number;
     friendUpdateProfileImageLen: number;
+    friendUpdateContentImageFileLen: number;
+    friendUpdateProfileImageFileLen: number;
     albumLastGetTimelineAt: string;
     albumLastSawTrackId: string;
     albumLastSharerUsername: string;
@@ -91,16 +95,22 @@ interface WidgetDataModuleInterface {
     albumLastDecodeError: string;
     csrftokenLen: number;
     accessTokenLen: number;
+    csrftokenFileLen: number;
+    accessTokenFileLen: number;
+    apiBaseUrl: string;
+    apiBaseUrlFile: string;
   }>;
 }
 
-const { WidgetDataModule } = NativeModules;
+/** Lazy read — do not touch NativeModules at module load (imported from App.tsx). */
+const getWidgetNativeModule = (): WidgetDataModuleInterface | undefined =>
+  NativeModules.WidgetDataModule as WidgetDataModuleInterface | undefined;
 
 export const syncTokensToWidget = async (
   csrftoken: string,
   accessToken: string,
 ): Promise<void> => {
-  if (!WidgetDataModule) {
+  if (!getWidgetNativeModule()) {
     console.warn('[WidgetSync] syncTokensToWidget: native module unavailable');
     return;
   }
@@ -111,12 +121,12 @@ export const syncTokensToWidget = async (
   });
 
   try {
-    await (WidgetDataModule as WidgetDataModuleInterface).syncAuthTokens(
+    await (getWidgetNativeModule() as WidgetDataModuleInterface).syncAuthTokens(
       csrftoken,
       accessToken,
     );
     // Also sync API base URL so widget can self-fetch check-in data
-    await (WidgetDataModule as WidgetDataModuleInterface).syncApiBaseUrl(
+    await (getWidgetNativeModule() as WidgetDataModuleInterface).syncApiBaseUrl(
       API_URL,
     );
     console.log('[WidgetSync] syncTokensToWidget native call succeeded');
@@ -126,20 +136,24 @@ export const syncTokensToWidget = async (
 };
 
 export const clearWidgetTokens = async (): Promise<void> => {
-  if (!WidgetDataModule) return;
+  if (!getWidgetNativeModule()) return;
 
   try {
-    await (WidgetDataModule as WidgetDataModuleInterface).clearAuthTokens();
+    await (
+      getWidgetNativeModule() as WidgetDataModuleInterface
+    ).clearAuthTokens();
   } catch (error) {
     console.error('Failed to clear widget tokens:', error);
   }
 };
 
 export const triggerWidgetRefresh = async (): Promise<void> => {
-  if (!WidgetDataModule) return;
+  if (!getWidgetNativeModule()) return;
 
   try {
-    await (WidgetDataModule as WidgetDataModuleInterface).refreshWidgets();
+    await (
+      getWidgetNativeModule() as WidgetDataModuleInterface
+    ).refreshWidgets();
   } catch (error) {
     console.error('Failed to refresh widgets:', error);
   }
@@ -149,14 +163,14 @@ export const syncSpotifyCredentialsToWidget = async (
   clientId: string,
   clientSecret: string,
 ): Promise<void> => {
-  if (!WidgetDataModule) {
+  if (!getWidgetNativeModule()) {
     console.warn('WidgetDataModule not available');
     return;
   }
 
   try {
     await (
-      WidgetDataModule as WidgetDataModuleInterface
+      getWidgetNativeModule() as WidgetDataModuleInterface
     ).syncSpotifyCredentials(clientId, clientSecret);
   } catch (error) {
     console.error('Failed to sync Spotify credentials to widget:', error);
@@ -173,7 +187,7 @@ export const syncMyCheckInToWidget = async (checkIn: {
   trackId: string;
   albumImageUrl: string | null;
 }): Promise<void> => {
-  if (!WidgetDataModule) {
+  if (!getWidgetNativeModule()) {
     console.warn('[WidgetSync] WidgetDataModule native module not available');
     return;
   }
@@ -229,7 +243,7 @@ export const syncMyCheckInToWidget = async (checkIn: {
       }
     }
 
-    await (WidgetDataModule as WidgetDataModuleInterface).syncMyCheckIn(
+    await (getWidgetNativeModule() as WidgetDataModuleInterface).syncMyCheckIn(
       checkInData,
       albumImageBase64,
     );
@@ -246,20 +260,24 @@ export const syncMyCheckInToWidget = async (checkIn: {
 };
 
 export const clearMyCheckInFromWidget = async (): Promise<void> => {
-  if (!WidgetDataModule) return;
+  if (!getWidgetNativeModule()) return;
 
   try {
-    await (WidgetDataModule as WidgetDataModuleInterface).clearMyCheckIn();
+    await (
+      getWidgetNativeModule() as WidgetDataModuleInterface
+    ).clearMyCheckIn();
   } catch (error) {
     console.error('Failed to clear MyCheckIn from widget:', error);
   }
 };
 
 export const clearAllWidgetDataForLogout = async (): Promise<void> => {
-  if (!WidgetDataModule) return;
+  if (!getWidgetNativeModule()) return;
 
   try {
-    await (WidgetDataModule as WidgetDataModuleInterface).clearAllWidgetData();
+    await (
+      getWidgetNativeModule() as WidgetDataModuleInterface
+    ).clearAllWidgetData();
   } catch (error) {
     console.error('Failed to clear all widget data for logout:', error);
   }
@@ -276,7 +294,7 @@ export const syncSharedPlaylistTrackToWidget = async (
   albumImageBase64: string,
   avatarImageBase64: string,
 ): Promise<void> => {
-  if (!WidgetDataModule) {
+  if (!getWidgetNativeModule()) {
     console.warn(
       '[WidgetSync][SharedSync][native-module-unavailable] WidgetDataModule missing',
     );
@@ -311,7 +329,7 @@ export const syncSharedPlaylistTrackToWidget = async (
       sharerUsername: track.sharerUsername,
     });
     await (
-      WidgetDataModule as WidgetDataModuleInterface
+      getWidgetNativeModule() as WidgetDataModuleInterface
     ).syncSharedPlaylistTrack(trackData, albumImageBase64, avatarImageBase64);
     console.log('[WidgetSync][SharedSync][native-call-success]', {
       trackId: track.trackId,
@@ -327,11 +345,11 @@ export const syncSharedPlaylistTrackToWidget = async (
 };
 
 export const clearSharedPlaylistTrackFromWidget = async (): Promise<void> => {
-  if (!WidgetDataModule) return;
+  if (!getWidgetNativeModule()) return;
 
   try {
     await (
-      WidgetDataModule as WidgetDataModuleInterface
+      getWidgetNativeModule() as WidgetDataModuleInterface
     ).clearSharedPlaylistTrack();
   } catch (error) {
     console.error('Failed to clear shared playlist track from widget:', error);
@@ -347,13 +365,13 @@ export const getWidgetDiagnostics = async (): Promise<{
   myCheckInJson: string;
   myCheckInJsonFile?: string;
 } | null> => {
-  if (!WidgetDataModule) {
+  if (!getWidgetNativeModule()) {
     console.warn('[WidgetSync] getWidgetDiagnostics: WidgetDataModule is null');
     return null;
   }
   try {
     const diagResult = await (
-      WidgetDataModule as WidgetDataModuleInterface
+      getWidgetNativeModule() as WidgetDataModuleInterface
     ).getWidgetDiagnostics();
 
     // Android returns a JSON string, iOS returns an object
@@ -393,6 +411,11 @@ export const getWidgetDiagnostics = async (): Promise<{
         // ── Auth tokens (must be >0 or widgets render SignInView) ──
         auth_csrftokenLen: diag.csrftokenLen ?? 'undefined-OLD-BRIDGE',
         auth_accessTokenLen: diag.accessTokenLen ?? 'undefined-OLD-BRIDGE',
+        auth_csrftokenFileLen: diag.csrftokenFileLen ?? 'undefined-OLD-BRIDGE',
+        auth_accessTokenFileLen:
+          diag.accessTokenFileLen ?? 'undefined-OLD-BRIDGE',
+        apiBaseUrl: diag.apiBaseUrl ?? 'undefined-OLD-BRIDGE',
+        apiBaseUrlFile: diag.apiBaseUrlFile ?? 'undefined-OLD-BRIDGE',
         // ── CheckinWidget ──
         checkin_lastGetTimelineAt: diag.lastGetTimelineAt,
         checkin_lastSeenMood: diag.lastSeenMood,
@@ -411,6 +434,7 @@ export const getWidgetDiagnostics = async (): Promise<{
         checkin_myCheckInJsonFilePreview:
           diag.myCheckInJsonFile?.slice(0, 200) ?? '',
         checkin_myCheckInRawPreview: diag.myCheckInRawPreview ?? '',
+        widgetHeartbeat: diag.widgetHeartbeat ?? 'undefined-OLD-BRIDGE',
         // ── AlbumCoverWidget ──
         album_lastGetTimelineAt:
           diag.albumLastGetTimelineAt ?? 'undefined-OLD-BRIDGE',
@@ -431,10 +455,17 @@ export const getWidgetDiagnostics = async (): Promise<{
           diag.sharedPlaylistAvatarImageLen ?? 'undefined',
         friendUpdate_jsonLen: diag.friendUpdateJson?.length ?? 0,
         friendUpdate_jsonPreview: diag.friendUpdateJson?.slice(0, 200) ?? '',
+        friendUpdate_jsonFileLen: diag.friendUpdateJsonFile?.length ?? 0,
+        friendUpdate_jsonFilePreview:
+          diag.friendUpdateJsonFile?.slice(0, 200) ?? '',
         friendUpdate_contentImageLen:
           diag.friendUpdateContentImageLen ?? 'undefined',
         friendUpdate_profileImageLen:
           diag.friendUpdateProfileImageLen ?? 'undefined',
+        friendUpdate_contentImageFileLen:
+          diag.friendUpdateContentImageFileLen ?? 'undefined',
+        friendUpdate_profileImageFileLen:
+          diag.friendUpdateProfileImageFileLen ?? 'undefined',
         photoWidget_lastRenderAt: diag.photoWidgetLastRenderAt ?? '(never)',
         photoWidget_lastRenderDiag: diag.photoWidgetLastRenderDiag ?? '(never)',
       });
@@ -449,15 +480,15 @@ export const getWidgetDiagnostics = async (): Promise<{
 export const syncVersionTypeToWidget = async (
   versionType: string,
 ): Promise<void> => {
-  if (!WidgetDataModule) {
+  if (!getWidgetNativeModule()) {
     console.warn('WidgetDataModule not available');
     return;
   }
 
   try {
-    await (WidgetDataModule as WidgetDataModuleInterface).syncVersionType(
-      versionType,
-    );
+    await (
+      getWidgetNativeModule() as WidgetDataModuleInterface
+    ).syncVersionType(versionType);
     console.log(`[WidgetBridge] Version type synced to widget: ${versionType}`);
   } catch (error) {
     console.error('Failed to sync version type to widget:', error);
@@ -469,7 +500,7 @@ export const syncFriendUpdateToWidget = async (
   profileImageBase64: string,
   contentImageBase64: string,
 ): Promise<void> => {
-  if (!WidgetDataModule) {
+  if (!getWidgetNativeModule()) {
     console.warn('[WidgetSync] WidgetDataModule native module not available');
     return;
   }
@@ -484,11 +515,9 @@ export const syncFriendUpdateToWidget = async (
   });
 
   try {
-    await (WidgetDataModule as WidgetDataModuleInterface).syncFriendUpdate(
-      payload,
-      profileImageBase64,
-      contentImageBase64,
-    );
+    await (
+      getWidgetNativeModule() as WidgetDataModuleInterface
+    ).syncFriendUpdate(payload, profileImageBase64, contentImageBase64);
     console.log(
       `[WidgetSync] syncFriendUpdate native call succeeded (kind='${payload.kind}', user='${payload.friend.username}')`,
     );
@@ -498,10 +527,12 @@ export const syncFriendUpdateToWidget = async (
 };
 
 export const clearFriendUpdateFromWidget = async (): Promise<void> => {
-  if (!WidgetDataModule) return;
+  if (!getWidgetNativeModule()) return;
 
   try {
-    await (WidgetDataModule as WidgetDataModuleInterface).clearFriendUpdate();
+    await (
+      getWidgetNativeModule() as WidgetDataModuleInterface
+    ).clearFriendUpdate();
   } catch (error) {
     console.error('Failed to clear friend update from widget:', error);
   }

@@ -1,3 +1,6 @@
+# Diagnostic: disable New Architecture / Bridgeless to isolate RCTEventEmitter race.
+ENV['RCT_NEW_ARCH_ENABLED'] = '0'
+
 require_relative '../node_modules/react-native/scripts/react_native_pods'
 
 # boost podspec의 체크섬 검증 제거 (JFrog 저장소 체크섬 불일치 문제 해결)
