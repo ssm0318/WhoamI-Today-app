@@ -64,6 +64,26 @@ public class AlbumCoverWidgetProvider extends AppWidgetProvider {
                 }
             }
         }
+
+        // Always re-fetch on each system update tick so a new random track from
+        // the shared playlist surfaces without the user opening the app, and
+        // the widget doesn't stay stuck on whichever track was first cached.
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        String accessToken = prefs.getString("access_token", "");
+        String versionType = prefs.getString("user_version_type", VERSION_TYPE_DEFAULT);
+        if (accessToken != null && !accessToken.isEmpty()
+                && !VERSION_TYPE_DEFAULT.equals(versionType)
+                && !VERSION_TYPE_Q.equals(versionType)) {
+            for (int appWidgetId : appWidgetIds) {
+                fetchSharedPlaylistFromApi(context, appWidgetManager, appWidgetId, prefs);
+            }
+        }
+    }
+
+    @Override
+    public void onEnabled(Context context) {
+        super.onEnabled(context);
+        WidgetRefreshScheduler.scheduleNext(context);
     }
 
     @Override
