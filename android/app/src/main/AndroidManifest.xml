@@ -124,6 +124,15 @@
             android:resource="@xml/widget_info_album_2x2" />
     </receiver>
 
+    <!-- Self-rearming alarm tick that re-fetches widget data every 10 minutes -->
+    <receiver
+        android:name=".widget.WidgetRefreshTickReceiver"
+        android:exported="false">
+        <intent-filter>
+            <action android:name="com.whoami.today.app.WIDGET_REFRESH_TICK" />
+        </intent-filter>
+    </receiver>
+
     <!-- Check-in Widget (4x1) - Quick check-in access -->
     <receiver
         android:name=".widget.CheckinWidgetProvider"

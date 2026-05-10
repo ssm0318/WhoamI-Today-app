@@ -20,6 +20,7 @@ import android.os.Build;
 import org.jetbrains.annotations.Nullable;
 
 import com.whoami.today.app.bridge.WidgetDataPackage;
+import com.whoami.today.app.widget.WidgetRefreshScheduler;
 
 public class MainApplication extends Application implements ReactApplication {
 
@@ -81,5 +82,10 @@ public class MainApplication extends Application implements ReactApplication {
       // If you opted-in for the New Architecture, we load the native entry point for this app.
       DefaultNewArchitectureEntryPoint.load();
     }
+
+    // Re-arm the widget refresh tick on every cold start: the alarm gets cancelled
+    // when the app is force-stopped or the package is reinstalled, so onEnabled
+    // alone isn't enough to keep widgets refreshing for long-running installs.
+    WidgetRefreshScheduler.scheduleNext(this);
   }
 }

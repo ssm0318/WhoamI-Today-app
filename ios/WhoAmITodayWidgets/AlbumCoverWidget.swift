@@ -101,12 +101,14 @@ struct AlbumCoverWidgetProvider: TimelineProvider {
             sharerUsername: track?.sharerUsername
         )
 
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: Date())!
+        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 10, to: Date())!
         let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
         completion(timeline)
 
-        // Fire-and-forget: self-fetch when no cached data
-        if isAuth && !isDefault && !isVersionQ && albumImageData == nil && avatarImageData == nil {
+        // Fire-and-forget self-fetch on every tick so a new random track from
+        // the shared playlist surfaces without the user opening the app, and
+        // the widget doesn't get stuck on whichever track was first cached.
+        if isAuth && !isDefault && !isVersionQ {
             Task.detached {
                 await Self.fetchSharedPlaylistFromApi()
             }
